@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Recruitment Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=3">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text" data-i18n="app_name">RePro</div>
+          <div class="sidebar-logo-tagline" data-i18n="app_tagline">Your Job Abroad</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          <span data-i18n="dashboard">דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span data-i18n="jobs">משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span data-i18n="candidates">מועמדים</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Reminders Container (filled dynamically if there are pending follow-ups) -->
+      <div id="reminders-container"></div>
+
+      <!-- Hero Banner -->
+      <div class="hero-banner">
+        <h1 class="hero-title" data-i18n="welcome">ברוכה הבאה</h1>
+        <p class="hero-subtitle" data-i18n="dashboard_subtitle">סקירה כללית של הפעילות שלך</p>
+        <div class="hero-actions">
+          <a href="candidates.html" class="btn hero-btn-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="add_candidate">מועמד חדש</span>
+          </a>
+          <a href="jobs.html" class="btn hero-btn-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="add_job">משרה חדשה</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid" id="stats-grid">
+        <a href="jobs.html?status=open" class="stat-card stat-card-link">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="open_jobs">משרות פתוחות</div>
+              <div class="stat-card-value" id="stat-open-jobs">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2"/>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+
+        <a href="jobs.html?new=1" class="stat-card stat-card-link green">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="new_jobs_this_week">משרות חדשות השבוע</div>
+              <div class="stat-card-value" id="stat-new-jobs">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M2 12h20"/>
+                <circle cx="12" cy="12" r="10"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+
+        <a href="candidates.html?stage=stage1" class="stat-card stat-card-link orange">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="in_stage1">בשלב ראשון</div>
+              <div class="stat-card-value" id="stat-stage1">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+
+        <a href="candidates.html?stage=stage2" class="stat-card stat-card-link purple">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="in_stage2">בשלב שני</div>
+              <div class="stat-card-value" id="stat-stage2">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+
+        <a href="candidates.html?stage=accepted" class="stat-card stat-card-link green">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="accepted_month">התקבלו החודש</div>
+              <div class="stat-card-value" id="stat-accepted-month">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 11l3 3L22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+
+        <a href="candidates.html" class="stat-card stat-card-link pink">
+          <div class="stat-card-header">
+            <div>
+              <div class="stat-card-label" data-i18n="total_candidates">סה״כ מועמדים</div>
+              <div class="stat-card-value" id="stat-total">-</div>
+            </div>
+            <div class="stat-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <!-- Two-column layout -->
+      <div class="grid-2">
+        <!-- Candidates by Category Chart -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <div class="panel-title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"/>
+                  <line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+              </div>
+              <span data-i18n="by_category">מועמדים לפי קטגוריה</span>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="chart-bar-container" id="category-chart">
+              <div class="empty-state">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Jobs This Week -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <div class="panel-title-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2"/>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                </svg>
+              </div>
+              <span data-i18n="new_jobs_this_week">משרות חדשות השבוע</span>
+            </div>
+            <span class="kanban-count" id="new-jobs-count">0</span>
+          </div>
+          <div class="panel-body">
+            <div id="new-jobs-list">
+              <div class="empty-state">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity (full width) -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-title-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <span data-i18n="recent_activity">פעילות אחרונה</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="activity-list" id="activity-list">
+            <div class="empty-state">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/i18n.js?v=2"></script>
+  <script src="js/api.js?v=2"></script>
+  <script src="js/dashboard.js?v=2"></script>
+</body>
+</html>

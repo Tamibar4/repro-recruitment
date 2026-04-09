@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up - RePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+    .auth-container {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+      width: 100%;
+      max-width: 460px;
+      overflow: hidden;
+    }
+    .auth-header {
+      padding: 32px 36px 12px;
+      text-align: center;
+    }
+    .auth-logo { width: 72px; height: 84px; object-fit: contain; margin: 0 auto 16px; display: block; filter: drop-shadow(0 4px 12px rgba(0,115,234,0.2)); }
+    .auth-title { font-size: 26px; font-weight: 800; color: #0d47a1; margin-bottom: 4px; letter-spacing: -0.5px; }
+    .auth-tagline { font-size: 14px; color: #676879; }
+    .auth-subtitle { font-size: 15px; font-weight: 600; color: #1a1d2e; margin-top: 10px; }
+    .auth-body { padding: 16px 36px 32px; }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { display: block; font-size: 13px; font-weight: 600; color: #1a1d2e; margin-bottom: 6px; }
+    .auth-input {
+      width: 100%; padding: 11px 14px; border: 1.5px solid #e6e9ef; border-radius: 10px;
+      background: #f5f6f8; font-size: 14px; font-weight: 500; transition: all 0.15s; font-family: inherit;
+    }
+    .auth-input:focus { outline: none; border-color: #0073ea; background: white; box-shadow: 0 0 0 3px rgba(0,115,234,0.12); }
+    .auth-error {
+      background: #fee; border: 1px solid #fca5a5; color: #e2445c; padding: 10px 14px;
+      border-radius: 10px; font-size: 13px; text-align: center; font-weight: 500;
+      display: none; margin-bottom: 14px;
+    }
+    .auth-error.visible { display: block; animation: shake 0.4s ease; }
+    .auth-success {
+      display: none;
+    }
+    .auth-success.visible {
+      display: block;
+      background: linear-gradient(135deg, #e0f9ef 0%, #d0f5e6 50%, #b8f0d8 100%);
+      border: 2px solid #66e5b0;
+      border-radius: 16px;
+      padding: 32px 24px;
+      text-align: center;
+      animation: successFadeIn 0.5s ease;
+    }
+    .success-checkmark {
+      width: 72px; height: 72px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, #34d399, #10b981);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+      animation: successPop 0.6s ease 0.2s both;
+    }
+    .success-checkmark svg { width: 36px; height: 36px; }
+    .success-title {
+      font-size: 22px; font-weight: 800; color: #065f46;
+      margin-bottom: 8px; letter-spacing: -0.3px;
+    }
+    .success-subtitle {
+      font-size: 14px; font-weight: 500; color: #047857;
+      line-height: 1.7; margin-bottom: 20px;
+    }
+    .success-login-btn {
+      display: inline-block; padding: 11px 28px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      text-decoration: none; font-family: inherit;
+      box-shadow: 0 6px 16px rgba(5, 150, 105, 0.3);
+      transition: all 0.15s;
+    }
+    .success-login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(5, 150, 105, 0.4);
+    }
+    @keyframes successFadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes successPop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+    .auth-btn {
+      width: 100%; padding: 13px; background: linear-gradient(135deg,#0073ea,#5559df); color: white;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all 0.15s; box-shadow: 0 8px 20px rgba(0,115,234,0.35); margin-top: 4px;
+    }
+    .auth-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 25px rgba(0,115,234,0.45); }
+    .auth-btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+    .auth-link { text-align: center; margin-top: 18px; padding-top: 18px; border-top: 1px solid #e6e9ef; font-size: 13px; color: #676879; }
+    .auth-link a { color: #0073ea; font-weight: 600; text-decoration: none; }
+    .auth-link a:hover { text-decoration: underline; }
+    .auth-note { font-size: 12px; color: #9699a6; text-align: center; margin-top: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-header">
+      <img src="assets/logo.png" alt="RePro" class="auth-logo">
+      <div class="auth-title">RePro</div>
+      <div class="auth-tagline">Your Job Abroad</div>
+      <div class="auth-subtitle" data-i18n="signup_title">הרשמה למערכת</div>
+    </div>
+    <div class="auth-body">
+      <form id="signup-form" onsubmit="return false">
+        <div class="auth-error" id="signup-error"></div>
+        <div class="auth-success" id="signup-success">
+          <div class="success-checkmark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="success-title">ההרשמה בוצעה בהצלחה!</div>
+          <div class="success-subtitle">המנהל יאשר את הבקשה בהקדם. תקבלו מייל כשהחשבון יאושר.</div>
+          <a href="login.html" class="success-login-btn">חזרה להתחברות</a>
+        </div>
+        <div id="signup-fields">
+          <div class="auth-field">
+            <label data-i18n="name">שם מלא</label>
+            <input type="text" id="signup-name" class="auth-input" required>
+          </div>
+          <div class="auth-field">
+            <label data-i18n="email">אימייל</label>
+            <input type="email" id="signup-email" class="auth-input" required dir="ltr">
+          </div>
+          <div class="auth-field">
+            <label data-i18n="username">שם משתמש</label>
+            <input type="text" id="signup-username" class="auth-input" required dir="ltr" pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscore only">
+          </div>
+          <div class="auth-field">
+            <label data-i18n="password">סיסמה (לפחות 8 תווים)</label>
+            <input type="password" id="signup-password" class="auth-input" required minlength="8" dir="ltr">
+          </div>
+          <button type="submit" class="auth-btn" id="signup-submit" data-i18n="signup_button">הרשמה</button>
+        </div>
+      </form>
+      <div class="auth-note" data-i18n="signup_note">ההרשמה דורשת אישור מנהל. לאחר ההרשמה תקבלו מייל כשהחשבון יאושר.</div>
+      <div class="auth-link">
+        <span data-i18n="already_have_account">כבר יש לך חשבון?</span>
+        <a href="login.html" data-i18n="login_button">התחברות</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/i18n.js?v=2"></script>
+  <script>
+    const form = document.getElementById('signup-form');
+    const errorEl = document.getElementById('signup-error');
+    const successEl = document.getElementById('signup-success');
+    const fieldsEl = document.getElementById('signup-fields');
+    const submitBtn = document.getElementById('signup-submit');
+
+    async function doSignup() {
+      const name = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const username = document.getElementById('signup-username').value.trim();
+      const password = document.getElementById('signup-password').value;
+
+      if (!name || !email || !username || !password) return;
+      if (password.length < 8) { showError('סיסמה חייבת להיות לפחות 8 תווים'); return; }
+
+      submitBtn.disabled = true;
+      errorEl.classList.remove('visible');
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ display_name: name, email, username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+        fieldsEl.style.display = 'none';
+        successEl.classList.add('visible');
+      } catch (err) {
+        showError(err.message);
+        submitBtn.disabled = false;
+      }
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.add('visible');
+    }
+
+    form.addEventListener('submit', doSignup);
+    document.getElementById('signup-name').focus();
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" fill="none">
+  <defs>
+    <!-- Head gradient - teal/blue sphere -->
+    <radialGradient id="headGrad" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#4dd0e1"/>
+      <stop offset="60%" stop-color="#1e88e5"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
+    </radialGradient>
+
+    <!-- Orange/amber gradient for top band -->
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6d00"/>
+      <stop offset="50%" stop-color="#ff9100"/>
+      <stop offset="100%" stop-color="#ffab40"/>
+    </linearGradient>
+
+    <!-- Blue gradient for middle band -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d47a1"/>
+      <stop offset="50%" stop-color="#1e88e5"/>
+      <stop offset="100%" stop-color="#42a5f5"/>
+    </linearGradient>
+
+    <!-- Purple/magenta gradient for bottom band -->
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6a1b9a"/>
+      <stop offset="50%" stop-color="#8e24aa"/>
+      <stop offset="100%" stop-color="#ba68c8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- HEAD - teal/blue circle -->
+  <circle cx="100" cy="36" r="26" fill="url(#headGrad)"/>
+
+  <!-- ORANGE BAND (top) - swooping right like an outstretched arm -->
+  <rect x="30" y="76" width="150" height="30" rx="15" ry="15"
+        fill="url(#orangeGrad)" transform="rotate(-8, 105, 91)"/>
+
+  <!-- BLUE BAND (middle) - slight opposite curve -->
+  <rect x="24" y="112" width="148" height="30" rx="15" ry="15"
+        fill="url(#blueGrad)" transform="rotate(5, 98, 127)"/>
+
+  <!-- PURPLE BAND (bottom) - swooping down like a leg/base -->
+  <rect x="36" y="148" width="136" height="30" rx="15" ry="15"
+        fill="url(#purpleGrad)" transform="rotate(-12, 104, 163)"/>
+</svg>

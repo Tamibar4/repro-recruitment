@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jobs - Recruitment Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=4">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text" data-i18n="app_name">RePro</div>
+          <div class="sidebar-logo-tagline" data-i18n="app_tagline">Your Job Abroad</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"/>
+            <rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/>
+            <rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          <span data-i18n="dashboard">דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span data-i18n="jobs">משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span data-i18n="candidates">מועמדים</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" data-i18n="jobs_title">משרות</h1>
+          <div class="page-subtitle" data-i18n="jobs_subtitle">ניהול כל המשרות שלך</div>
+        </div>
+        <button class="btn btn-primary" id="btn-new-job">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="new_job">משרה חדשה</span>
+        </button>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="search-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" id="search-input" data-i18n-placeholder="search_jobs" placeholder="חיפוש משרה...">
+        </div>
+        <!-- Category chips + Status on same row -->
+        <div class="filter-row">
+          <div class="multi-filter" id="category-filter">
+            <!-- Populated dynamically from server -->
+          </div>
+          <select class="filter-select" id="filter-status">
+            <option value="all" data-i18n="all_statuses">כל הסטטוסים</option>
+            <option value="open" data-i18n="status_open">פתוחה</option>
+            <option value="paused" data-i18n="status_paused">בהמתנה</option>
+            <option value="closed" data-i18n="status_closed">סגורה</option>
+          </select>
+        </div>
+        <!-- Location/Region filter -->
+        <div class="filter-row">
+          <span class="filter-row-label">📍 מדינה:</span>
+          <div class="multi-filter" id="location-filter">
+            <button class="filter-chip filter-chip-sm active" data-value="all">הכל</button>
+            <button class="filter-chip filter-chip-sm" data-value="usa">ארה"ב</button>
+            <button class="filter-chip filter-chip-sm" data-value="canada">קנדה</button>
+            <button class="filter-chip filter-chip-sm" data-value="australia">אוסטרליה</button>
+            <button class="filter-chip filter-chip-sm" data-value="philippines">פיליפינים</button>
+            <button class="filter-chip filter-chip-sm" data-value="caribbean">קריביים/מקסיקו</button>
+            <button class="filter-chip filter-chip-sm" data-value="cyprus">קפריסין</button>
+            <button class="filter-chip filter-chip-sm" data-value="thailand">תאילנד</button>
+            <button class="filter-chip filter-chip-sm" data-value="china">סין</button>
+            <button class="filter-chip filter-chip-sm" data-value="taiwan">טיוואן</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jobs Grid -->
+      <div id="jobs-container">
+        <div class="empty-state">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Job Edit Modal -->
+  <div class="modal-overlay" id="job-modal" role="dialog" aria-modal="true" aria-labelledby="job-modal-title" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="job-modal-title" data-i18n="new_job">משרה חדשה</h2>
+        <button class="modal-close" onclick="closeModal('job-modal')" aria-label="סגור" data-i18n-aria-label="close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="job-form" onsubmit="return false">
+          <input type="hidden" id="job-id">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label data-i18n="title">כותרת <span class="required">*</span></label>
+              <input type="text" id="job-title" required>
+            </div>
+            <div class="form-field">
+              <label data-i18n="category">קטגוריה <span class="required">*</span></label>
+              <select id="job-category" required>
+                <option value="">בחרי קטגוריה</option>
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="form-field">
+              <label data-i18n="status">סטטוס</label>
+              <select id="job-status">
+                <option value="open" data-i18n="status_open">פתוחה</option>
+                <option value="paused" data-i18n="status_paused">בהמתנה</option>
+                <option value="closed" data-i18n="status_closed">סגורה</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label data-i18n="company">חברה</label>
+              <input type="text" id="job-company">
+            </div>
+            <div class="form-field">
+              <label data-i18n="salary">טווח שכר</label>
+              <input type="text" id="job-salary" placeholder="$60k - $80k / year">
+            </div>
+            <div class="form-field">
+              <label>עמלת גיוס ($)</label>
+              <input type="number" id="job-commission" min="0" step="1" dir="ltr" placeholder="סכום לכל מועמד">
+            </div>
+
+            <!-- Urgent toggle -->
+            <div class="form-field full">
+              <label class="urgent-toggle">
+                <input type="checkbox" id="job-urgent">
+                <span class="urgent-toggle-label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  </svg>
+                  <span data-i18n="urgent_job">משרה דחופה - תופיע למעלה ברשימה</span>
+                </span>
+              </label>
+            </div>
+
+            <!-- Locations editor -->
+            <div class="form-field full">
+              <div class="locations-header">
+                <label data-i18n="locations_list">מיקומים</label>
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-add-location">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                  <span data-i18n="add_location">הוסף מיקום</span>
+                </button>
+              </div>
+              <div id="locations-editor" class="locations-editor"></div>
+            </div>
+
+            <div class="form-field full">
+              <label data-i18n="description">תיאור</label>
+              <textarea id="job-description" rows="3"></textarea>
+            </div>
+            <div class="form-field full">
+              <label data-i18n="notes">הערות</label>
+              <textarea id="job-notes" rows="2"></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('job-modal')" data-i18n="cancel">ביטול</button>
+        <button class="btn btn-primary" id="btn-save-job" data-i18n="save">שמירה</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job Details Modal -->
+  <div class="modal-overlay" id="job-details-modal" role="dialog" aria-modal="true" aria-labelledby="job-details-title" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="job-details-title" data-i18n="job_details">פרטים על המשרה</h2>
+        <button class="modal-close" onclick="closeModal('job-details-modal')" aria-label="סגור" data-i18n-aria-label="close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="job-details-body">
+        <!-- Filled dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="btn-details-delete" style="margin-right: auto;" data-i18n="delete">מחיקה</button>
+        <button class="btn btn-secondary" id="btn-details-view-candidates" data-i18n="view_candidates">צפי במועמדים</button>
+        <button class="btn btn-primary" id="btn-details-edit" data-i18n="edit">עריכה</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hover tooltip for job locations preview -->
+  <div id="job-tooltip" class="job-tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <script src="js/i18n.js?v=2"></script>
+  <script src="js/api.js?v=2"></script>
+  <script src="js/jobs.js?v=2"></script>
+</body>
+</html>

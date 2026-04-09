@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - RePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=3">
+  <style>
+    .admin-section { margin-bottom: 32px; }
+    .admin-section-title {
+      font-size: 18px; font-weight: 700; color: var(--color-text);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    }
+    .admin-section-title .badge {
+      background: var(--color-red); color: white; padding: 3px 10px;
+      border-radius: 20px; font-size: 12px; font-weight: 700;
+    }
+    .user-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      background: var(--color-white); border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border); overflow: hidden;
+    }
+    .user-table th {
+      text-align: right; padding: 14px 18px; font-size: 12px; font-weight: 700;
+      color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px;
+      background: var(--color-bg); border-bottom: 2px solid var(--color-border);
+    }
+    [dir="ltr"] .user-table th { text-align: left; }
+    .user-table td {
+      padding: 14px 18px; border-bottom: 1px solid var(--color-border);
+      font-size: 14px; vertical-align: middle;
+    }
+    .user-table tr:last-child td { border-bottom: none; }
+    .user-table tr:hover td { background: var(--color-primary-lighter); }
+    .user-status {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px; font-size: 11px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .user-status::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+    }
+    .user-status.active { background: var(--color-green-light); color: #007a3d; }
+    .user-status.pending { background: var(--color-orange-light); color: #b87414; animation: pulseSoft 2s ease-in-out infinite; }
+    .user-status.disabled { background: #f2f2f2; color: #676879; }
+    .user-actions { display: flex; gap: 6px; }
+    .user-actions .btn { padding: 6px 14px; font-size: 12px; }
+    .btn-approve {
+      background: linear-gradient(135deg, #00c875, #00a65a); color: white;
+      border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 3px 10px rgba(0,200,117,0.3); transition: all 0.15s;
+    }
+    .btn-approve:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(0,200,117,0.4); }
+    .btn-reject {
+      background: var(--color-white); color: var(--color-red); border: 1px solid var(--color-red);
+      border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-reject:hover { background: var(--color-red-light); }
+    .btn-disable {
+      background: var(--color-white); color: var(--color-text-secondary);
+      border: 1px solid var(--color-border); border-radius: 8px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-disable:hover { background: var(--color-bg); }
+    .pending-alert {
+      background: linear-gradient(135deg, #fff8e6, #fff0d0);
+      border: 1.5px solid #ffd789; border-radius: var(--radius-lg);
+      padding: 20px 24px; margin-bottom: 24px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .pending-alert-icon {
+      width: 48px; height: 48px; border-radius: var(--radius);
+      background: var(--gradient-orange); color: white;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; box-shadow: 0 4px 12px rgba(253,171,61,0.35);
+    }
+    .pending-alert-icon svg { width: 24px; height: 24px; }
+    .pending-alert-text { flex: 1; }
+    .pending-alert-title { font-size: 15px; font-weight: 700; color: var(--color-text); margin-bottom: 2px; }
+    .pending-alert-desc { font-size: 13px; color: var(--color-text-secondary); }
+    .empty-admin {
+      text-align: center; padding: 40px 20px; color: var(--color-text-secondary);
+      font-size: 14px;
+    }
+    .empty-admin-icon { font-size: 40px; margin-bottom: 12px; }
+    .user-avatar-sm {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--gradient-primary); color: white;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; margin-left: 8px;
+    }
+    [dir="ltr"] .user-avatar-sm { margin-left: 0; margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text" data-i18n="app_name">RePro</div>
+          <div class="sidebar-logo-tagline" data-i18n="app_tagline">Your Job Abroad</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/>
+            <rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+          </svg>
+          <span data-i18n="dashboard">דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <span data-i18n="jobs">משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span data-i18n="candidates">מועמדים</span>
+        </a>
+        <a href="admin.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">ניהול משתמשים</h1>
+          <div class="page-subtitle">אישור הרשמות, ניהול הרשאות</div>
+        </div>
+      </div>
+
+      <!-- Pending alert (shown if there are pending users) -->
+      <div id="pending-alert" class="pending-alert" style="display: none;">
+        <div class="pending-alert-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+        </div>
+        <div class="pending-alert-text">
+          <div class="pending-alert-title" id="pending-alert-title">יש הרשמות ממתינות לאישור</div>
+          <div class="pending-alert-desc" id="pending-alert-desc">לחצי על "אישור" כדי להפעיל את החשבון</div>
+        </div>
+      </div>
+
+      <!-- Pending Users Section -->
+      <div class="admin-section" id="pending-section">
+        <div class="admin-section-title">
+          ממתינים לאישור
+          <span class="badge" id="pending-count" style="display: none;">0</span>
+        </div>
+        <div id="pending-table-container"></div>
+      </div>
+
+      <!-- Active Users Section -->
+      <div class="admin-section">
+        <div class="admin-section-title">משתמשים פעילים</div>
+        <div id="active-table-container"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    let allUsers = [];
+
+    async function loadUsers() {
+      try {
+        // Check if current user is admin
+        const me = API.getCurrentUser();
+        if (!me || me.role !== 'admin') {
+          document.querySelector('.main').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🔒</div>
+              <div class="empty-state-title">גישה למנהלים בלבד</div>
+              <div class="empty-state-desc">רק מנהלים יכולים לגשת לעמוד זה</div>
+            </div>
+          `;
+          return;
+        }
+
+        const token = API.getToken();
+
+        // Fetch all users list
+        const res = await fetch('/api/auth/users', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        allUsers = await res.json();
+
+        // Fetch pending users (has more detail)
+        const pendingRes = await fetch('/api/auth/pending', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const pendingUsers = await pendingRes.json();
+
+        renderUsers(pendingUsers);
+      } catch (err) {
+        console.error('Failed to load users:', err);
+      }
+    }
+
+    function renderUsers(pendingUsers) {
+      const pending = pendingUsers || [];
+      const active = allUsers.filter(u => u.status !== 'pending');
+
+      // Pending alert
+      const alertEl = document.getElementById('pending-alert');
+      const countEl = document.getElementById('pending-count');
+      if (pending.length > 0) {
+        alertEl.style.display = 'flex';
+        countEl.style.display = '';
+        countEl.textContent = pending.length;
+        document.getElementById('pending-alert-title').textContent =
+          `${pending.length} הרשמות ממתינות לאישור`;
+      } else {
+        alertEl.style.display = 'none';
+        countEl.style.display = 'none';
+      }
+
+      // Pending table
+      const pendingContainer = document.getElementById('pending-table-container');
+      if (pending.length === 0) {
+        pendingContainer.innerHTML = `
+          <div class="empty-admin">
+            <div class="empty-admin-icon">✅</div>
+            אין הרשמות ממתינות
+          </div>
+        `;
+      } else {
+        pendingContainer.innerHTML = `
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th>שם משתמש</th>
+                <th>אימייל</th>
+                <th>תאריך הרשמה</th>
+                <th>פעולות</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pending.map(u => `
+                <tr>
+                  <td>
+                    <span class="user-avatar-sm">${(u.display_name || u.username || '?').charAt(0).toUpperCase()}</span>
+                    <strong>${escapeHtml(u.display_name || '')}</strong>
+                  </td>
+                  <td dir="ltr">${escapeHtml(u.username)}</td>
+                  <td dir="ltr">${escapeHtml(u.email || '')}</td>
+                  <td>${u.created_at ? formatDate(u.created_at) : '—'}</td>
+                  <td>
+                    <div class="user-actions">
+                      <button class="btn btn-approve btn-sm" onclick="approveUser('${escapeHtml(u.username)}')">
+                        ✓ אישור
+                      </button>
+                      <button class="btn btn-reject btn-sm" onclick="rejectUser('${escapeHtml(u.username)}')">
+                        ✕ דחייה
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      // Active table
+      const activeContainer = document.getElementById('active-table-container');
+      if (active.length === 0) {
+        activeContainer.innerHTML = `<div class="empty-admin"><div class="empty-admin-icon">👥</div>אין משתמשים</div>`;
+      } else {
+        activeContainer.innerHTML = `
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th>שם משתמש</th>
+                <th>תפקיד</th>
+                <th>סטטוס</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${active.map(u => `
+                <tr>
+                  <td>
+                    <span class="user-avatar-sm">${(u.display_name || u.username || '?').charAt(0).toUpperCase()}</span>
+                    <strong>${escapeHtml(u.display_name || '')}</strong>
+                  </td>
+                  <td dir="ltr">${escapeHtml(u.username)}</td>
+                  <td>${u.role === 'admin' ? '👑 מנהל' : 'משתמש'}</td>
+                  <td><span class="user-status ${u.status || 'active'}">${u.status === 'disabled' ? 'מושבת' : 'פעיל'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+
+    async function approveUser(username) {
+      try {
+        const token = API.getToken();
+        const res = await fetch('/api/auth/approve/' + username, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Failed');
+        showToast('המשתמש אושר בהצלחה!');
+        loadUsers();
+      } catch (err) {
+        showToast('שגיאה באישור', 'error');
+      }
+    }
+
+    async function rejectUser(username) {
+      if (!confirm('האם את בטוחה שברצונך לדחות את ההרשמה?')) return;
+      try {
+        const token = API.getToken();
+        const res = await fetch('/api/auth/reject/' + username, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Failed');
+        showToast('ההרשמה נדחתה');
+        loadUsers();
+      } catch (err) {
+        showToast('שגיאה בדחייה', 'error');
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatDate(d) {
+      if (!d) return '';
+      return new Date(d).toLocaleDateString('he-IL', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    loadUsers();
+  </script>
+</body>
+</html>
