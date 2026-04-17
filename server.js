@@ -32,7 +32,8 @@ const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
 // Allow disabling host binding restriction. Default to localhost-only for safety.
 // In production (Render etc.) listen on 0.0.0.0; locally on 127.0.0.1
-const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
+// In production (Railway/Render) listen on 0.0.0.0; locally on 127.0.0.1
+const HOST = process.env.HOST || (process.env.RAILWAY_ENVIRONMENT || process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
 
 // Allowed origins for CORS - default to local origins only.
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`)
@@ -906,6 +907,122 @@ app.get('/api/auth/users', (req, res) => {
   })));
 });
 
+// ============================================================
+// PROFILE API (authenticated user)
+// ============================================================
+
+// GET /api/auth/profile - get full profile
+app.get('/api/auth/profile', (req, res) => {
+  const auth = req.headers['authorization'];
+  const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = sessions.get(token);
+  if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+  const user = data.users.find(u => u.username === session.username);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  res.json({
+    username: user.username,
+    display_name: user.display_name,
+    email: user.email || '',
+    role: user.role,
+    avatar_url: user.avatar_url || null,
+    notifications: user.notifications || { email_follow_up: true, email_duplicate: true, email_payment: true },
+    created_at: user.created_at
+  });
+});
+
+// PUT /api/auth/profile - update profile
+app.put('/api/auth/profile', (req, res) => {
+  const auth = req.headers['authorization'];
+  const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = sessions.get(token);
+  if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+  const user = data.users.find(u => u.username === session.username);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  try {
+    const { display_name, email, avatar_url, notifications } = req.body;
+
+    if (display_name !== undefined) {
+      const name = validateString(display_name, { required: true, maxLen: 64, minLen: 2 });
+      user.display_name = name;
+      session.display_name = name;
+    }
+
+    if (email !== undefined) {
+      const em = validateString(email, { required: true, maxLen: 128, minLen: 5 });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return res.status(400).json({ error: 'Invalid email' });
+      // Check email not taken by another user
+      const emailTaken = data.users.find(u => u.email && u.email.toLowerCase() === em.toLowerCase() && u.username !== user.username);
+      if (emailTaken) return res.status(409).json({ error: 'Email already in use' });
+      user.email = em.toLowerCase();
+    }
+
+    if (avatar_url !== undefined) {
+      user.avatar_url = avatar_url || null;
+    }
+
+    if (notifications !== undefined && typeof notifications === 'object') {
+      user.notifications = {
+        email_follow_up: !!notifications.email_follow_up,
+        email_duplicate: !!notifications.email_duplicate,
+        email_payment: !!notifications.email_payment
+      };
+    }
+
+    saveData();
+
+    // Update localStorage data
+    res.json({
+      username: user.username,
+      display_name: user.display_name,
+      email: user.email,
+      role: user.role,
+      avatar_url: user.avatar_url,
+      notifications: user.notifications
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/auth/change-password
+app.put('/api/auth/change-password', (req, res) => {
+  const auth = req.headers['authorization'];
+  const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = sessions.get(token);
+  if (!session) return res.status(401).json({ error: 'Invalid session' });
+
+  const user = data.users.find(u => u.username === session.username);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) return res.status(400).json({ error: 'Both passwords required' });
+    if (new_password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+    // Verify current password
+    const ok = verifyPassword(current_password, user.salt, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    // Set new password
+    const { salt, hash } = hashPassword(new_password);
+    user.salt = salt;
+    user.password_hash = hash;
+    saveData();
+
+    auditLog('password_changed', { username: user.username });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Apply auth middleware AFTER auth routes are defined (to all subsequent /api routes)
 app.use(authMiddleware);
 
@@ -1021,7 +1138,7 @@ app.get('/api/jobs/:id', (req, res) => {
 // POST /api/jobs
 app.post('/api/jobs', (req, res) => {
   try {
-    const { title, category, company, location, locations, salary_range, commission, description, status, notes, is_urgent } = req.body;
+    const { title, category, company, location, locations, salary_range, commission, description, status, notes, is_urgent, requirements } = req.body;
     if (!title || !category) {
       return res.status(400).json({ error: 'Title and category are required' });
     }
@@ -1033,6 +1150,7 @@ app.post('/api/jobs', (req, res) => {
       company: company || null,
       location: location || null,
       locations: Array.isArray(locations) ? locations : [],
+      requirements: Array.isArray(requirements) ? requirements.filter(r => r && r.trim()) : [],
       is_urgent: !!is_urgent,
       salary_range: salary_range || null,
       commission: commission != null ? Number(commission) : null,
@@ -1058,7 +1176,7 @@ app.put('/api/jobs/:id', (req, res) => {
     const idx = data.jobs.findIndex(j => j.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Job not found' });
 
-    const { title, category, company, location, locations, salary_range, commission, description, status, notes, is_urgent } = req.body;
+    const { title, category, company, location, locations, salary_range, commission, description, status, notes, is_urgent, requirements } = req.body;
     data.jobs[idx] = {
       ...data.jobs[idx],
       title,
@@ -1066,6 +1184,7 @@ app.put('/api/jobs/:id', (req, res) => {
       company: company || null,
       location: location || null,
       locations: Array.isArray(locations) ? locations : (data.jobs[idx].locations || []),
+      requirements: Array.isArray(requirements) ? requirements.filter(r => r && r.trim()) : (data.jobs[idx].requirements || []),
       is_urgent: typeof is_urgent === 'boolean' ? is_urgent : !!data.jobs[idx].is_urgent,
       salary_range: salary_range || null,
       commission: commission !== undefined ? (commission != null ? Number(commission) : null) : (data.jobs[idx].commission || null),
@@ -1134,11 +1253,16 @@ function enrichCandidate(c) {
   };
 }
 
-// GET /api/candidates
+// GET /api/candidates (user-scoped: non-admin sees only their own)
 app.get('/api/candidates', (req, res) => {
   try {
     const { stage, job_id, category, search } = req.query;
     let candidates = data.candidates.map(enrichCandidate);
+
+    // Non-admin users see only their own candidates
+    if (req.user && req.user.role !== 'admin') {
+      candidates = candidates.filter(c => c.created_by === req.user.username);
+    }
 
     if (stage && stage !== 'all') {
       candidates = candidates.filter(c => c.stage === stage);
@@ -1170,6 +1294,82 @@ app.get('/api/candidates', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/candidates/export/accepted - CSV export (must be before /:id)
+app.get('/api/candidates/export/accepted', (req, res) => {
+  try {
+    let accepted = data.candidates
+      .filter(c => c.stage === 'accepted')
+      .map(enrichCandidate);
+    // Non-admin: only their own
+    if (req.user && req.user.role !== 'admin') {
+      accepted = accepted.filter(c => c.created_by === req.user.username);
+    }
+    const BOM = '\uFEFF';
+    const headers = ['שם','טלפון','אימייל','משרה','חברה','קטגוריה','תוכנית תשלום','תאריך התחלה','תאריך תשלום','סכום תשלום','סיכום שיחה','נוצר ע"י'];
+    const rows = accepted.map(c => [
+      c.name||'', c.phone||'', c.email||'', c.job_title||'', c.job_company||'', c.job_category||'',
+      c.payment_plan||'', c.start_date||'', c.payment_date||'',
+      c.payment_amount!=null?c.payment_amount:'',
+      (c.call_summary||'').replace(/[\n\r]/g,' '),
+      c.created_by||''
+    ]);
+    const csv = BOM + [headers,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    res.setHeader('Content-Type','text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition','attachment; filename="accepted_candidates.csv"');
+    res.send(csv);
+  } catch(err) { res.status(500).json({error:err.message}); }
+});
+
+// GET /api/candidates/payment-summary (must be before /:id)
+app.get('/api/candidates/payment-summary', (req, res) => {
+  try {
+    let accepted = data.candidates
+      .filter(c => c.stage === 'accepted' && c.payment_date && c.payment_amount)
+      .map(enrichCandidate);
+    if (req.user && req.user.role !== 'admin') {
+      accepted = accepted.filter(c => c.created_by === req.user.username);
+    }
+    const byMonth = {};
+    accepted.forEach(c => {
+      const d = new Date(c.payment_date);
+      if (isNaN(d)) return;
+      const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonth[key]) byMonth[key] = {month:key,total:0,candidates:[]};
+      byMonth[key].total += c.payment_amount;
+      byMonth[key].candidates.push({name:c.name,amount:c.payment_amount,payment_date:c.payment_date,job_title:c.job_title});
+    });
+    const sorted = Object.values(byMonth).sort((a,b)=>a.month.localeCompare(b.month));
+    res.json({months:sorted,grandTotal:sorted.reduce((s,m)=>s+m.total,0)});
+  } catch(err) { res.status(500).json({error:err.message}); }
+});
+
+// GET /api/candidates/check-duplicate/:phone (must be before /:id)
+app.get('/api/candidates/check-duplicate/:phone', (req, res) => {
+  try {
+    const phone = req.params.phone.replace(/\D/g, '');
+    if (!phone || phone.length < 7) return res.json({ duplicate: false });
+    const match = data.candidates.find(c => {
+      const cPhone = (c.phone || '').replace(/\D/g, '');
+      return cPhone && cPhone.includes(phone) || phone.includes(cPhone);
+    });
+    if (match) {
+      const enriched = enrichCandidate(match);
+      res.json({
+        duplicate: true,
+        candidate: {
+          name: enriched.name,
+          phone: enriched.phone,
+          stage: enriched.stage,
+          job_title: enriched.job_title,
+          created_by: enriched.created_by || 'unknown'
+        }
+      });
+    } else {
+      res.json({ duplicate: false });
+    }
+  } catch(err) { res.status(500).json({error:err.message}); }
 });
 
 // GET /api/candidates/:id
@@ -1212,9 +1412,34 @@ app.post('/api/candidates', (req, res) => {
       payment_date: payment_date || null,
       payment_amount: payment_amount != null ? Number(payment_amount) : null,
       payment_plan: payment_plan || null,
+      available_from: req.body.available_from || null,
+      created_by: req.user ? req.user.username : null,
       created_at: now(),
       updated_at: now()
     };
+
+    // Check for duplicate phone
+    if (candidate.phone) {
+      const cleanPhone = candidate.phone.replace(/\D/g, '');
+      const dup = data.candidates.find(c => {
+        const cp = (c.phone || '').replace(/\D/g, '');
+        return cp && cleanPhone && (cp.includes(cleanPhone) || cleanPhone.includes(cp));
+      });
+      if (dup) {
+        const dupEnriched = enrichCandidate(dup);
+        return res.status(409).json({
+          error: 'duplicate_phone',
+          message: `הליד כבר קיים במערכת!`,
+          existing: {
+            name: dupEnriched.name,
+            phone: dupEnriched.phone,
+            stage: dupEnriched.stage,
+            job_title: dupEnriched.job_title,
+            created_by: dupEnriched.created_by || 'לא ידוע'
+          }
+        });
+      }
+    }
 
     data.candidates.push(candidate);
 
@@ -1272,6 +1497,7 @@ app.put('/api/candidates/:id', (req, res) => {
       payment_date: payment_date !== undefined ? (payment_date || null) : (existing.payment_date || null),
       payment_amount: payment_amount !== undefined ? (payment_amount != null ? Number(payment_amount) : null) : (existing.payment_amount || null),
       payment_plan: payment_plan !== undefined ? (payment_plan || null) : (existing.payment_plan || null),
+      available_from: req.body.available_from !== undefined ? (req.body.available_from || null) : (existing.available_from || null),
       updated_at: now()
     };
 
@@ -1353,70 +1579,6 @@ app.get('/api/follow-ups', (req, res) => {
   }
 });
 
-// GET /api/candidates/export/accepted - export accepted candidates as CSV (Excel compatible)
-app.get('/api/candidates/export/accepted', (req, res) => {
-  try {
-    const accepted = data.candidates
-      .filter(c => c.stage === 'accepted')
-      .map(enrichCandidate);
-
-    // BOM for Hebrew Excel + CSV headers
-    const BOM = '\uFEFF';
-    const headers = ['שם', 'טלפון', 'אימייל', 'משרה', 'חברה', 'קטגוריה', 'תאריך התחלה', 'תאריך תשלום', 'סכום תשלום', 'סיכום שיחה'];
-    const rows = accepted.map(c => [
-      c.name || '',
-      c.phone || '',
-      c.email || '',
-      c.job_title || '',
-      c.job_company || '',
-      c.job_category || '',
-      c.start_date || '',
-      c.payment_date || '',
-      c.payment_amount != null ? c.payment_amount : '',
-      (c.call_summary || '').replace(/[\n\r,]/g, ' ')
-    ]);
-
-    const csv = BOM + [headers, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="accepted_candidates.csv"');
-    res.send(csv);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/candidates/payment-summary - monthly payment summary
-app.get('/api/candidates/payment-summary', (req, res) => {
-  try {
-    const accepted = data.candidates
-      .filter(c => c.stage === 'accepted' && c.payment_date && c.payment_amount)
-      .map(enrichCandidate);
-
-    const byMonth = {};
-    accepted.forEach(c => {
-      const d = new Date(c.payment_date);
-      if (isNaN(d)) return;
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      if (!byMonth[key]) byMonth[key] = { month: key, total: 0, candidates: [] };
-      byMonth[key].total += c.payment_amount;
-      byMonth[key].candidates.push({
-        name: c.name,
-        amount: c.payment_amount,
-        payment_date: c.payment_date,
-        job_title: c.job_title
-      });
-    });
-
-    const sorted = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
-    const grandTotal = sorted.reduce((s, m) => s + m.total, 0);
-
-    res.json({ months: sorted, grandTotal });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // DELETE /api/candidates/:id
 app.delete('/api/candidates/:id', (req, res) => {
   try {
@@ -1443,11 +1605,17 @@ app.get('/api/stats', (req, res) => {
     const totalJobs = data.jobs.length;
     const filledJobs = data.jobs.filter(j => j.status === 'filled').length;
 
-    const stage1 = data.candidates.filter(c => c.stage === 'stage1').length;
-    const stage2 = data.candidates.filter(c => c.stage === 'stage2').length;
-    const accepted = data.candidates.filter(c => c.stage === 'accepted').length;
-    const rejected = data.candidates.filter(c => c.stage === 'rejected').length;
-    const totalCandidates = data.candidates.length;
+    // User-scoped candidates for non-admin
+    const isAdmin = req.user && req.user.role === 'admin';
+    const userCandidates = isAdmin
+      ? data.candidates
+      : data.candidates.filter(c => c.created_by === (req.user ? req.user.username : ''));
+
+    const stage1 = userCandidates.filter(c => c.stage === 'stage1').length;
+    const stage2 = userCandidates.filter(c => c.stage === 'stage2').length;
+    const accepted = userCandidates.filter(c => c.stage === 'accepted').length;
+    const rejected = userCandidates.filter(c => c.stage === 'rejected').length;
+    const totalCandidates = userCandidates.length;
 
     // Accepted this month (based on stage_history)
     const monthStart = new Date();
@@ -1459,7 +1627,7 @@ app.get('/api/stats', (req, res) => {
 
     // Candidates by category
     const categoryMap = {};
-    data.candidates.forEach(c => {
+    userCandidates.forEach(c => {
       if (c.job_id) {
         const job = data.jobs.find(j => j.id === c.job_id);
         if (job && job.category) {
@@ -1512,7 +1680,7 @@ app.get('/api/stats', (req, res) => {
     let paymentsDue = 0;
     let paymentsDueSoon = 0;
     const inOneWeek = new Date(nowDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-    data.candidates.forEach(c => {
+    userCandidates.forEach(c => {
       if (c.follow_up_at && !c.follow_up_done) {
         const due = new Date(c.follow_up_at);
         if (due < nowDate) overdue++;
@@ -1542,6 +1710,70 @@ app.get('/api/stats', (req, res) => {
       recentActivity,
       newJobs
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// TEAM API (admin only)
+// ============================================================
+app.get('/api/team/overview', (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+
+    const activeUsers = data.users.filter(u => u.status === 'active' || !u.status);
+    const team = activeUsers.map(u => {
+      const userCandidates = data.candidates.filter(c => c.created_by === u.username);
+      const stage1 = userCandidates.filter(c => c.stage === 'stage1').length;
+      const stage2 = userCandidates.filter(c => c.stage === 'stage2').length;
+      const accepted = userCandidates.filter(c => c.stage === 'accepted').length;
+      const rejected = userCandidates.filter(c => c.stage === 'rejected').length;
+      const total = userCandidates.length;
+      const pendingFollowUps = userCandidates.filter(c => c.follow_up_at && !c.follow_up_done && new Date(c.follow_up_at) < new Date()).length;
+
+      return {
+        username: u.username,
+        display_name: u.display_name,
+        role: u.role,
+        total,
+        stage1,
+        stage2,
+        accepted,
+        rejected,
+        pendingFollowUps,
+        recentCandidates: userCandidates
+          .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .slice(0, 5)
+          .map(enrichCandidate)
+      };
+    });
+
+    // Unassigned candidates (created_by is null)
+    const unassigned = data.candidates.filter(c => !c.created_by);
+
+    res.json({
+      team,
+      unassigned: unassigned.length,
+      totalCandidates: data.candidates.length,
+      totalJobs: data.jobs.filter(j => j.status === 'open').length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/team/user/:username/candidates - get all candidates for a specific user
+app.get('/api/team/user/:username/candidates', (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+
+    const candidates = data.candidates
+      .filter(c => c.created_by === req.params.username)
+      .map(enrichCandidate)
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+    res.json(candidates);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
