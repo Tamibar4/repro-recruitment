@@ -47,6 +47,13 @@
           </svg>
           <span data-i18n="candidates">מועמדים</span>
         </a>
+        <a href="team.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>צוות</span>
+        </a>
         <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -80,6 +87,22 @@
           <span data-i18n="new_candidate">מועמד חדש</span>
         </button>
       </div>
+
+      <!-- Tabs -->
+      <div class="page-tabs">
+        <button class="page-tab active" data-tab="active">
+          <span class="page-tab-icon">📋</span>
+          <span>לידים פעילים</span>
+        </button>
+        <button class="page-tab" data-tab="delayed">
+          <span class="page-tab-icon">⏳</span>
+          <span>זמינות מאוחרת</span>
+          <span class="page-tab-count" id="tab-delayed-count" style="display:none">0</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: Active Candidates -->
+      <div id="tab-content-active" class="tab-content">
 
       <!-- Toolbar -->
       <div class="toolbar">
@@ -151,7 +174,47 @@
           <!-- Monthly payment summary -->
           <div id="payment-summary" class="payment-summary"></div>
         </div>
+
+        <!-- Not Relevant -->
+        <div class="kanban-column">
+          <div class="kanban-header" style="background: linear-gradient(135deg, #9e9e9e, #bdbdbd);">
+            <div class="kanban-title">
+              <span class="kanban-title-emoji">❌</span>
+              <span>לא רלוונטים</span>
+            </div>
+            <span class="kanban-count" id="count-rejected">0</span>
+          </div>
+          <div class="kanban-body" id="column-rejected"></div>
+        </div>
+
+        <!-- Delayed Availability -->
+        <div class="kanban-column">
+          <div class="kanban-header" style="background: linear-gradient(135deg, #7c4dff, #b388ff);">
+            <div class="kanban-title">
+              <span class="kanban-title-emoji">⏳</span>
+              <span>זמינות מאוחרת</span>
+            </div>
+            <span class="kanban-count" id="count-delayed">0</span>
+          </div>
+          <div class="kanban-body" id="column-delayed"></div>
+        </div>
       </div>
+
+      </div><!-- end tab-content-active -->
+
+      <!-- TAB 2: Delayed Availability -->
+      <div id="tab-content-delayed" class="tab-content" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <button class="btn btn-primary" id="btn-new-delayed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            הוסף מועמד עם זמינות מאוחרת
+          </button>
+        </div>
+        <div id="delayed-availability-container">
+          <div class="empty-state"><div class="spinner"></div></div>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -200,10 +263,11 @@
             <div class="form-field">
               <label data-i18n="stage">שלב</label>
               <select id="candidate-stage">
-                <option value="stage1" data-i18n="stage1">שלב ראשון</option>
-                <option value="stage2" data-i18n="stage2">שלב שני</option>
-                <option value="accepted" data-i18n="accepted">התקבלו</option>
-                <option value="rejected" data-i18n="rejected">נדחו</option>
+                <option value="stage1">שלב ראשון - שיחה איתי</option>
+                <option value="stage2">שלב שני - שיחה עם המעסיק</option>
+                <option value="accepted">התקבלו</option>
+                <option value="rejected">לא רלוונטים</option>
+                <option value="delayed">זמינות מאוחרת</option>
               </select>
             </div>
             <div class="form-field">
@@ -211,8 +275,23 @@
               <input type="datetime-local" id="candidate-call-date">
             </div>
             <div class="form-field full">
-              <label data-i18n="follow_up_label">תאריך ושעה לפולואפ</label>
-              <input type="datetime-local" id="candidate-follow-up">
+              <label>תזכורת פולואפ</label>
+              <div class="followup-quick-btns">
+                <button type="button" class="followup-btn" data-days="1">מחר</button>
+                <button type="button" class="followup-btn" data-days="3">עוד 3 ימים</button>
+                <button type="button" class="followup-btn" data-days="7">עוד שבוע</button>
+                <button type="button" class="followup-btn" data-days="14">עוד שבועיים</button>
+                <button type="button" class="followup-btn" data-days="0">תאריך ידני</button>
+              </div>
+              <div id="followup-date-row" class="followup-date-row" style="display:none">
+                <input type="datetime-local" id="candidate-follow-up">
+                <button type="button" class="followup-clear-btn" id="followup-clear" title="נקה">✕</button>
+              </div>
+              <div id="followup-preview" class="followup-preview"></div>
+            </div>
+            <div class="form-field full">
+              <label>זמינות מאוחרת - מתי המועמד זמין להתחיל?</label>
+              <input type="month" id="candidate-available-from" placeholder="בחר חודש">
             </div>
             <div class="form-field full">
               <label data-i18n="call_summary">סיכום שיחה</label>

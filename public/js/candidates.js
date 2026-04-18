@@ -57,22 +57,32 @@ function renderKanban() {
   const columns = {
     stage1: [],
     stage2: [],
-    accepted: []
+    accepted: [],
+    rejected: [],
+    delayed: []
   };
 
   allCandidates.forEach(c => {
-    if (columns[c.stage]) columns[c.stage].push(c);
+    if (columns[c.stage]) {
+      columns[c.stage].push(c);
+    } else if (c.stage === 'delayed') {
+      columns.delayed.push(c);
+    }
   });
 
   // Update counts
   document.getElementById('count-stage1').textContent = columns.stage1.length;
   document.getElementById('count-stage2').textContent = columns.stage2.length;
   document.getElementById('count-accepted').textContent = columns.accepted.length;
+  document.getElementById('count-rejected').textContent = columns.rejected.length;
+  document.getElementById('count-delayed').textContent = columns.delayed.length;
 
   // Render each column
   renderColumn('stage1', columns.stage1);
   renderColumn('stage2', columns.stage2);
   renderColumn('accepted', columns.accepted);
+  renderColumn('rejected', columns.rejected);
+  renderColumn('delayed', columns.delayed);
   renderPaymentSummary(columns.accepted);
 
   // Highlight the column that matches URL stage filter
@@ -96,11 +106,18 @@ function renderColumn(stage, items) {
   const container = document.getElementById('column-' + stage);
 
   if (items.length === 0) {
-    const emptyIcons = { stage1: '👋', stage2: '📋', accepted: '🎉' };
+    const emptyIcons = { stage1: '👋', stage2: '📋', accepted: '🎉', rejected: '📭', delayed: '⏳' };
+    const emptyTexts = {
+      stage1: 'אין מועמדים בשלב זה',
+      stage2: 'אין מועמדים בשלב זה',
+      accepted: 'אין מועמדים בשלב זה',
+      rejected: 'אין מועמדים לא רלוונטיים',
+      delayed: 'אין מועמדים עם זמינות מאוחרת'
+    };
     container.innerHTML = `
       <div class="kanban-empty">
         <div class="kanban-empty-icon">${emptyIcons[stage] || '✨'}</div>
-        <div>${I18n.t('no_candidates_' + stage)}</div>
+        <div>${emptyTexts[stage] || 'אין מועמדים'}</div>
       </div>
     `;
     return;
@@ -160,7 +177,7 @@ function getFollowUpStatus(candidate) {
 }
 
 function renderCandidateCard(candidate, stage) {
-  const stageOrder = ['stage1', 'stage2', 'accepted'];
+  const stageOrder = ['stage1', 'stage2', 'accepted', 'rejected', 'delayed'];
   const currentIdx = stageOrder.indexOf(stage);
   const canPrev = currentIdx > 0;
   const canNext = currentIdx < stageOrder.length - 1;
@@ -175,18 +192,32 @@ function renderCandidateCard(candidate, stage) {
 
   let followUpBadgeHtml = '';
   if (followUpStatus) {
-    const labels = {
-      'overdue': I18n.t('follow_up_overdue'),
-      'due-soon': I18n.t('follow_up_due_soon'),
-      'upcoming': I18n.t('follow_up_upcoming')
-    };
+    const fuDate = new Date(candidate.follow_up_at);
+    const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    const dayName = dayNames[fuDate.getDay()];
+    const today = new Date();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const isToday = fuDate.toDateString() === today.toDateString();
+    const isTomorrow = fuDate.toDateString() === tomorrow.toDateString();
+
+    let fuLabel;
+    if (followUpStatus === 'overdue') {
+      fuLabel = `פולואפ באיחור! (יום ${dayName})`;
+    } else if (isToday) {
+      fuLabel = `פולואפ היום!`;
+    } else if (isTomorrow) {
+      fuLabel = `פולואפ מחר`;
+    } else {
+      fuLabel = `פולואפ ביום ${dayName} ${formatDateShort(candidate.follow_up_at)}`;
+    }
+
     followUpBadgeHtml = `
       <div class="follow-up-badge ${followUpStatus}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
-        ${formatDateShort(candidate.follow_up_at)}
+        ${fuLabel}
       </div>
     `;
   }
@@ -199,21 +230,13 @@ function renderCandidateCard(candidate, stage) {
         <div class="candidate-avatar ${avatarColor}">${escapeHtml(initials)}</div>
         <div class="candidate-card-info">
           <div class="candidate-card-name">${escapeHtml(candidate.name)}</div>
-          ${candidate.phone ? `
+          ${candidate.phone && waLink ? `
             <div class="candidate-card-phone-row">
-              <div class="candidate-card-phone" dir="ltr">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <a href="${waLink}" target="_blank" rel="noopener" class="whatsapp-btn" onclick="event.stopPropagation()" title="WhatsApp" aria-label="WhatsApp">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                 </svg>
-                ${escapeHtml(candidate.phone)}
-              </div>
-              ${waLink ? `
-                <a href="${waLink}" target="_blank" rel="noopener" class="whatsapp-btn" onclick="event.stopPropagation()" title="WhatsApp" aria-label="WhatsApp">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                  </svg>
-                </a>
-              ` : ''}
+              </a>
             </div>
           ` : ''}
         </div>
@@ -228,7 +251,12 @@ function renderCandidateCard(candidate, stage) {
           <span class="candidate-card-job-title">${escapeHtml(candidate.job_title)}${candidate.job_company ? ' · ' + escapeHtml(candidate.job_company) : ''}</span>
         </div>
       ` : ''}
-      ${followUpBadgeHtml ? `<div style="margin-top: 10px;">${followUpBadgeHtml}</div>` : ''}
+      ${candidate.available_from ? `
+        <div style="margin-top:8px">
+          <span class="delayed-badge">⏳ זמין מ-${candidate.available_from}</span>
+        </div>
+      ` : ''}
+      ${followUpBadgeHtml ? `<div style="margin-top:6px">${followUpBadgeHtml}</div>` : ''}
       ${candidate.call_summary ? `
         <div class="candidate-card-summary">${escapeHtml(candidate.call_summary)}</div>
       ` : ''}
@@ -301,24 +329,35 @@ function openCandidateModal(candidate = null) {
     } else {
       document.getElementById('candidate-call-date').value = '';
     }
-    // Format follow-up date
+    // Format follow-up date + show preview
+    document.querySelectorAll('.followup-btn').forEach(b => b.classList.remove('active'));
     if (candidate.follow_up_at) {
       const f = new Date(candidate.follow_up_at);
       if (!isNaN(f)) {
         const pad = n => String(n).padStart(2, '0');
         document.getElementById('candidate-follow-up').value =
           `${f.getFullYear()}-${pad(f.getMonth() + 1)}-${pad(f.getDate())}T${pad(f.getHours())}:${pad(f.getMinutes())}`;
+        // Show preview
+        const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        const preview = document.getElementById('followup-preview');
+        preview.textContent = `📅 פולואפ ביום ${dayNames[f.getDay()]}, ${f.toLocaleDateString('he-IL')}`;
+        preview.classList.add('visible');
+        document.getElementById('followup-date-row').style.display = 'none';
       } else {
         document.getElementById('candidate-follow-up').value = '';
+        document.getElementById('followup-preview').classList.remove('visible');
       }
     } else {
       document.getElementById('candidate-follow-up').value = '';
+      document.getElementById('followup-preview').classList.remove('visible');
+      document.getElementById('followup-date-row').style.display = 'none';
     }
     document.getElementById('candidate-summary').value = candidate.call_summary || '';
     document.getElementById('candidate-notes').value = candidate.notes || '';
     document.getElementById('candidate-start-date').value = candidate.start_date || '';
     document.getElementById('candidate-payment-date').value = candidate.payment_date || '';
     document.getElementById('candidate-payment-amount').value = candidate.payment_amount != null ? candidate.payment_amount : '';
+    document.getElementById('candidate-available-from').value = candidate.available_from || '';
     // Set active payment plan button
     const savedPlan = candidate.payment_plan || '';
     document.getElementById('candidate-payment-plan').value = savedPlan;
@@ -341,10 +380,14 @@ function openCandidateModal(candidate = null) {
     const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
     document.getElementById('candidate-call-date').value = nowStr;
     document.getElementById('candidate-follow-up').value = '';
+    document.getElementById('followup-date-row').style.display = 'none';
+    document.getElementById('followup-preview').classList.remove('visible');
+    document.querySelectorAll('.followup-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('candidate-start-date').value = '';
     document.getElementById('candidate-payment-date').value = '';
     document.getElementById('candidate-payment-amount').value = '';
     document.getElementById('candidate-payment-plan').value = '';
+    document.getElementById('candidate-available-from').value = '';
     document.querySelectorAll('#payment-plan-options .plan-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('payment-schedule-section').style.display = 'none';
     deleteBtn.style.display = 'none';
@@ -383,7 +426,8 @@ async function saveCandidate() {
     start_date: document.getElementById('candidate-start-date').value || null,
     payment_date: document.getElementById('candidate-payment-date').value || null,
     payment_amount: document.getElementById('candidate-payment-amount').value || null,
-    payment_plan: document.getElementById('candidate-payment-plan').value || null
+    payment_plan: document.getElementById('candidate-payment-plan').value || null,
+    available_from: document.getElementById('candidate-available-from').value || null
   };
 
   if (!data.name) {
@@ -395,12 +439,22 @@ async function saveCandidate() {
     if (id) {
       await API.candidates.update(id, data);
     } else {
-      await API.candidates.create(data);
+      const result = await API.candidates.create(data);
     }
     showToast(I18n.t('saved'));
     closeModal('candidate-modal');
     loadCandidates();
   } catch (err) {
+    // Handle duplicate phone
+    if (err.message && err.message.includes('duplicate_phone')) {
+      try {
+        const errData = JSON.parse(err.message.replace('duplicate_phone: ', ''));
+        showDuplicateAlert(errData);
+      } catch(e) {
+        showToast('הליד כבר קיים במערכת!', 'error');
+      }
+      return;
+    }
     console.error('Save candidate error:', err);
     showToast(I18n.t('error'), 'error');
   }
@@ -449,6 +503,61 @@ document.getElementById('candidate-form').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
     e.preventDefault();
     saveCandidate();
+  }
+});
+
+// Follow-up quick buttons
+document.querySelectorAll('.followup-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const days = parseInt(btn.dataset.days);
+    const input = document.getElementById('candidate-follow-up');
+    const dateRow = document.getElementById('followup-date-row');
+    const preview = document.getElementById('followup-preview');
+
+    // Toggle active
+    document.querySelectorAll('.followup-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (days === 0) {
+      // Manual - show date input
+      dateRow.style.display = 'flex';
+      input.focus();
+      preview.classList.remove('visible');
+    } else {
+      // Auto-calculate
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      d.setHours(10, 0, 0, 0);
+      const pad = n => String(n).padStart(2, '0');
+      input.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      dateRow.style.display = 'none';
+
+      const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+      preview.textContent = `📅 פולואפ ביום ${dayNames[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
+      preview.classList.add('visible');
+    }
+  });
+});
+
+// Clear follow-up
+document.getElementById('followup-clear').addEventListener('click', () => {
+  document.getElementById('candidate-follow-up').value = '';
+  document.getElementById('followup-date-row').style.display = 'none';
+  document.getElementById('followup-preview').classList.remove('visible');
+  document.querySelectorAll('.followup-btn').forEach(b => b.classList.remove('active'));
+});
+
+// Update preview when manual date changes
+document.getElementById('candidate-follow-up').addEventListener('change', () => {
+  const val = document.getElementById('candidate-follow-up').value;
+  const preview = document.getElementById('followup-preview');
+  if (val) {
+    const d = new Date(val);
+    const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    preview.textContent = `📅 פולואפ ביום ${dayNames[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
+    preview.classList.add('visible');
+  } else {
+    preview.classList.remove('visible');
   }
 });
 
@@ -607,6 +716,101 @@ function renderPaymentSummary(acceptedCandidates) {
     </div>
   `;
 }
+
+// ============================================================
+// Tabs: Active / Delayed
+// ============================================================
+document.querySelectorAll('.page-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const tabName = tab.dataset.tab;
+    document.getElementById('tab-content-active').style.display = tabName === 'active' ? '' : 'none';
+    document.getElementById('tab-content-delayed').style.display = tabName === 'delayed' ? '' : 'none';
+    if (tabName === 'delayed') loadDelayedAvailability();
+  });
+});
+
+document.getElementById('btn-new-delayed').addEventListener('click', () => {
+  openCandidateModal();
+  setTimeout(() => {
+    document.getElementById('candidate-stage').value = 'delayed';
+    togglePaymentFields();
+  }, 100);
+});
+
+async function loadDelayedAvailability() {
+  try {
+    const candidates = await API.candidates.list({ stage: 'delayed' });
+    const withDate = candidates.filter(c => c.available_from);
+    const withoutDate = candidates.filter(c => !c.available_from);
+
+    const countEl = document.getElementById('tab-delayed-count');
+    if (countEl) {
+      countEl.textContent = candidates.length;
+      countEl.style.display = candidates.length > 0 ? '' : 'none';
+    }
+
+    const container = document.getElementById('delayed-availability-container');
+    if (candidates.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--color-text-light)"><div style="font-size:48px;margin-bottom:12px">⏳</div><div style="font-size:16px;font-weight:700;color:var(--color-text)">אין מועמדים עם זמינות מאוחרת</div></div>';
+      return;
+    }
+
+    const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+    const byMonth = {};
+    withDate.forEach(c => { const k = c.available_from; if (!byMonth[k]) byMonth[k] = []; byMonth[k].push(c); });
+
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+    let html = Object.keys(byMonth).sort().map(key => {
+      const [yr, mo] = key.split('-');
+      const mName = monthNames[parseInt(mo)-1];
+      const isPast = key < curKey, isCur = key === curKey;
+      const bg = isCur ? '#ff6d00,#ffab40' : isPast ? '#9e9e9e,#bdbdbd' : '#7c4dff,#b388ff';
+      const icon = isCur ? '🔥' : isPast ? '⏰' : '📅';
+      const items = byMonth[key];
+      return `<div class="panel" style="margin-bottom:20px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;background:linear-gradient(135deg,${bg});color:white;font-weight:700;font-size:16px">
+          <span style="font-size:20px">${icon}</span>${mName} ${yr}
+          <span style="background:rgba(255,255,255,0.25);padding:3px 12px;border-radius:20px;font-size:12px;margin-right:auto">${items.length}</span>
+        </div>
+        <div style="padding:0">${items.map(c => {
+          const wa = buildWhatsAppLink(c.phone);
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--color-border);cursor:pointer" onclick="openCandidateModal(allCandidates.find(x=>x.id===${c.id}))">
+            <div><strong>${escapeHtml(c.name)}</strong><div style="font-size:12px;color:var(--color-text-secondary)">${escapeHtml(c.job_title||'—')}</div></div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--color-text-light)">${escapeHtml(c.call_summary||'').substring(0,40)}</span>
+              ${wa ? '<a href="'+wa+'" target="_blank" onclick="event.stopPropagation()" class="whatsapp-btn"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></a>' : ''}
+              <button onclick="event.stopPropagation();deleteDelayedCandidate(${c.id})" style="width:28px;height:28px;border-radius:6px;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-light);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;font-size:14px" onmouseover="this.style.background='#fee';this.style.color='#e2445c';this.style.borderColor='#e2445c'" onmouseout="this.style.background='var(--color-bg)';this.style.color='var(--color-text-light)';this.style.borderColor='var(--color-border)'" title="מחק">🗑</button>
+            </div>
+          </div>`;
+        }).join('')}</div>
+      </div>`;
+    }).join('');
+
+    if (withoutDate.length > 0) {
+      html += `<div class="panel" style="margin-bottom:20px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;background:linear-gradient(135deg,#78909c,#b0bec5);color:white;font-weight:700;font-size:16px">
+          <span style="font-size:20px">❓</span>ללא תאריך זמינות
+          <span style="background:rgba(255,255,255,0.25);padding:3px 12px;border-radius:20px;font-size:12px;margin-right:auto">${withoutDate.length}</span>
+        </div>
+        <div style="padding:0">${withoutDate.map(c => `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--color-border)"><strong>${escapeHtml(c.name)}</strong><span style="font-size:12px;color:var(--color-text-secondary)">${escapeHtml(c.job_title||'—')}</span></div>`).join('')}</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch(err) { console.error('Delayed load failed:', err); }
+}
+
+// Load delayed count on page init
+(async function loadDelayedCount() {
+  try {
+    const d = await API.candidates.list({ stage: 'delayed' });
+    const el = document.getElementById('tab-delayed-count');
+    if (el && d.length > 0) { el.textContent = d.length; el.style.display = ''; }
+  } catch(e) {}
+})();
 
 // ---------- Initial load ----------
 (async function init() {

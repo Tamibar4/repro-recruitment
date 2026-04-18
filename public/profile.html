@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הגדרות - RePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=7">
+  <style>
+    .profile-container { max-width: 640px; }
+    .profile-section {
+      background: var(--color-white); border-radius: var(--radius-xl);
+      border: 1px solid var(--color-border); padding: 28px; margin-bottom: 20px;
+      box-shadow: var(--shadow-xs);
+    }
+    .profile-section-title {
+      font-size: 16px; font-weight: 700; color: var(--color-text);
+      margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+      padding-bottom: 14px; border-bottom: 1px solid var(--color-border);
+    }
+    .profile-section-title svg { width: 20px; height: 20px; color: var(--color-primary); }
+
+    /* Avatar */
+    .avatar-section { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; }
+    .avatar-large {
+      width: 80px; height: 80px; border-radius: 50%; background: var(--gradient-primary);
+      color: white; display: flex; align-items: center; justify-content: center;
+      font-size: 32px; font-weight: 700; flex-shrink: 0; box-shadow: var(--shadow-md);
+      overflow: hidden; position: relative;
+    }
+    .avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+    .avatar-name { font-size: 18px; font-weight: 700; color: var(--color-text); }
+    .avatar-role { font-size: 13px; color: var(--color-text-secondary); }
+    .avatar-upload-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+      background: var(--color-bg); border: 1px solid var(--color-border);
+      border-radius: var(--radius); font-size: 12px; font-weight: 600;
+      color: var(--color-text-secondary); cursor: pointer; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .avatar-upload-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .avatar-upload-btn input { display: none; }
+
+    /* Form fields */
+    .profile-field { margin-bottom: 18px; }
+    .profile-field label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--color-text); margin-bottom: 6px;
+    }
+    .profile-field input {
+      width: 100%; padding: 11px 14px; border: 1px solid var(--color-border);
+      border-radius: var(--radius); background: var(--color-white);
+      font-size: 14px; font-weight: 500; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .profile-field input:focus {
+      outline: none; border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0,115,234,0.12);
+    }
+    .profile-field input:disabled { background: var(--color-bg); color: var(--color-text-light); }
+    .profile-field .field-hint { font-size: 11px; color: var(--color-text-light); margin-top: 4px; }
+
+    /* Notification toggles */
+    .notif-list { display: flex; flex-direction: column; gap: 12px; }
+    .notif-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; background: var(--color-bg); border-radius: var(--radius);
+      border: 1px solid var(--color-border);
+    }
+    .notif-info { flex: 1; }
+    .notif-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
+    .notif-desc { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+
+    /* Toggle switch */
+    .toggle-switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--color-border-strong);
+      border-radius: 26px; cursor: pointer; transition: all 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 20px; height: 20px;
+      left: 3px; bottom: 3px; background: white; border-radius: 50%;
+      transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--color-green); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+    /* Save button area */
+    .profile-save {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding-top: 16px; border-top: 1px solid var(--color-border); margin-top: 8px;
+    }
+
+    /* Success/error message */
+    .profile-msg {
+      padding: 10px 16px; border-radius: var(--radius); font-size: 13px;
+      font-weight: 600; margin-bottom: 16px; display: none;
+    }
+    .profile-msg.success { display: block; background: var(--color-green-light); color: #007a3d; }
+    .profile-msg.error { display: block; background: var(--color-red-light); color: var(--color-red); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text">RePro</div>
+          <div class="sidebar-logo-tagline">Your Job Abroad</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span>דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>מועמדים</span>
+        </a>
+        <a href="team.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>צוות</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">⚙️ הגדרות פרופיל</h1>
+          <div class="page-subtitle">עדכון פרטים אישיים והגדרות התראות</div>
+        </div>
+      </div>
+
+      <div class="profile-container">
+        <div id="profile-msg" class="profile-msg"></div>
+
+        <!-- Profile Info -->
+        <div class="profile-section">
+          <div class="profile-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            פרטים אישיים
+          </div>
+
+          <div class="avatar-section">
+            <div class="avatar-large" id="avatar-display"></div>
+            <div class="avatar-actions">
+              <div class="avatar-name" id="profile-display-name"></div>
+              <div class="avatar-role" id="profile-role"></div>
+              <label class="avatar-upload-btn">
+                📷 שנה תמונה
+                <input type="file" id="avatar-input" accept="image/*">
+              </label>
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <label>שם תצוגה</label>
+            <input type="text" id="input-display-name" placeholder="השם שלך">
+          </div>
+
+          <div class="profile-field">
+            <label>שם משתמש</label>
+            <input type="text" id="input-username" disabled>
+            <div class="field-hint">שם המשתמש לא ניתן לשינוי</div>
+          </div>
+
+          <div class="profile-field">
+            <label>אימייל</label>
+            <input type="email" id="input-email" dir="ltr" placeholder="your@email.com">
+          </div>
+
+          <div class="profile-save">
+            <button class="btn btn-primary" id="btn-save-profile">שמור שינויים</button>
+          </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="profile-section">
+          <div class="profile-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            שינוי סיסמה
+          </div>
+
+          <div class="profile-field">
+            <label>סיסמה נוכחית</label>
+            <input type="password" id="input-current-password" dir="ltr">
+          </div>
+          <div class="profile-field">
+            <label>סיסמה חדשה (לפחות 8 תווים)</label>
+            <input type="password" id="input-new-password" dir="ltr" minlength="8">
+          </div>
+          <div class="profile-field">
+            <label>אישור סיסמה חדשה</label>
+            <input type="password" id="input-confirm-password" dir="ltr">
+          </div>
+
+          <div class="profile-save">
+            <button class="btn btn-secondary" id="btn-change-password">שנה סיסמה</button>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="profile-section">
+          <div class="profile-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            התראות
+          </div>
+
+          <div class="notif-list">
+            <div class="notif-item">
+              <div class="notif-info">
+                <div class="notif-title">תזכורת פולואפ</div>
+                <div class="notif-desc">קבלת מייל כשיש פולואפ שצריך לעשות</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="notif-follow-up" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="notif-item">
+              <div class="notif-info">
+                <div class="notif-title">ליד כפול</div>
+                <div class="notif-desc">התראה כשמישהו מהצוות מוסיף ליד שכבר קיים</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="notif-duplicate" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="notif-item">
+              <div class="notif-info">
+                <div class="notif-title">תזכורת תשלום</div>
+                <div class="notif-desc">התראה כשמגיע תאריך תשלום צפוי</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="notif-payment" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="profile-save" style="margin-top:16px">
+            <button class="btn btn-primary" id="btn-save-notifications">שמור התראות</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    let profileData = null;
+
+    async function loadProfile() {
+      try {
+        profileData = await API.request('/auth/profile');
+        renderProfile();
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    }
+
+    function renderProfile() {
+      if (!profileData) return;
+      const p = profileData;
+      const initial = (p.display_name || p.username || '?').charAt(0).toUpperCase();
+
+      // Avatar
+      const avatarEl = document.getElementById('avatar-display');
+      if (p.avatar_url) {
+        avatarEl.innerHTML = `<img src="${p.avatar_url}" alt="">`;
+      } else {
+        avatarEl.textContent = initial;
+      }
+
+      document.getElementById('profile-display-name').textContent = p.display_name || p.username;
+      document.getElementById('profile-role').textContent = p.role === 'admin' ? '👑 מנהל' : '👤 משתמש';
+
+      // Form fields
+      document.getElementById('input-display-name').value = p.display_name || '';
+      document.getElementById('input-username').value = p.username || '';
+      document.getElementById('input-email').value = p.email || '';
+
+      // Notifications
+      const notifs = p.notifications || {};
+      document.getElementById('notif-follow-up').checked = notifs.email_follow_up !== false;
+      document.getElementById('notif-duplicate').checked = notifs.email_duplicate !== false;
+      document.getElementById('notif-payment').checked = notifs.email_payment !== false;
+    }
+
+    function showMsg(text, type) {
+      const el = document.getElementById('profile-msg');
+      el.textContent = text;
+      el.className = 'profile-msg ' + type;
+      el.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => { el.className = 'profile-msg'; }, 4000);
+    }
+
+    // Save profile
+    document.getElementById('btn-save-profile').addEventListener('click', async () => {
+      try {
+        const result = await API.request('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            display_name: document.getElementById('input-display-name').value.trim(),
+            email: document.getElementById('input-email').value.trim()
+          })
+        });
+        // Update local storage
+        const user = API.getCurrentUser();
+        if (user) {
+          user.display_name = result.display_name;
+          localStorage.setItem('auth_user', JSON.stringify(user));
+        }
+        profileData = result;
+        renderProfile();
+        renderUserBadge();
+        showMsg('הפרופיל עודכן בהצלחה!', 'success');
+      } catch (err) {
+        showMsg(err.message || 'שגיאה בעדכון', 'error');
+      }
+    });
+
+    // Change password
+    document.getElementById('btn-change-password').addEventListener('click', async () => {
+      const current = document.getElementById('input-current-password').value;
+      const newPass = document.getElementById('input-new-password').value;
+      const confirm = document.getElementById('input-confirm-password').value;
+
+      if (!current || !newPass) return showMsg('נא למלא את כל השדות', 'error');
+      if (newPass.length < 8) return showMsg('סיסמה חדשה חייבת להיות לפחות 8 תווים', 'error');
+      if (newPass !== confirm) return showMsg('הסיסמאות לא תואמות', 'error');
+
+      try {
+        await API.request('/auth/change-password', {
+          method: 'PUT',
+          body: JSON.stringify({ current_password: current, new_password: newPass })
+        });
+        document.getElementById('input-current-password').value = '';
+        document.getElementById('input-new-password').value = '';
+        document.getElementById('input-confirm-password').value = '';
+        showMsg('הסיסמה שונתה בהצלחה!', 'success');
+      } catch (err) {
+        showMsg(err.message || 'שגיאה בשינוי סיסמה', 'error');
+      }
+    });
+
+    // Save notifications
+    document.getElementById('btn-save-notifications').addEventListener('click', async () => {
+      try {
+        await API.request('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            notifications: {
+              email_follow_up: document.getElementById('notif-follow-up').checked,
+              email_duplicate: document.getElementById('notif-duplicate').checked,
+              email_payment: document.getElementById('notif-payment').checked
+            }
+          })
+        });
+        showMsg('הגדרות ההתראות נשמרו!', 'success');
+      } catch (err) {
+        showMsg(err.message || 'שגיאה בשמירה', 'error');
+      }
+    });
+
+    // Avatar upload - convert to base64 data URL
+    document.getElementById('avatar-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 500000) return showMsg('התמונה גדולה מדי (מקסימום 500KB)', 'error');
+
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const dataUrl = ev.target.result;
+        try {
+          await API.request('/auth/profile', {
+            method: 'PUT',
+            body: JSON.stringify({ avatar_url: dataUrl })
+          });
+          profileData.avatar_url = dataUrl;
+          renderProfile();
+          renderUserBadge();
+          showMsg('התמונה עודכנה!', 'success');
+        } catch (err) {
+          showMsg('שגיאה בהעלאת תמונה', 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    loadProfile();
+  </script>
+</body>
+</html>

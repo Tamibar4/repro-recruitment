@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team - RePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=6">
+  <style>
+    .team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-bottom: 28px; }
+    .team-card {
+      background: var(--color-white); border-radius: var(--radius-xl); border: 1px solid var(--color-border);
+      padding: 22px; cursor: pointer; transition: all var(--transition); box-shadow: var(--shadow-xs);
+    }
+    .team-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-3px); border-color: var(--color-primary-light); }
+    .team-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0,115,234,0.15), var(--shadow-md); }
+    .team-card-top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .team-avatar {
+      width: 48px; height: 48px; border-radius: 50%; background: var(--gradient-primary);
+      color: white; display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 18px; flex-shrink: 0; box-shadow: var(--shadow-sm);
+    }
+    .team-name { font-size: 16px; font-weight: 700; color: var(--color-text); }
+    .team-role { font-size: 12px; color: var(--color-text-secondary); }
+    .team-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .team-stat {
+      text-align: center; padding: 10px 4px; background: var(--color-bg); border-radius: var(--radius-sm);
+    }
+    .team-stat-num { font-size: 20px; font-weight: 700; color: var(--color-text); }
+    .team-stat-label { font-size: 10px; color: var(--color-text-secondary); font-weight: 600; }
+    .team-stat.s1 .team-stat-num { color: var(--color-orange); }
+    .team-stat.s2 .team-stat-num { color: var(--color-primary); }
+    .team-stat.acc .team-stat-num { color: var(--color-green); }
+    .team-stat.total .team-stat-num { color: var(--color-text); }
+    .team-alert { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12px; color: var(--color-red); font-weight: 600; }
+
+    .team-detail-section { margin-top: 28px; }
+    .team-detail-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+      padding-bottom: 12px; border-bottom: 2px solid var(--color-primary);
+    }
+    .team-detail-title { font-size: 18px; font-weight: 700; color: var(--color-text); display: flex; align-items: center; gap: 10px; }
+    .team-detail-avatar {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--gradient-primary);
+      color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+    }
+
+    .team-candidates-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+      background: var(--color-white); border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border); overflow: hidden;
+    }
+    .team-candidates-table th {
+      text-align: right; padding: 12px 16px; font-size: 11px; font-weight: 700;
+      color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.4px;
+      background: var(--color-bg); border-bottom: 2px solid var(--color-border);
+    }
+    .team-candidates-table td {
+      padding: 12px 16px; border-bottom: 1px solid var(--color-border); font-size: 13px;
+    }
+    .team-candidates-table tr:last-child td { border-bottom: none; }
+    .team-candidates-table tr:hover td { background: var(--color-primary-lighter); }
+    .stage-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; }
+    .stage-dot.stage1 { background: var(--color-orange); }
+    .stage-dot.stage2 { background: var(--color-primary); }
+    .stage-dot.accepted { background: var(--color-green); }
+    .stage-dot.rejected { background: var(--color-red); }
+
+    .team-empty { text-align: center; padding: 40px; color: var(--color-text-light); }
+    .team-empty-icon { font-size: 40px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text">RePro</div>
+          <div class="sidebar-logo-tagline">Your Job Abroad</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span>דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>מועמדים</span>
+        </a>
+        <a href="team.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>צוות</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">👥 ניהול צוות</h1>
+          <div class="page-subtitle">צפייה בהתקדמות הלידים של כל חבר צוות</div>
+        </div>
+      </div>
+
+      <!-- Team overview cards -->
+      <div class="team-grid" id="team-grid">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+
+      <!-- Selected user detail -->
+      <div id="team-detail" class="team-detail-section" style="display:none"></div>
+    </main>
+  </div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    let teamData = null;
+    let selectedUser = null;
+
+    async function loadTeam() {
+      try {
+        const me = API.getCurrentUser();
+        if (!me || me.role !== 'admin') {
+          document.querySelector('.main').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🔒</div>
+              <div class="empty-state-title">גישה למנהלים בלבד</div>
+            </div>`;
+          return;
+        }
+
+        teamData = await API.request('/team/overview');
+        renderTeamCards();
+      } catch (err) {
+        console.error('Failed to load team:', err);
+      }
+    }
+
+    function renderTeamCards() {
+      const container = document.getElementById('team-grid');
+      const team = teamData.team || [];
+
+      if (team.length === 0) {
+        container.innerHTML = `<div class="team-empty"><div class="team-empty-icon">👥</div>אין חברי צוות</div>`;
+        return;
+      }
+
+      container.innerHTML = team.map(u => {
+        const initial = (u.display_name || u.username || '?').charAt(0).toUpperCase();
+        const isSelected = selectedUser === u.username;
+        return `
+          <div class="team-card ${isSelected ? 'selected' : ''}" data-user="${u.username}" onclick="selectUser('${u.username}')">
+            <div class="team-card-top">
+              <div class="team-avatar">${initial}</div>
+              <div>
+                <div class="team-name">${escapeHtml(u.display_name || u.username)}</div>
+                <div class="team-role">${u.role === 'admin' ? '👑 מנהל' : '👤 משתמש'}</div>
+              </div>
+            </div>
+            <div class="team-stats">
+              <div class="team-stat s1">
+                <div class="team-stat-num">${u.stage1}</div>
+                <div class="team-stat-label">שלב 1</div>
+              </div>
+              <div class="team-stat s2">
+                <div class="team-stat-num">${u.stage2}</div>
+                <div class="team-stat-label">שלב 2</div>
+              </div>
+              <div class="team-stat acc">
+                <div class="team-stat-num">${u.accepted}</div>
+                <div class="team-stat-label">התקבלו</div>
+              </div>
+              <div class="team-stat total">
+                <div class="team-stat-num">${u.total}</div>
+                <div class="team-stat-label">סה"כ</div>
+              </div>
+            </div>
+            ${u.pendingFollowUps > 0 ? `
+              <div class="team-alert">⚠️ ${u.pendingFollowUps} פולואפים באיחור</div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function selectUser(username) {
+      selectedUser = username;
+      renderTeamCards();
+
+      const detail = document.getElementById('team-detail');
+      detail.style.display = 'block';
+      detail.innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
+
+      try {
+        const candidates = await API.request('/team/user/' + username + '/candidates');
+        const user = teamData.team.find(u => u.username === username);
+        const initial = (user?.display_name || username).charAt(0).toUpperCase();
+        const stageLabels = { stage1: 'שלב ראשון', stage2: 'שלב שני', accepted: 'התקבלו', rejected: 'נדחו' };
+
+        if (candidates.length === 0) {
+          detail.innerHTML = `
+            <div class="team-detail-header">
+              <div class="team-detail-title">
+                <div class="team-detail-avatar">${initial}</div>
+                הלידים של ${escapeHtml(user?.display_name || username)}
+              </div>
+            </div>
+            <div class="team-empty"><div class="team-empty-icon">📋</div>אין לידים עדיין</div>`;
+          return;
+        }
+
+        detail.innerHTML = `
+          <div class="team-detail-header">
+            <div class="team-detail-title">
+              <div class="team-detail-avatar">${initial}</div>
+              הלידים של ${escapeHtml(user?.display_name || username)} (${candidates.length})
+            </div>
+          </div>
+          <table class="team-candidates-table">
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th>טלפון</th>
+                <th>משרה</th>
+                <th>שלב</th>
+                <th>פולואפ</th>
+                <th>תאריך</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${candidates.map(c => {
+                const followUpStatus = c.follow_up_at && !c.follow_up_done
+                  ? (new Date(c.follow_up_at) < new Date() ? '🔴 באיחור' : '🟢 מתוכנן')
+                  : '—';
+                return `
+                  <tr>
+                    <td><strong>${escapeHtml(c.name)}</strong></td>
+                    <td dir="ltr">${escapeHtml(c.phone || '')}</td>
+                    <td>${escapeHtml(c.job_title || '—')}</td>
+                    <td><span class="stage-dot ${c.stage}"></span>${stageLabels[c.stage] || c.stage}</td>
+                    <td>${followUpStatus}</td>
+                    <td>${c.created_at ? new Date(c.created_at).toLocaleDateString('he-IL') : '—'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+
+        detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        detail.innerHTML = '<div class="team-empty">שגיאה בטעינת נתונים</div>';
+      }
+    }
+
+    loadTeam();
+  </script>
+</body>
+</html>

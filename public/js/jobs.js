@@ -5,6 +5,7 @@
 let allJobs = [];
 let currentJob = null;
 let currentLocations = []; // working copy of locations being edited
+let currentRequirements = []; // working copy of requirements being edited
 let filters = { categories: ['all'], regions: ['all'], status: 'all', search: '' };
 
 // Map location names to regions
@@ -150,9 +151,8 @@ function renderJobs() {
       const job = allJobs.find(j => j.id == id);
       if (!job) return;
       try {
-        await fetch(`/api/jobs/${id}/urgent`, {
+        await API.request(`/jobs/${id}/urgent`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ is_urgent: !job.is_urgent })
         });
         showToast(I18n.t('saved'));
@@ -339,6 +339,23 @@ function renderDetailsModalBody() {
       </div>
     ` : ''}
 
+    ${job.requirements && job.requirements.length > 0 ? `
+      <div class="details-section">
+        <div class="details-label">📋 דרישות</div>
+        <div class="requirements-list">
+          ${job.requirements.map(req => `
+            <div class="requirement-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 11 12 14 22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              <span>${escapeHtml(req)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+
     ${job.notes ? `
       <div class="details-section">
         <div class="details-label">📝 ${I18n.t('notes')}</div>
@@ -502,15 +519,18 @@ function openJobModal(job = null) {
     document.getElementById('job-notes').value = job.notes || '';
     document.getElementById('job-urgent').checked = !!job.is_urgent;
     currentLocations = Array.isArray(job.locations) ? [...job.locations] : [];
+    currentRequirements = Array.isArray(job.requirements) ? [...job.requirements] : [];
   } else {
     title.textContent = I18n.t('new_job');
     document.getElementById('job-form').reset();
     document.getElementById('job-id').value = '';
     document.getElementById('job-urgent').checked = false;
     currentLocations = [];
+    currentRequirements = [];
   }
 
   renderLocationsEditor();
+  renderRequirementsEditor();
   openModal('job-modal');
 }
 
@@ -567,6 +587,52 @@ function renderLocationsEditor() {
   });
 }
 
+// ============================================================
+// Requirements Editor
+// ============================================================
+function renderRequirementsEditor() {
+  const container = document.getElementById('requirements-editor');
+  if (!container) return;
+  if (currentRequirements.length === 0) {
+    container.innerHTML = '<div class="locations-empty">אין דרישות - לחצי "הוסף דרישה"</div>';
+    return;
+  }
+
+  container.innerHTML = currentRequirements.map((req, idx) => `
+    <div class="requirement-edit-row" data-idx="${idx}">
+      <input type="text" class="req-text" data-idx="${idx}" value="${escapeHtml(req)}" placeholder="לדוגמה: אנגלית טובה">
+      <button type="button" class="icon-btn danger req-remove" data-idx="${idx}" aria-label="מחק">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.req-text').forEach(input => {
+    input.addEventListener('input', (e) => {
+      currentRequirements[parseInt(e.target.dataset.idx)] = e.target.value;
+    });
+  });
+  container.querySelectorAll('.req-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentRequirements.splice(parseInt(btn.dataset.idx), 1);
+      renderRequirementsEditor();
+    });
+  });
+}
+
+function addRequirement() {
+  currentRequirements.push('');
+  renderRequirementsEditor();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.req-text');
+    if (inputs.length > 0) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+document.getElementById('btn-add-requirement').addEventListener('click', addRequirement);
+
 function addLocation() {
   currentLocations.push({ name: '', pressure: '', needed: '' });
   renderLocationsEditor();
@@ -598,7 +664,8 @@ async function saveJob() {
     description: document.getElementById('job-description').value.trim(),
     notes: document.getElementById('job-notes').value.trim(),
     is_urgent: document.getElementById('job-urgent').checked,
-    locations
+    locations,
+    requirements: currentRequirements.filter(r => r.trim())
   };
 
   if (!data.title || !data.category) {

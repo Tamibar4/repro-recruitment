@@ -39,11 +39,19 @@ const API = {
     const res = await fetch(this.baseUrl + path, { ...options, headers });
 
     if (res.status === 401) {
-      // Session expired or invalid - redirect to login
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
       window.location.href = '/login.html';
       throw new Error('Unauthorized');
+    }
+
+    if (res.status === 409) {
+      const err = await res.json().catch(() => ({ error: 'Conflict' }));
+      if (err.error === 'duplicate_phone' && err.existing) {
+        showDuplicateAlert(err.existing);
+        throw new Error('duplicate');
+      }
+      throw new Error(err.error || 'Conflict');
     }
 
     if (!res.ok) {
@@ -303,6 +311,36 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 // Login enforcement + user badge
 // ============================================================
+// Duplicate candidate alert
+function showDuplicateAlert(existing) {
+  const stageLabels = { stage1: 'שלב ראשון', stage2: 'שלב שני', accepted: 'התקבלו', rejected: 'נדחו' };
+  const stageName = stageLabels[existing.stage] || existing.stage;
+
+  // Remove any existing alert
+  document.querySelectorAll('.duplicate-alert-overlay').forEach(el => el.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'duplicate-alert-overlay';
+  overlay.innerHTML = `
+    <div class="duplicate-alert">
+      <div class="duplicate-alert-icon">⚠️</div>
+      <div class="duplicate-alert-title">ליד כפול!</div>
+      <div class="duplicate-alert-body">
+        <p>מועמד עם אותו מספר טלפון כבר קיים במערכת:</p>
+        <div class="duplicate-alert-details">
+          <div class="dup-row"><span>👤 שם:</span><strong>${escapeHtml(existing.name)}</strong></div>
+          <div class="dup-row"><span>📞 טלפון:</span><strong dir="ltr">${escapeHtml(existing.phone)}</strong></div>
+          <div class="dup-row"><span>📋 שלב:</span><strong>${stageName}</strong></div>
+          ${existing.job_title ? `<div class="dup-row"><span>💼 משרה:</span><strong>${escapeHtml(existing.job_title)}</strong></div>` : ''}
+          <div class="dup-row"><span>👥 בטיפול של:</span><strong>${escapeHtml(existing.created_by || 'לא ידוע')}</strong></div>
+        </div>
+      </div>
+      <button class="duplicate-alert-close" onclick="this.closest('.duplicate-alert-overlay').remove()">הבנתי</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
 function checkAuth() {
   // Skip on login page
   if (window.location.pathname.endsWith('/login.html')) return;
@@ -322,11 +360,11 @@ function renderUserBadge() {
   const initial = (user.display_name || user.username || '?').charAt(0).toUpperCase();
   container.innerHTML = `
     <div class="user-badge">
-      <div class="user-badge-avatar">${escapeHtml(initial)}</div>
-      <div class="user-badge-info">
+      <a href="profile.html" class="user-badge-avatar" title="הגדרות פרופיל">${escapeHtml(initial)}</a>
+      <a href="profile.html" class="user-badge-info" style="text-decoration:none;color:inherit">
         <div class="user-badge-name">${escapeHtml(user.display_name || user.username)}</div>
         <div class="user-badge-role">${escapeHtml(user.role || '')}</div>
-      </div>
+      </a>
       <button class="user-badge-logout" id="btn-logout" title="${I18n.t('logout')}" aria-label="${I18n.t('logout')}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
