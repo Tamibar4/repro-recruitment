@@ -291,11 +291,13 @@ function authMiddleware(req, res, next) {
 // SECURITY: Origin Guard (CSRF defense in depth)
 // ============================================================
 function originGuard(req, res, next) {
-  // GET requests don't change state
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   const origin = req.headers.origin || req.headers.referer || '';
-  if (!origin) return next(); // Same-origin request without Origin header (rare but valid)
-  const allowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o));
+  if (!origin) return next();
+  // Allow listed origins + any *.up.railway.app (for Railway deployments)
+  const allowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o)) ||
+                  (process.env.RAILWAY_PUBLIC_DOMAIN && origin.includes(process.env.RAILWAY_PUBLIC_DOMAIN)) ||
+                  origin.includes('.up.railway.app');
   if (!allowed) {
     auditLog('origin_blocked', { ip: getClientIp(req), origin, path: req.path });
     return res.status(403).json({ error: 'Origin not allowed' });
@@ -337,14 +339,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Restricted CORS - only allow whitelisted origins
+// 2. CORS - allow same-origin + whitelisted origins (Railway auto-adds RAILWAY_PUBLIC_DOMAIN)
+const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https://' + process.env.RAILWAY_PUBLIC_DOMAIN : null;
+const dynamicOrigins = [...ALLOWED_ORIGINS];
+if (railwayDomain) dynamicOrigins.push(railwayDomain);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // Allow same-origin (no Origin header)
-    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    if (dynamicOrigins.includes(origin)) return callback(null, true);
+    // In production, allow any *.up.railway.app subdomain (for preview deployments too)
+    if (origin.endsWith('.up.railway.app')) return callback(null, true);
+    callback(null, false); // Return false instead of throwing - lets request through but no CORS headers
   },
-  credentials: false, // We use Bearer tokens, not cookies
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400
