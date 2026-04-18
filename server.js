@@ -878,6 +878,24 @@ app.post('/api/auth/approve/:username', (req, res) => {
   res.json({ success: true, message: `User ${user.username} approved` });
 });
 
+// POST /api/auth/promote/:username - promote user to admin (admin only)
+app.post('/api/auth/promote/:username', (req, res) => {
+  const auth = req.headers['authorization'];
+  const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const session = sessions.get(token);
+  if (!session || session.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
+  const user = data.users.find(u => u.username === req.params.username);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  user.role = 'admin';
+  user.status = 'active';
+  saveData();
+  auditLog('user_promoted_to_admin', { username: user.username, by: session.username });
+  res.json({ success: true, message: `User ${user.username} is now admin` });
+});
+
 // POST /api/auth/reject/:username - reject pending user (admin only)
 app.post('/api/auth/reject/:username', (req, res) => {
   const auth = req.headers['authorization'];

@@ -3956,6 +3956,75 @@ button:focus-visible,
   color: var(--color-purple);
 }
 
+/* ============================================================
+   Mobile top-right user menu (always visible on mobile)
+   ============================================================ */
+.mobile-user-menu {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 999;
+}
+[dir="rtl"] .mobile-user-menu {
+  left: auto;
+  right: 12px;
+}
+.mobile-user-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px;
+  box-shadow: var(--shadow);
+  border: 2px solid white;
+  cursor: pointer;
+}
+.mobile-user-dropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  min-width: 180px;
+  padding: 6px;
+  display: none;
+  border: 1px solid var(--color-border);
+}
+[dir="rtl"] .mobile-user-dropdown {
+  left: auto;
+  right: 0;
+}
+.mobile-user-dropdown.show { display: block; }
+.mobile-user-dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  background: none; border: none; width: 100%;
+  font-family: inherit;
+  text-align: right;
+}
+[dir="ltr"] .mobile-user-dropdown-item { text-align: left; }
+.mobile-user-dropdown-item:hover { background: var(--color-bg); }
+.mobile-user-dropdown-item.danger { color: var(--color-red); }
+.mobile-user-dropdown-item.danger:hover { background: var(--color-red-light); }
+.mobile-user-dropdown-item svg { width: 16px; height: 16px; }
+.mobile-user-dropdown-divider {
+  height: 1px; background: var(--color-border); margin: 4px 8px;
+}
+
+@media (max-width: 600px) {
+  .mobile-user-menu { display: block; }
+}
+
 /* ---------- Utilities ---------- */
 .flex { display: flex; }
 .items-center { align-items: center; }

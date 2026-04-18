@@ -352,9 +352,53 @@ function checkAuth() {
   return true;
 }
 
+function renderMobileUserMenu() {
+  const user = API.getCurrentUser();
+  if (!user) return;
+  // Only add if not already present
+  if (document.getElementById('mobile-user-menu')) return;
+  const initial = (user.display_name || user.username || '?').charAt(0).toUpperCase();
+  const menu = document.createElement('div');
+  menu.id = 'mobile-user-menu';
+  menu.className = 'mobile-user-menu';
+  menu.innerHTML = `
+    <button class="mobile-user-btn" id="mobile-user-btn">${escapeHtml(initial)}</button>
+    <div class="mobile-user-dropdown" id="mobile-user-dropdown">
+      <a href="profile.html" class="mobile-user-dropdown-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        ${escapeHtml(user.display_name || user.username)}
+      </a>
+      <div class="mobile-user-dropdown-divider"></div>
+      <button class="mobile-user-dropdown-item danger" id="mobile-logout-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        התנתקות
+      </button>
+    </div>
+  `;
+  document.body.appendChild(menu);
+
+  document.getElementById('mobile-user-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('mobile-user-dropdown').classList.toggle('show');
+  });
+  document.getElementById('mobile-logout-btn').addEventListener('click', () => API.logout());
+  document.addEventListener('click', (e) => {
+    const dd = document.getElementById('mobile-user-dropdown');
+    if (dd && !e.target.closest('#mobile-user-menu')) dd.classList.remove('show');
+  });
+}
+
 function renderUserBadge() {
   const user = API.getCurrentUser();
   if (!user) return;
+
+  // Always render mobile menu (visible only on mobile via CSS)
+  renderMobileUserMenu();
+
   const container = document.getElementById('user-badge-container');
   if (!container) return;
   const initial = (user.display_name || user.username || '?').charAt(0).toUpperCase();
@@ -363,7 +407,7 @@ function renderUserBadge() {
       <a href="profile.html" class="user-badge-avatar" title="הגדרות פרופיל">${escapeHtml(initial)}</a>
       <a href="profile.html" class="user-badge-info" style="text-decoration:none;color:inherit">
         <div class="user-badge-name">${escapeHtml(user.display_name || user.username)}</div>
-        <div class="user-badge-role">${escapeHtml(user.role || '')}</div>
+        <div class="user-badge-role">${user.role === 'admin' ? '👑 מנהלת' : '👤 משתמש/ת'}</div>
       </a>
       <button class="user-badge-logout" id="btn-logout" title="${I18n.t('logout')}" aria-label="${I18n.t('logout')}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

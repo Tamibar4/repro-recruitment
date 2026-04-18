@@ -59,7 +59,10 @@
     }
     .team-candidates-table td {
       padding: 12px 16px; border-bottom: 1px solid var(--color-border); font-size: 13px;
+      text-align: right;
     }
+    .team-candidates-table td.phone-cell { direction: ltr; text-align: right; unicode-bidi: isolate; }
+    [dir="ltr"] .team-candidates-table td { text-align: left; }
     .team-candidates-table tr:last-child td { border-bottom: none; }
     .team-candidates-table tr:hover td { background: var(--color-primary-lighter); }
     .stage-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; }
@@ -92,7 +95,7 @@
           <span>משרות</span>
         </a>
         <a href="candidates.html" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
           <span>מועמדים</span>
         </a>
         <a href="team.html" class="nav-item active">
@@ -129,6 +132,9 @@
         <div class="empty-state"><div class="spinner"></div></div>
       </div>
 
+      <!-- All candidates section (visible by default) -->
+      <div id="team-all-candidates" class="team-detail-section"></div>
+
       <!-- Selected user detail -->
       <div id="team-detail" class="team-detail-section" style="display:none"></div>
     </main>
@@ -154,6 +160,7 @@
 
         teamData = await API.request('/team/overview');
         renderTeamCards();
+        renderAllCandidates();
       } catch (err) {
         console.error('Failed to load team:', err);
       }
@@ -206,10 +213,77 @@
       }).join('');
     }
 
+    async function renderAllCandidates() {
+      const container = document.getElementById('team-all-candidates');
+      try {
+        // Get ALL candidates (admin sees all from /api/candidates)
+        const candidates = await API.candidates.list();
+        const stageLabels = { stage1: 'שלב ראשון', stage2: 'שלב שני', accepted: 'התקבלו', rejected: 'נדחו', delayed: 'זמינות מאוחרת' };
+
+        if (candidates.length === 0) {
+          container.innerHTML = `
+            <div class="team-detail-header">
+              <div class="team-detail-title">📋 כל הלידים של הצוות</div>
+            </div>
+            <div class="team-empty"><div class="team-empty-icon">📋</div>עדיין אין לידים במערכת</div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="team-detail-header">
+            <div class="team-detail-title">📋 כל הלידים של הצוות (${candidates.length})</div>
+          </div>
+          <table class="team-candidates-table">
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th>טלפון</th>
+                <th>משרה</th>
+                <th>שלב</th>
+                <th>נוצר ע"י</th>
+                <th>פולואפ</th>
+                <th>תאריך</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${candidates.map(c => {
+                const followUpStatus = c.follow_up_at && !c.follow_up_done
+                  ? (new Date(c.follow_up_at) < new Date() ? '🔴 באיחור' : '🟢 מתוכנן')
+                  : '—';
+                return `
+                  <tr>
+                    <td><strong>${escapeHtml(c.name)}</strong></td>
+                    <td class="phone-cell">${escapeHtml(c.phone || '—')}</td>
+                    <td>${escapeHtml(c.job_title || '—')}</td>
+                    <td><span class="stage-dot ${c.stage}"></span>${stageLabels[c.stage] || c.stage}</td>
+                    <td>${escapeHtml(c.created_by || '—')}</td>
+                    <td>${followUpStatus}</td>
+                    <td>${c.created_at ? new Date(c.created_at).toLocaleDateString('he-IL') : '—'}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        container.innerHTML = '<div class="team-empty">שגיאה בטעינת לידים</div>';
+      }
+    }
+
     async function selectUser(username) {
+      // Toggle: if same user clicked again, show all
+      if (selectedUser === username) {
+        selectedUser = null;
+        renderTeamCards();
+        document.getElementById('team-detail').style.display = 'none';
+        document.getElementById('team-all-candidates').style.display = 'block';
+        renderAllCandidates();
+        return;
+      }
       selectedUser = username;
       renderTeamCards();
 
+      // Hide all-candidates section, show user-specific
+      document.getElementById('team-all-candidates').style.display = 'none';
       const detail = document.getElementById('team-detail');
       detail.style.display = 'block';
       detail.innerHTML = '<div style="text-align:center;padding:20px"><div class="spinner"></div></div>';
