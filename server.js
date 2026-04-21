@@ -26,7 +26,13 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'database.json');
+// Persistent storage: use DB_PATH env var (Railway volume) or fallback to local
+const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'database.json');
+// Ensure parent directory exists (for Railway volumes)
+try {
+  const dbDir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+} catch (e) { console.error('Could not create DB dir:', e.message); }
 const AUDIT_LOG_FILE = path.join(__dirname, 'audit.log');
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
