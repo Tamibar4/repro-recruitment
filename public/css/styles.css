@@ -1355,11 +1355,16 @@ button:focus-visible,
 /* ---------- Kanban Board ---------- */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(260px, 1fr));
   gap: 16px;
   min-height: 70vh;
   overflow-x: auto;
+  padding-bottom: 12px;
 }
+
+.kanban-board::-webkit-scrollbar { height: 8px; }
+.kanban-board::-webkit-scrollbar-track { background: var(--color-bg); border-radius: 4px; }
+.kanban-board::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
 
 .kanban-column {
   background: var(--color-white);
@@ -1394,7 +1399,7 @@ button:focus-visible,
 }
 
 .kanban-header {
-  padding: 18px 20px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1426,15 +1431,16 @@ button:focus-visible,
 }
 
 .kanban-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   position: relative;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
+  min-width: 0;
 }
+.kanban-title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .kanban-title-emoji {
   font-size: 18px;
@@ -1492,7 +1498,7 @@ button:focus-visible,
   background: var(--color-white);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 12px;
   cursor: pointer;
   transition: all var(--transition);
   position: relative;
@@ -1534,14 +1540,14 @@ button:focus-visible,
 }
 
 .candidate-avatar {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
   box-shadow: var(--shadow-sm);
@@ -3626,14 +3632,15 @@ button:focus-visible,
 }
 
 .candidate-payment-info {
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: 8px;
+  padding: 6px 8px;
   background: linear-gradient(135deg, #f0fdf4, #e8faf0);
   border: 1px solid #b7ebd4;
   border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  font-size: 11px;
 }
 
 .payment-row {
