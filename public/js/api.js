@@ -142,13 +142,14 @@ function formatDate(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   if (isNaN(date)) return '';
-  const lang = I18n.current;
-  return date.toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US', {
+  return date.toLocaleDateString('he-IL', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Jerusalem'
   });
 }
 
@@ -156,10 +157,10 @@ function formatDateShort(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   if (isNaN(date)) return '';
-  const lang = I18n.current;
-  return date.toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-US', {
+  return date.toLocaleDateString('he-IL', {
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'Asia/Jerusalem'
   });
 }
 

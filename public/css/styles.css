@@ -1355,7 +1355,7 @@ button:focus-visible,
 /* ---------- Kanban Board ---------- */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
   gap: 16px;
   min-height: 70vh;
   overflow-x: auto;
@@ -1537,11 +1537,14 @@ button:focus-visible,
 }
 
 .candidate-card-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   margin-bottom: 10px;
-  flex-wrap: wrap;
+}
+
+.candidate-card-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 .candidate-card-top .tag {
   max-width: 100%;
@@ -4118,43 +4121,94 @@ button:focus-visible,
 
 .accepted-table {
   width: 100%;
+}
+
+/* Month groups */
+.accepted-month-group {
+  border-bottom: 1px solid var(--color-border);
+}
+.accepted-month-group:last-child { border-bottom: none; }
+
+.accepted-month-header {
+  padding: 14px 22px;
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1d2e 100%);
+  color: white;
+}
+.accepted-month-header.current {
+  background: linear-gradient(135deg, #0d47a1 0%, #1e88e5 100%);
+}
+.accepted-month-header.past {
+  background: linear-gradient(135deg, #1a1d2e 0%, #2d3142 100%);
+}
+.accepted-month-header.future {
+  background: linear-gradient(135deg, #00c875 0%, #00a65a 100%);
+}
+.accepted-month-header.no-date {
+  background: linear-gradient(135deg, #78909c 0%, #607d8b 100%);
+}
+.accepted-month-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.accepted-month-icon {
+  font-size: 24px;
+}
+.accepted-month-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.accepted-month-count {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.accepted-table-inner {
+  width: 100%;
   border-collapse: collapse;
   min-width: 720px;
 }
 
-.accepted-table th {
+.accepted-table th,
+.accepted-table-inner th {
   text-align: right;
-  padding: 14px 18px;
+  padding: 12px 18px;
   font-size: 11px;
   font-weight: 700;
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: var(--color-bg);
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
 }
 
-[dir="ltr"] .accepted-table th {
+[dir="ltr"] .accepted-table th,
+[dir="ltr"] .accepted-table-inner th {
   text-align: left;
 }
 
-.accepted-table td {
-  padding: 14px 18px;
+.accepted-table td,
+.accepted-table-inner td {
+  padding: 12px 18px;
   border-bottom: 1px solid var(--color-border);
   font-size: 13px;
   vertical-align: middle;
 }
 
-.accepted-table tr:last-child td {
+.accepted-table tr:last-child td,
+.accepted-table-inner tr:last-child td {
   border-bottom: none;
 }
 
-.accepted-table tr:hover td {
+.accepted-table tr:hover td,
+.accepted-table-inner tr:hover td {
   background: #f0fdf4;
 }
 
-.accepted-table tbody tr {
+.accepted-table tbody tr,
+.accepted-table-inner tbody tr {
   cursor: pointer;
   transition: background var(--transition-fast);
 }

@@ -71,16 +71,13 @@ function renderKanban() {
   // Update counts
   document.getElementById('count-stage1').textContent = columns.stage1.length;
   document.getElementById('count-stage2').textContent = columns.stage2.length;
-  document.getElementById('count-accepted').textContent = columns.accepted.length;
   document.getElementById('count-rejected').textContent = columns.rejected.length;
 
-  // Render each column
+  // Render each column (accepted shows as separate table below)
   renderColumn('stage1', columns.stage1);
   renderColumn('stage2', columns.stage2);
-  renderColumn('accepted', columns.accepted);
   renderColumn('rejected', columns.rejected);
   renderAcceptedTable(columns.accepted);
-  renderPaymentSummary(columns.accepted);
 
   // Highlight the column that matches URL stage filter
   if (filters.stage && filters.stage !== 'all') {
@@ -224,16 +221,14 @@ function renderCandidateCard(candidate, stage) {
   return `
     <div class="candidate-card ${followUpClass}" data-id="${candidate.id}">
       <div class="candidate-card-top">
-        <div class="candidate-card-info">
+        <div class="candidate-card-name-row">
           <div class="candidate-card-name">${escapeHtml(candidate.name)}</div>
           ${candidate.phone && waLink ? `
-            <div class="candidate-card-phone-row">
-              <a href="${waLink}" target="_blank" rel="noopener" class="whatsapp-btn" onclick="event.stopPropagation()" title="WhatsApp" aria-label="WhatsApp">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                </svg>
-              </a>
-            </div>
+            <a href="${waLink}" target="_blank" rel="noopener" class="whatsapp-btn" onclick="event.stopPropagation()" title="WhatsApp" aria-label="WhatsApp">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+            </a>
           ` : ''}
         </div>
       </div>
@@ -662,9 +657,9 @@ document.getElementById('candidate-phone').addEventListener('input', updatePhone
 // ---------- Payment Summary ----------
 function renderAcceptedTable(accepted) {
   const section = document.getElementById('accepted-section');
-  const table = document.getElementById('accepted-table');
+  const container = document.getElementById('accepted-table');
   const subtitle = document.getElementById('accepted-subtitle');
-  if (!section || !table) return;
+  if (!section || !container) return;
 
   if (!accepted || accepted.length === 0) {
     section.style.display = 'none';
@@ -674,37 +669,120 @@ function renderAcceptedTable(accepted) {
   subtitle.textContent = accepted.length + ' מועמדים';
 
   const planLabels = { '45days': '45 יום', '2weeks': 'שבועיים', '5050': '50/50', 'custom': 'ידני' };
-  const fmt = d => d ? new Date(d).toLocaleDateString('he-IL', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const fmt = d => d ? new Date(d).toLocaleDateString('he-IL', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Jerusalem' }) : '—';
 
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>שם</th>
-        <th>טלפון</th>
-        <th>משרה</th>
-        <th>תוכנית</th>
-        <th>תאריך הגעה</th>
-        <th>תאריך תשלום</th>
-        <th>סכום</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${accepted.map(c => `
-        <tr data-id="${c.id}">
-          <td><span class="accepted-name">${escapeHtml(c.name)}</span></td>
-          <td><span class="accepted-phone">${escapeHtml(c.phone || '—')}</span></td>
-          <td><span class="accepted-job">${escapeHtml(c.job_title || '—')}</span></td>
-          <td>${c.payment_plan ? '<span class="accepted-plan-pill">' + (planLabels[c.payment_plan] || c.payment_plan) + '</span>' : '—'}</td>
-          <td>${fmt(c.start_date)}</td>
-          <td>${fmt(c.payment_date)}</td>
-          <td>${c.payment_amount ? '<span class="accepted-amount">$' + Number(c.payment_amount).toLocaleString() + '</span>' : '—'}</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  `;
+  // Group by payment month (the month when payment is expected)
+  const byMonth = {};
+  const noDate = [];
+  accepted.forEach(c => {
+    if (c.payment_date) {
+      const d = new Date(c.payment_date);
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      if (!byMonth[key]) byMonth[key] = { year: d.getFullYear(), month: d.getMonth(), candidates: [], total: 0 };
+      byMonth[key].candidates.push(c);
+      byMonth[key].total += Number(c.payment_amount || 0);
+    } else {
+      noDate.push(c);
+    }
+  });
 
-  // Click row to open modal
-  table.querySelectorAll('tbody tr').forEach(row => {
+  const sortedKeys = Object.keys(byMonth).sort();
+  const now = new Date();
+  const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+  let html = '';
+
+  for (const key of sortedKeys) {
+    const g = byMonth[key];
+    const isCurrent = key === curKey;
+    const isPast = key < curKey;
+    const label = monthNames[g.month] + ' ' + g.year;
+
+    html += `
+      <div class="accepted-month-group">
+        <div class="accepted-month-header ${isCurrent ? 'current' : isPast ? 'past' : 'future'}">
+          <div class="accepted-month-title">
+            <span class="accepted-month-icon">${isCurrent ? '🔥' : isPast ? '✅' : '📅'}</span>
+            <div>
+              <div class="accepted-month-label">תשלומים בחודש ${label}</div>
+              <div class="accepted-month-count">${g.candidates.length} מועמדים · סה"כ $${g.total.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+        <table class="accepted-table-inner">
+          <thead>
+            <tr>
+              <th>שם</th>
+              <th>טלפון</th>
+              <th>משרה</th>
+              <th>תוכנית</th>
+              <th>תאריך הגעה</th>
+              <th>תאריך תשלום</th>
+              <th>סכום</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${g.candidates.map(c => `
+              <tr data-id="${c.id}">
+                <td><span class="accepted-name">${escapeHtml(c.name)}</span></td>
+                <td><span class="accepted-phone">${escapeHtml(c.phone || '—')}</span></td>
+                <td><span class="accepted-job">${escapeHtml(c.job_title || '—')}</span></td>
+                <td>${c.payment_plan ? '<span class="accepted-plan-pill">' + (planLabels[c.payment_plan] || c.payment_plan) + '</span>' : '—'}</td>
+                <td>${fmt(c.start_date)}</td>
+                <td>${fmt(c.payment_date)}</td>
+                <td>${c.payment_amount ? '<span class="accepted-amount">$' + Number(c.payment_amount).toLocaleString() + '</span>' : '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // No payment date group
+  if (noDate.length > 0) {
+    html += `
+      <div class="accepted-month-group">
+        <div class="accepted-month-header no-date">
+          <div class="accepted-month-title">
+            <span class="accepted-month-icon">❓</span>
+            <div>
+              <div class="accepted-month-label">ללא תאריך תשלום</div>
+              <div class="accepted-month-count">${noDate.length} מועמדים - נדרש להגדיר תאריך</div>
+            </div>
+          </div>
+        </div>
+        <table class="accepted-table-inner">
+          <thead>
+            <tr>
+              <th>שם</th>
+              <th>טלפון</th>
+              <th>משרה</th>
+              <th>תאריך הגעה</th>
+              <th>סכום</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${noDate.map(c => `
+              <tr data-id="${c.id}">
+                <td><span class="accepted-name">${escapeHtml(c.name)}</span></td>
+                <td><span class="accepted-phone">${escapeHtml(c.phone || '—')}</span></td>
+                <td><span class="accepted-job">${escapeHtml(c.job_title || '—')}</span></td>
+                <td>${fmt(c.start_date)}</td>
+                <td>${c.payment_amount ? '<span class="accepted-amount">$' + Number(c.payment_amount).toLocaleString() + '</span>' : '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  container.outerHTML = '<div id="accepted-table">' + html + '</div>';
+
+  // Re-attach click handlers
+  document.querySelectorAll('#accepted-table tbody tr').forEach(row => {
     row.addEventListener('click', () => {
       const id = parseInt(row.dataset.id);
       const c = allCandidates.find(x => x.id === id);
