@@ -1535,8 +1535,17 @@ button:focus-visible,
 .candidate-card-top {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.candidate-card-top .tag {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  padding: 3px 8px;
 }
 
 .candidate-avatar {
