@@ -58,15 +58,13 @@ function renderKanban() {
     stage1: [],
     stage2: [],
     accepted: [],
-    rejected: [],
-    delayed: []
+    rejected: []
   };
 
+  // Only active stages in main Kanban (delayed goes to separate tab)
   allCandidates.forEach(c => {
-    if (columns[c.stage]) {
+    if (c.stage !== 'delayed' && columns[c.stage]) {
       columns[c.stage].push(c);
-    } else if (c.stage === 'delayed') {
-      columns.delayed.push(c);
     }
   });
 
@@ -75,14 +73,12 @@ function renderKanban() {
   document.getElementById('count-stage2').textContent = columns.stage2.length;
   document.getElementById('count-accepted').textContent = columns.accepted.length;
   document.getElementById('count-rejected').textContent = columns.rejected.length;
-  document.getElementById('count-delayed').textContent = columns.delayed.length;
 
   // Render each column
   renderColumn('stage1', columns.stage1);
   renderColumn('stage2', columns.stage2);
   renderColumn('accepted', columns.accepted);
   renderColumn('rejected', columns.rejected);
-  renderColumn('delayed', columns.delayed);
   renderPaymentSummary(columns.accepted);
 
   // Highlight the column that matches URL stage filter
@@ -227,7 +223,6 @@ function renderCandidateCard(candidate, stage) {
   return `
     <div class="candidate-card ${followUpClass}" data-id="${candidate.id}">
       <div class="candidate-card-top">
-        <div class="candidate-avatar ${avatarColor}">${escapeHtml(initials)}</div>
         <div class="candidate-card-info">
           <div class="candidate-card-name">${escapeHtml(candidate.name)}</div>
           ${candidate.phone && waLink ? `
@@ -768,7 +763,7 @@ async function loadDelayedAvailability() {
       const [yr, mo] = key.split('-');
       const mName = monthNames[parseInt(mo)-1];
       const isPast = key < curKey, isCur = key === curKey;
-      const bg = isCur ? '#ff6d00,#ffab40' : isPast ? '#9e9e9e,#bdbdbd' : '#7c4dff,#b388ff';
+      const bg = '#1a1d2e,#2d3142';
       const icon = isCur ? '🔥' : isPast ? '⏰' : '📅';
       const items = byMonth[key];
       return `<div class="panel" style="margin-bottom:20px;overflow:hidden">
@@ -792,7 +787,7 @@ async function loadDelayedAvailability() {
 
     if (withoutDate.length > 0) {
       html += `<div class="panel" style="margin-bottom:20px;overflow:hidden">
-        <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;background:linear-gradient(135deg,#78909c,#b0bec5);color:white;font-weight:700;font-size:16px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;background:linear-gradient(135deg,#1a1d2e,#2d3142);color:white;font-weight:700;font-size:16px">
           <span style="font-size:20px">❓</span>ללא תאריך זמינות
           <span style="background:rgba(255,255,255,0.25);padding:3px 12px;border-radius:20px;font-size:12px;margin-right:auto">${withoutDate.length}</span>
         </div>
