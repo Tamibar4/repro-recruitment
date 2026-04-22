@@ -705,9 +705,12 @@ function renderAcceptedTable(accepted) {
           <div class="accepted-month-title">
             <span class="accepted-month-icon">${isCurrent ? '🔥' : isPast ? '✅' : '📅'}</span>
             <div>
-              <div class="accepted-month-label">תשלומים בחודש ${label}</div>
-              <div class="accepted-month-count">${g.candidates.length} מועמדים · סה"כ $${g.total.toLocaleString()}</div>
+              <div class="accepted-month-label">${label}</div>
+              <div class="accepted-month-count">${g.candidates.length} מועמדים</div>
             </div>
+          </div>
+          <div class="accepted-month-summary">
+            <span class="accepted-month-summary-num">$${g.total.toLocaleString()}</span>
           </div>
         </div>
         <table class="accepted-table-inner">
@@ -749,7 +752,7 @@ function renderAcceptedTable(accepted) {
             <span class="accepted-month-icon">❓</span>
             <div>
               <div class="accepted-month-label">ללא תאריך תשלום</div>
-              <div class="accepted-month-count">${noDate.length} מועמדים - נדרש להגדיר תאריך</div>
+              <div class="accepted-month-count">${noDate.length} מועמדים</div>
             </div>
           </div>
         </div>
