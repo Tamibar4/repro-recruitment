@@ -4057,6 +4057,154 @@ button:focus-visible,
   .mobile-user-menu { display: block; }
 }
 
+/* ============================================================
+   Accepted Candidates Section (detailed table)
+   ============================================================ */
+.accepted-section {
+  margin-top: 28px;
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.accepted-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, #00c875 0%, #00a65a 100%);
+  color: white;
+}
+
+.accepted-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.accepted-header-icon {
+  font-size: 28px;
+}
+
+.accepted-header-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.accepted-header-subtitle {
+  font-size: 12px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+.accepted-header .btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+.accepted-header .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.accepted-table-wrap {
+  overflow-x: auto;
+}
+
+.accepted-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.accepted-table th {
+  text-align: right;
+  padding: 14px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--color-bg);
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+[dir="ltr"] .accepted-table th {
+  text-align: left;
+}
+
+.accepted-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.accepted-table tr:last-child td {
+  border-bottom: none;
+}
+
+.accepted-table tr:hover td {
+  background: #f0fdf4;
+}
+
+.accepted-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.accepted-name {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.accepted-job {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.accepted-phone {
+  direction: ltr;
+  text-align: right;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.accepted-amount {
+  font-weight: 700;
+  color: var(--color-green);
+  white-space: nowrap;
+}
+
+.accepted-plan-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.accepted-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--color-text-light);
+  font-size: 13px;
+}
+
+/* Make payment summary blend into the accepted section */
+.accepted-section .payment-summary {
+  border-top: 1px solid var(--color-border);
+}
+
 /* ---------- Utilities ---------- */
 .flex { display: flex; }
 .items-center { align-items: center; }

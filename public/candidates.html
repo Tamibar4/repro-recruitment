@@ -158,20 +158,9 @@
               <span class="kanban-title-emoji">🎯</span>
               <span data-i18n="accepted">התקבלו</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="kanban-count" id="count-accepted">0</span>
-              <button class="export-btn" id="btn-export-csv" title="ייצוא לאקסל">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-              </button>
-            </div>
+            <span class="kanban-count" id="count-accepted">0</span>
           </div>
           <div class="kanban-body" id="column-accepted"></div>
-          <!-- Monthly payment summary -->
-          <div id="payment-summary" class="payment-summary"></div>
         </div>
 
         <!-- Not Relevant -->
@@ -185,6 +174,32 @@
           </div>
           <div class="kanban-body" id="column-rejected"></div>
         </div>
+      </div>
+
+      <!-- Accepted candidates detailed table + monthly payment summary -->
+      <div id="accepted-section" class="accepted-section" style="display:none">
+        <div class="accepted-header">
+          <div class="accepted-header-left">
+            <span class="accepted-header-icon">🎯</span>
+            <div>
+              <div class="accepted-header-title">מועמדים שהתקבלו</div>
+              <div class="accepted-header-subtitle" id="accepted-subtitle">0 מועמדים</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-accepted-export" title="ייצוא לאקסל">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            ייצוא אקסל
+          </button>
+        </div>
+        <div class="accepted-table-wrap">
+          <table class="accepted-table" id="accepted-table"></table>
+        </div>
+        <!-- Monthly payment summary (moved here) -->
+        <div id="payment-summary" class="payment-summary"></div>
       </div>
 
       </div><!-- end tab-content-active -->

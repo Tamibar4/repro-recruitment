@@ -79,6 +79,7 @@ function renderKanban() {
   renderColumn('stage2', columns.stage2);
   renderColumn('accepted', columns.accepted);
   renderColumn('rejected', columns.rejected);
+  renderAcceptedTable(columns.accepted);
   renderPaymentSummary(columns.accepted);
 
   // Highlight the column that matches URL stage filter
@@ -235,7 +236,6 @@ function renderCandidateCard(candidate, stage) {
             </div>
           ` : ''}
         </div>
-        ${candidate.job_category ? getCategoryTag(candidate.job_category) : ''}
       </div>
       ${candidate.job_title ? `
         <div class="candidate-card-job">
@@ -252,9 +252,6 @@ function renderCandidateCard(candidate, stage) {
         </div>
       ` : ''}
       ${followUpBadgeHtml ? `<div style="margin-top:6px">${followUpBadgeHtml}</div>` : ''}
-      ${candidate.call_summary ? `
-        <div class="candidate-card-summary">${escapeHtml(candidate.call_summary)}</div>
-      ` : ''}
       ${stage === 'accepted' && (candidate.start_date || candidate.payment_date || candidate.payment_amount) ? `
         <div class="candidate-payment-info">
           ${candidate.payment_plan ? `<div class="payment-row"><span>📋 תוכנית:</span><strong>${{
@@ -647,10 +644,6 @@ function calculatePaymentSchedule() {
 }
 
 // Export CSV button
-document.getElementById('btn-export-csv').addEventListener('click', () => {
-  const token = API.getToken();
-  window.open('/api/candidates/export/accepted?token=' + token, '_blank');
-});
 
 function updatePhoneWaBtn() {
   const phone = document.getElementById('candidate-phone').value;
@@ -667,6 +660,70 @@ function updatePhoneWaBtn() {
 document.getElementById('candidate-phone').addEventListener('input', updatePhoneWaBtn);
 
 // ---------- Payment Summary ----------
+function renderAcceptedTable(accepted) {
+  const section = document.getElementById('accepted-section');
+  const table = document.getElementById('accepted-table');
+  const subtitle = document.getElementById('accepted-subtitle');
+  if (!section || !table) return;
+
+  if (!accepted || accepted.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  subtitle.textContent = accepted.length + ' מועמדים';
+
+  const planLabels = { '45days': '45 יום', '2weeks': 'שבועיים', '5050': '50/50', 'custom': 'ידני' };
+  const fmt = d => d ? new Date(d).toLocaleDateString('he-IL', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>שם</th>
+        <th>טלפון</th>
+        <th>משרה</th>
+        <th>תוכנית</th>
+        <th>תאריך הגעה</th>
+        <th>תאריך תשלום</th>
+        <th>סכום</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${accepted.map(c => `
+        <tr data-id="${c.id}">
+          <td><span class="accepted-name">${escapeHtml(c.name)}</span></td>
+          <td><span class="accepted-phone">${escapeHtml(c.phone || '—')}</span></td>
+          <td><span class="accepted-job">${escapeHtml(c.job_title || '—')}</span></td>
+          <td>${c.payment_plan ? '<span class="accepted-plan-pill">' + (planLabels[c.payment_plan] || c.payment_plan) + '</span>' : '—'}</td>
+          <td>${fmt(c.start_date)}</td>
+          <td>${fmt(c.payment_date)}</td>
+          <td>${c.payment_amount ? '<span class="accepted-amount">$' + Number(c.payment_amount).toLocaleString() + '</span>' : '—'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+
+  // Click row to open modal
+  table.querySelectorAll('tbody tr').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = parseInt(row.dataset.id);
+      const c = allCandidates.find(x => x.id === id);
+      if (c) openCandidateModal(c);
+    });
+  });
+}
+
+// Export button (moved into the accepted-section header)
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('btn-accepted-export');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const token = API.getToken();
+      window.open('/api/candidates/export/accepted?token=' + token, '_blank');
+    });
+  }
+});
+
 function renderPaymentSummary(acceptedCandidates) {
   const container = document.getElementById('payment-summary');
   if (!container) return;
