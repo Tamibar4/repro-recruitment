@@ -1708,20 +1708,21 @@ app.get('/api/stats', (req, res) => {
     const inOneDay = new Date(nowDate.getTime() + 24 * 60 * 60 * 1000);
     let overdue = 0;
     let dueSoon = 0;
-    let paymentsDue = 0;
-    let paymentsDueSoon = 0;
-    const inOneWeek = new Date(nowDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    let paymentsDue = 0; // today or overdue
+    let paymentsDueSoon = 0; // tomorrow or within 3 days
+    const endOfToday = new Date(nowDate); endOfToday.setHours(23, 59, 59, 999);
+    const inThreeDays = new Date(nowDate.getTime() + 3 * 24 * 60 * 60 * 1000);
     userCandidates.forEach(c => {
       if (c.follow_up_at && !c.follow_up_done) {
         const due = new Date(c.follow_up_at);
         if (due < nowDate) overdue++;
         else if (due < inOneDay) dueSoon++;
       }
-      // Payment reminders
+      // Payment reminders: today/overdue vs within 3 days
       if (c.stage === 'accepted' && c.payment_date && c.payment_amount) {
         const payDate = new Date(c.payment_date);
-        if (payDate < nowDate) paymentsDue++;
-        else if (payDate < inOneWeek) paymentsDueSoon++;
+        if (payDate <= endOfToday) paymentsDue++;
+        else if (payDate <= inThreeDays) paymentsDueSoon++;
       }
     });
 

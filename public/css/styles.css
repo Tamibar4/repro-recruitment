@@ -4265,6 +4265,42 @@ button:focus-visible,
   white-space: nowrap;
 }
 
+/* Payment reminder badges */
+.pay-reminder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+[dir="rtl"] .pay-reminder { margin-right: 0; margin-left: 6px; }
+
+.pay-reminder.today {
+  background: #fff4e0;
+  color: #b87414;
+  border: 1px solid #ffd789;
+  animation: pulsePayment 1.5s ease-in-out infinite;
+}
+.pay-reminder.tomorrow {
+  background: #e3f2ff;
+  color: var(--color-primary);
+  border: 1px solid #a5d2ff;
+}
+.pay-reminder.overdue {
+  background: var(--color-red-light);
+  color: var(--color-red);
+  border: 1px solid #fca5a5;
+  animation: pulsePayment 1.2s ease-in-out infinite;
+}
+@keyframes pulsePayment {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(1.05); }
+}
+
 .accepted-plan-pill {
   display: inline-block;
   padding: 3px 10px;

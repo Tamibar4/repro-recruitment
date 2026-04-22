@@ -94,6 +94,45 @@ function renderReminders() {
     `;
     container.appendChild(banner);
   }
+
+  // Payment reminders (today + overdue)
+  const payments = statsData.payments || { paymentsDue: 0, paymentsDueSoon: 0 };
+  if (payments.paymentsDue > 0) {
+    const banner = document.createElement('a');
+    banner.href = 'candidates.html';
+    banner.className = 'reminder-banner critical';
+    banner.innerHTML = `
+      <div class="reminder-icon" style="background: linear-gradient(135deg, #00c875, #00a65a);">💰</div>
+      <div class="reminder-content">
+        <div class="reminder-title">${payments.paymentsDue} תשלומים שהגיע זמנם!</div>
+        <div class="reminder-desc">יש תשלומים שצריך לקבל - לחצי לצפייה</div>
+      </div>
+      <div class="reminder-arrow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    `;
+    container.appendChild(banner);
+  }
+  if (payments.paymentsDueSoon > 0) {
+    const banner = document.createElement('a');
+    banner.href = 'candidates.html';
+    banner.className = 'reminder-banner';
+    banner.innerHTML = `
+      <div class="reminder-icon" style="background: linear-gradient(135deg, #1e88e5, #42a5f5);">📅</div>
+      <div class="reminder-content">
+        <div class="reminder-title">${payments.paymentsDueSoon} תשלומים צפויים השבוע</div>
+        <div class="reminder-desc">תשלומים צפויים ב-7 הימים הקרובים - מוכנים לפולואפ</div>
+      </div>
+      <div class="reminder-arrow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    `;
+    container.appendChild(banner);
+  }
 }
 
 function renderCategoryChart() {
