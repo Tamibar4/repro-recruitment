@@ -897,9 +897,36 @@ document.getElementById('btn-new-delayed').addEventListener('click', () => {
   }, 100);
 });
 
+// Delete candidate from delayed availability list (called from inline onclick)
+async function deleteDelayedCandidate(id) {
+  if (!confirm('האם למחוק את המועמד?')) return;
+  try {
+    await API.candidates.delete(id);
+    showToast(I18n.t('deleted'));
+    loadDelayedAvailability();
+    // Also refresh main candidates list count
+    try {
+      const d = await API.candidates.list({ stage: 'delayed' });
+      const el = document.getElementById('tab-delayed-count');
+      if (el) {
+        el.textContent = d.length;
+        el.style.display = d.length > 0 ? '' : 'none';
+      }
+    } catch(e) {}
+  } catch (err) {
+    console.error('Delete delayed candidate error:', err);
+    showToast(I18n.t('error'), 'error');
+  }
+}
+// Expose globally for inline onclick handlers
+window.deleteDelayedCandidate = deleteDelayedCandidate;
+window.openCandidateModal = openCandidateModal;
+
 async function loadDelayedAvailability() {
   try {
     const candidates = await API.candidates.list({ stage: 'delayed' });
+    // Cache delayed candidates globally so inline onclick handlers can find them
+    window.__delayedCandidates = candidates;
     const withDate = candidates.filter(c => c.available_from);
     const withoutDate = candidates.filter(c => !c.available_from);
 
@@ -936,7 +963,7 @@ async function loadDelayedAvailability() {
         </div>
         <div style="padding:0">${items.map(c => {
           const wa = buildWhatsAppLink(c.phone);
-          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--color-border);cursor:pointer" onclick="openCandidateModal(allCandidates.find(x=>x.id===${c.id}))">
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--color-border);cursor:pointer" onclick="openCandidateModal(window.__delayedCandidates.find(x=>x.id===${c.id}))">
             <div><strong>${escapeHtml(c.name)}</strong><div style="font-size:12px;color:var(--color-text-secondary)">${escapeHtml(c.job_title||'—')}</div></div>
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-size:12px;color:var(--color-text-light)">${escapeHtml(c.call_summary||'').substring(0,40)}</span>
