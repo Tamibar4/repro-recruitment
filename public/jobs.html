@@ -110,20 +110,11 @@
             <option value="closed" data-i18n="status_closed">סגורה</option>
           </select>
         </div>
-        <!-- Location/Region filter -->
+        <!-- Location/Region filter - populated dynamically -->
         <div class="filter-row">
           <span class="filter-row-label">📍 מדינה:</span>
           <div class="multi-filter" id="location-filter">
-            <button class="filter-chip filter-chip-sm active" data-value="all">הכל</button>
-            <button class="filter-chip filter-chip-sm" data-value="usa">ארה"ב</button>
-            <button class="filter-chip filter-chip-sm" data-value="canada">קנדה</button>
-            <button class="filter-chip filter-chip-sm" data-value="australia">אוסטרליה</button>
-            <button class="filter-chip filter-chip-sm" data-value="philippines">פיליפינים</button>
-            <button class="filter-chip filter-chip-sm" data-value="caribbean">קריביים/מקסיקו</button>
-            <button class="filter-chip filter-chip-sm" data-value="cyprus">קפריסין</button>
-            <button class="filter-chip filter-chip-sm" data-value="thailand">תאילנד</button>
-            <button class="filter-chip filter-chip-sm" data-value="china">סין</button>
-            <button class="filter-chip filter-chip-sm" data-value="taiwan">טיוואן</button>
+            <!-- Filled by buildCountryUI() in jobs.js -->
           </div>
         </div>
       </div>
@@ -263,6 +254,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=2"></script>
-  <script src="js/jobs.js?v=2"></script>
+  <script src="js/jobs.js?v=3"></script>
 </body>
 </html>

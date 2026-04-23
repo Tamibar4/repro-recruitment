@@ -8,34 +8,31 @@ let currentLocations = []; // working copy of locations being edited
 let currentRequirements = []; // working copy of requirements being edited
 let filters = { categories: ['all'], regions: ['all'], status: 'all', search: '' };
 
-// Map location names to regions
-const REGION_KEYWORDS = {
-  usa: ['ניו יורק','שיקגו','סיאטל','פורטלנד','אטלנטה','מיאמי','קליפורניה','סקרמנטו',
-        'וושינגטון דיסי','מרילנד','אוהיו','בוסטון','קרוליינה','קנטקי','לאס ווגאס',
-        'פיטסבורג','ספוקן','מדפורד','רידינג','טקסס','טיילר','פאלם ספרינג','לוס אנג',
-        'ניו ג\'רזי','מיין','ארה"ב','ארה\"ב'],
-  canada: ['קנדה','טורונטו','ונקובר','אדמונטון','ויקטוריה','ננימו','לוויל'],
-  australia: ['אוסטרליה','סידני','מלבורן'],
-  philippines: ['פיליפינים','מנילה'],
-  caribbean: ['ארובה','סאן מרטין','קריביים','מקסיקו'],
-  cyprus: ['קפריסין','פאפוס'],
-  thailand: ['תאילנד','פיסנולוק','קונקן','נקון סוואן'],
-  china: ['סין','שנג\'ן'],
-  taiwan: ['טיוואן','טייפה']
-};
+// Countries loaded dynamically from server (has keywords for city → country matching)
+let COUNTRIES_DATA = [];
 
 function getJobRegions(job) {
   const regions = new Set();
   if (!job.locations || job.locations.length === 0) return regions;
   job.locations.forEach(loc => {
     const name = (loc.name || '').toLowerCase();
-    for (const [region, keywords] of Object.entries(REGION_KEYWORDS)) {
-      if (keywords.some(kw => name.includes(kw.toLowerCase()))) {
-        regions.add(region);
+    COUNTRIES_DATA.forEach(country => {
+      const kws = country.keywords || [];
+      if (kws.some(kw => kw && name.includes(kw.toLowerCase()))) {
+        regions.add(country.id);
       }
-    }
+    });
   });
   return regions;
+}
+
+async function loadCountries() {
+  try {
+    COUNTRIES_DATA = await API.request('/countries');
+  } catch (err) {
+    console.error('Failed to load countries:', err);
+    COUNTRIES_DATA = [];
+  }
 }
 
 // Read URL params
@@ -1059,9 +1056,91 @@ function showAddCategoryDialog() {
   });
 }
 
+// ============================================================
+// Dynamic Countries UI
+// ============================================================
+function buildCountryUI() {
+  const filterContainer = document.getElementById('location-filter');
+  if (!filterContainer) return;
+
+  let html = '<button class="filter-chip filter-chip-sm active" data-value="all">הכל</button>';
+  COUNTRIES_DATA.forEach(country => {
+    html += `<button class="filter-chip filter-chip-sm" data-value="${country.id}">${I18n.current === 'he' ? country.label_he : country.label_en}</button>`;
+  });
+  html += `<button class="filter-chip filter-chip-sm add-category-chip" id="btn-add-country-chip" title="הוסף מדינה">+</button>`;
+  filterContainer.innerHTML = html;
+
+  // Re-attach click handlers for country chips
+  filterContainer.querySelectorAll('.filter-chip:not(.add-category-chip)').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const value = chip.dataset.value;
+      if (value === 'all') {
+        filters.regions = ['all'];
+        filterContainer.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      } else {
+        filters.regions = filters.regions.filter(r => r !== 'all');
+        filterContainer.querySelector('.filter-chip[data-value="all"]').classList.remove('active');
+        if (chip.classList.contains('active')) {
+          chip.classList.remove('active');
+          filters.regions = filters.regions.filter(r => r !== value);
+          if (filters.regions.length === 0) {
+            filters.regions = ['all'];
+            filterContainer.querySelector('.filter-chip[data-value="all"]').classList.add('active');
+          }
+        } else {
+          chip.classList.add('active');
+          filters.regions.push(value);
+        }
+      }
+      loadJobs();
+    });
+  });
+
+  // Add country button
+  const addBtn = document.getElementById('btn-add-country-chip');
+  if (addBtn) addBtn.addEventListener('click', showAddCountryDialog);
+}
+
+function showAddCountryDialog() {
+  const nameHe = prompt(I18n.current === 'he' ? 'שם המדינה בעברית (למשל: ישראל):' : 'Country name (Hebrew):');
+  if (!nameHe || !nameHe.trim()) return;
+
+  const nameEn = prompt(I18n.current === 'he' ? 'שם המדינה באנגלית (אופציונלי):' : 'Country name (English, optional):');
+
+  const keywordsStr = prompt(
+    I18n.current === 'he'
+      ? 'מילות חיפוש - ערים / אזורים באותה מדינה, מופרדות בפסיקים (למשל: תל אביב, חיפה, ישראל):'
+      : 'Keywords - cities/regions in that country, comma separated:',
+    nameHe.trim()
+  );
+  const keywords = (keywordsStr || nameHe).split(',').map(k => k.trim()).filter(Boolean);
+
+  const id = nameHe.trim().toLowerCase()
+    .replace(/[\u0590-\u05FF]/g, '')
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  const finalId = id || 'country_' + Date.now();
+
+  API.request('/countries', {
+    method: 'POST',
+    body: JSON.stringify({ id: finalId, label_he: nameHe.trim(), label_en: (nameEn || nameHe).trim(), keywords })
+  }).then(() => {
+    showToast(I18n.current === 'he' ? 'מדינה נוספה!' : 'Country added!');
+    return loadCountries();
+  }).then(() => {
+    buildCountryUI();
+    loadJobs();
+  }).catch(err => {
+    showToast(err.message, 'error');
+  });
+}
+
 // ---------- Initialize ----------
 (async function init() {
-  await loadCategories();
+  await Promise.all([loadCategories(), loadCountries()]);
   buildCategoryUI();
+  buildCountryUI();
   loadJobs();
 })();

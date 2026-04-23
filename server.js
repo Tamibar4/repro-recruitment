@@ -429,12 +429,25 @@ const DEFAULT_CATEGORIES = [
   { id: 'cosmetics', label_he: 'מכירות (Cosmetics)', label_en: 'Cosmetics', color: '#ff158a' }
 ];
 
+const DEFAULT_COUNTRIES = [
+  { id: 'usa', label_he: 'ארה"ב', label_en: 'USA', keywords: ['ניו יורק','שיקגו','סיאטל','פורטלנד','אטלנטה','מיאמי','קליפורניה','סקרמנטו','וושינגטון דיסי','מרילנד','אוהיו','בוסטון','קרוליינה','קנטקי','לאס ווגאס','פיטסבורג','ספוקן','מדפורד','רידינג','טקסס','טיילר','פאלם ספרינג','לוס אנג',"ניו ג'רזי",'מיין','ארה"ב','ארה\"ב','קונטיקט'] },
+  { id: 'canada', label_he: 'קנדה', label_en: 'Canada', keywords: ['קנדה','טורונטו','ונקובר','אדמונטון','ויקטוריה','ננימו','לוויל'] },
+  { id: 'australia', label_he: 'אוסטרליה', label_en: 'Australia', keywords: ['אוסטרליה','סידני','מלבורן'] },
+  { id: 'philippines', label_he: 'פיליפינים', label_en: 'Philippines', keywords: ['פיליפינים','מנילה'] },
+  { id: 'caribbean', label_he: 'קריביים/מקסיקו', label_en: 'Caribbean/Mexico', keywords: ['ארובה','סאן מרטין','קריביים','מקסיקו'] },
+  { id: 'cyprus', label_he: 'קפריסין', label_en: 'Cyprus', keywords: ['קפריסין','פאפוס'] },
+  { id: 'thailand', label_he: 'תאילנד', label_en: 'Thailand', keywords: ['תאילנד','פיסנולוק','קונקן','נקון סוואן'] },
+  { id: 'china', label_he: 'סין', label_en: 'China', keywords: ['סין',"שנג'ן"] },
+  { id: 'taiwan', label_he: 'טיוואן', label_en: 'Taiwan', keywords: ['טיוואן','טייפה'] }
+];
+
 const defaultData = {
   jobs: [],
   candidates: [],
   stage_history: [],
   users: defaultUsers,
   categories: DEFAULT_CATEGORIES,
+  countries: DEFAULT_COUNTRIES,
   counters: { jobs: 0, candidates: 0, stage_history: 0 }
 };
 
@@ -453,6 +466,11 @@ function loadData() {
       // Add default categories if missing
       if (!data.categories || data.categories.length === 0) {
         data.categories = DEFAULT_CATEGORIES;
+        saveData();
+      }
+      // Add default countries if missing (migration for existing databases)
+      if (!data.countries || data.countries.length === 0) {
+        data.countries = DEFAULT_COUNTRIES;
         saveData();
       }
       // Add default users if missing (migration for existing databases)
@@ -1091,6 +1109,73 @@ app.delete('/api/categories/:id', (req, res) => {
     const idx = data.categories.findIndex(c => c.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'Category not found' });
     data.categories.splice(idx, 1);
+    saveData();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// COUNTRIES API
+// ============================================================
+
+// GET /api/countries
+app.get('/api/countries', (req, res) => {
+  res.json(data.countries || []);
+});
+
+// POST /api/countries - add new country
+app.post('/api/countries', (req, res) => {
+  try {
+    const { id, label_he, label_en, keywords } = req.body;
+    if (!id || !label_he) return res.status(400).json({ error: 'id and label_he required' });
+    const cleanId = id.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (!data.countries) data.countries = [];
+    if (data.countries.find(c => c.id === cleanId)) {
+      return res.status(409).json({ error: 'Country already exists' });
+    }
+    const country = {
+      id: cleanId,
+      label_he,
+      label_en: label_en || label_he,
+      keywords: Array.isArray(keywords) ? keywords : (typeof keywords === 'string' ? keywords.split(',').map(k => k.trim()).filter(Boolean) : [label_he])
+    };
+    data.countries.push(country);
+    saveData();
+    res.status(201).json(country);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/countries/:id - update country (for keyword edits)
+app.put('/api/countries/:id', (req, res) => {
+  try {
+    if (!data.countries) data.countries = [];
+    const idx = data.countries.findIndex(c => c.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Country not found' });
+    const { label_he, label_en, keywords } = req.body;
+    data.countries[idx] = {
+      ...data.countries[idx],
+      label_he: label_he || data.countries[idx].label_he,
+      label_en: label_en || data.countries[idx].label_en,
+      keywords: Array.isArray(keywords) ? keywords : (typeof keywords === 'string' ? keywords.split(',').map(k => k.trim()).filter(Boolean) : data.countries[idx].keywords)
+    };
+    saveData();
+    res.json(data.countries[idx]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/countries/:id
+app.delete('/api/countries/:id', (req, res) => {
+  try {
+    if (!data.countries) data.countries = [];
+    const idx = data.countries.findIndex(c => c.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Country not found' });
+    data.countries.splice(idx, 1);
     saveData();
     res.json({ success: true });
   } catch (err) {
