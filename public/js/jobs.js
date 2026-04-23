@@ -6,7 +6,7 @@ let allJobs = [];
 let currentJob = null;
 let currentLocations = []; // working copy of locations being edited
 let currentRequirements = []; // working copy of requirements being edited
-let filters = { categories: ['all'], regions: ['all'], status: 'all', search: '' };
+let filters = { categories: ['all'], regions: ['all'], status: 'all', search: '', urgentOnly: false };
 
 // Countries loaded dynamically from server (has keywords for city → country matching)
 let COUNTRIES_DATA = [];
@@ -76,6 +76,27 @@ async function loadJobs() {
 function renderJobs() {
   const container = document.getElementById('jobs-container');
 
+  // ---- Urgent-only grouped view ----
+  if (filters.urgentOnly) {
+    const urgentJobs = allJobs.filter(j => j.is_urgent);
+    if (urgentJobs.length === 0) {
+      container.innerHTML = `
+        <div class="panel">
+          <div class="empty-state">
+            <div class="empty-state-icon" style="color:#e2445c">⚡</div>
+            <div class="empty-state-title">אין משרות דחופות</div>
+            <div class="empty-state-desc">סמני משרה כדחופה על ידי לחיצה על אייקון הברק בכרטיס המשרה</div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+    container.innerHTML = renderUrgentGroupedView(urgentJobs);
+    attachJobCardHandlers(container);
+    return;
+  }
+
+  // ---- Normal flat grid ----
   if (allJobs.length === 0) {
     container.innerHTML = `
       <div class="panel">
@@ -95,6 +116,11 @@ function renderJobs() {
     </div>
   `;
 
+  attachJobCardHandlers(container);
+}
+
+// Attach click/hover handlers to job cards (shared between normal and urgent views)
+function attachJobCardHandlers(container) {
   // Card click → open details modal
   container.querySelectorAll('.job-card').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -103,19 +129,14 @@ function renderJobs() {
       const job = allJobs.find(j => j.id == id);
       if (job) openDetailsModal(job);
     });
-
-    // Hover preview tooltip
-    card.addEventListener('mouseenter', (e) => {
+    card.addEventListener('mouseenter', () => {
       const id = card.dataset.id;
       const job = allJobs.find(j => j.id == id);
       if (job) showJobTooltip(job, card);
     });
-    card.addEventListener('mouseleave', () => {
-      hideJobTooltip();
-    });
+    card.addEventListener('mouseleave', hideJobTooltip);
   });
 
-  // Edit button
   container.querySelectorAll('.btn-edit-job').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -124,7 +145,6 @@ function renderJobs() {
     });
   });
 
-  // Delete button
   container.querySelectorAll('.btn-delete-job').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -140,7 +160,6 @@ function renderJobs() {
     });
   });
 
-  // Quick urgent toggle on card
   container.querySelectorAll('.urgent-toggle-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -159,6 +178,98 @@ function renderJobs() {
       }
     });
   });
+}
+
+// Build the grouped urgent view: category → country → jobs
+function renderUrgentGroupedView(urgentJobs) {
+  // Build lookup of category data for labels + colors
+  const catMap = {};
+  (typeof CATEGORIES_DATA !== 'undefined' ? CATEGORIES_DATA : []).forEach(c => { catMap[c.id] = c; });
+  const countryMap = {};
+  COUNTRIES_DATA.forEach(c => { countryMap[c.id] = c; });
+
+  // Group by category → country
+  const byCategory = {};
+  urgentJobs.forEach(job => {
+    const catId = job.category || 'uncategorized';
+    if (!byCategory[catId]) byCategory[catId] = { jobs: [], byCountry: {} };
+    byCategory[catId].jobs.push(job);
+
+    const regions = Array.from(getJobRegions(job));
+    const countries = regions.length > 0 ? regions : ['_no_country'];
+    countries.forEach(countryId => {
+      if (!byCategory[catId].byCountry[countryId]) byCategory[catId].byCountry[countryId] = [];
+      // Avoid pushing the same job twice if it matches multiple keywords from the same country
+      if (!byCategory[catId].byCountry[countryId].find(j => j.id === job.id)) {
+        byCategory[catId].byCountry[countryId].push(job);
+      }
+    });
+  });
+
+  // Sort categories by urgent count desc
+  const sortedCats = Object.keys(byCategory).sort((a, b) => byCategory[b].jobs.length - byCategory[a].jobs.length);
+
+  let html = `
+    <div class="urgent-view-header">
+      <div class="urgent-view-header-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <div class="urgent-view-header-text">
+        <div class="urgent-view-header-title">משרות דחופות - מסודר לפי תחום ומדינה</div>
+        <div class="urgent-view-header-desc">סה"כ ${urgentJobs.length} משרות דחופות בעדיפות גבוהה</div>
+      </div>
+      <div class="urgent-view-header-count">${urgentJobs.length}</div>
+    </div>
+  `;
+
+  sortedCats.forEach(catId => {
+    const catInfo = catMap[catId];
+    const catLabel = catInfo ? (I18n.current === 'he' ? catInfo.label_he : catInfo.label_en) : (catId || 'ללא תחום');
+    const catColor = catInfo && catInfo.color ? catInfo.color : '#676879';
+    const group = byCategory[catId];
+    const sortedCountries = Object.keys(group.byCountry).sort((a, b) => {
+      // Put "_no_country" last
+      if (a === '_no_country') return 1;
+      if (b === '_no_country') return -1;
+      return group.byCountry[b].length - group.byCountry[a].length;
+    });
+
+    html += `
+      <div class="urgent-group">
+        <div class="urgent-group-header" style="background: linear-gradient(135deg, ${catColor}, ${catColor}dd);">
+          <span class="urgent-group-cat-tag">תחום</span>
+          <span class="urgent-group-label">${escapeHtml(catLabel)}</span>
+          <span class="urgent-group-count">${group.jobs.length} משרות</span>
+        </div>
+    `;
+
+    sortedCountries.forEach(countryId => {
+      const countryInfo = countryMap[countryId];
+      const countryLabel = countryInfo
+        ? (I18n.current === 'he' ? countryInfo.label_he : countryInfo.label_en)
+        : (countryId === '_no_country' ? 'ללא מיקום' : countryId);
+      const jobs = group.byCountry[countryId];
+
+      html += `
+        <div class="urgent-subgroup">
+          <div class="urgent-subgroup-header">
+            <span class="urgent-subgroup-header-icon">📍</span>
+            <span>${escapeHtml(countryLabel)}</span>
+            <span style="margin-right:auto;color:var(--color-text-light);font-weight:500">${jobs.length} משרות</span>
+          </div>
+          <div class="urgent-subgroup-content">
+            ${jobs.map(renderJobCard).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+  });
+
+  return html;
 }
 
 function renderJobCard(job) {
@@ -788,6 +899,16 @@ document.getElementById('filter-status').addEventListener('change', (e) => {
   filters.status = e.target.value;
   loadJobs();
 });
+
+// Urgent toggle button - switches between normal and grouped urgent view
+const urgentToggleBtn = document.getElementById('btn-urgent-toggle');
+if (urgentToggleBtn) {
+  urgentToggleBtn.addEventListener('click', () => {
+    filters.urgentOnly = !filters.urgentOnly;
+    urgentToggleBtn.classList.toggle('active', filters.urgentOnly);
+    renderJobs();
+  });
+}
 
 // Copy description to clipboard
 function copyDescription(btn) {
