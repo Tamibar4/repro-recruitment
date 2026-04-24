@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RePro | הכשרות</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="icon" type="image/png" href="assets/logo.png?v=2">
+  <link rel="apple-touch-icon" href="assets/logo.png?v=2">
+  <style>
+    /* ----- Training page layout ----- */
+    .training-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      height: calc(100vh - 140px);
+      min-height: 600px;
+    }
+    @media (max-width: 900px) { .training-layout { grid-template-columns: 1fr; height: auto; } }
+
+    .training-sidebar-panel {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .training-main-panel {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Mode selector */
+    .training-modes-title {
+      font-size: 12px; font-weight: 700; color: var(--color-text-light);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .training-mode-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 12px;
+      background: var(--color-bg);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      color: var(--color-text);
+      transition: all 0.15s;
+      width: 100%;
+      text-align: right;
+    }
+    .training-mode-btn:hover { border-color: var(--color-primary); background: var(--color-primary-lighter); }
+    .training-mode-btn.active {
+      background: var(--gradient-primary);
+      color: white;
+      border-color: var(--color-primary);
+      box-shadow: 0 3px 10px rgba(0,115,234,0.3);
+    }
+    .training-mode-btn-icon { font-size: 18px; }
+    .training-mode-btn-text { flex: 1; }
+    .training-mode-btn-desc { display: block; font-size: 11px; font-weight: 500; opacity: 0.75; margin-top: 2px; }
+
+    /* Conversation list */
+    .training-section-title {
+      font-size: 12px; font-weight: 700; color: var(--color-text-light);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-top: 12px; padding-top: 14px;
+      border-top: 1px solid var(--color-border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .training-section-title button {
+      padding: 4px 10px; font-size: 11px; font-weight: 700;
+      background: var(--color-primary); color: white; border: none; border-radius: 6px;
+      cursor: pointer; font-family: inherit;
+    }
+    .training-conv-item {
+      padding: 9px 12px; border-radius: 8px; cursor: pointer;
+      font-size: 12px; color: var(--color-text);
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      transition: background 0.15s;
+    }
+    .training-conv-item:hover { background: var(--color-bg); }
+    .training-conv-item.active { background: var(--color-primary-lighter); font-weight: 700; }
+    .training-conv-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .training-conv-delete {
+      background: none; border: none; color: var(--color-text-light);
+      cursor: pointer; padding: 2px 6px; border-radius: 4px;
+      font-size: 13px; opacity: 0; transition: all 0.15s;
+    }
+    .training-conv-item:hover .training-conv-delete { opacity: 1; }
+    .training-conv-delete:hover { background: var(--color-red-light); color: var(--color-red); }
+
+    /* Chat area */
+    .chat-header {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, #f0f4ff, #e8efff);
+    }
+    .chat-header-icon {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--gradient-primary); color: white;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; box-shadow: var(--shadow-sm);
+    }
+    .chat-header-title { font-size: 15px; font-weight: 700; color: var(--color-text); }
+    .chat-header-subtitle { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: #fafbfc;
+    }
+    .chat-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--color-text-light);
+    }
+    .chat-empty-icon {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--gradient-primary); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin: 0 auto 16px;
+      box-shadow: var(--shadow-md);
+    }
+    .chat-empty-title { font-size: 17px; font-weight: 700; color: var(--color-text); margin-bottom: 8px; }
+    .chat-empty-desc { font-size: 13px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+
+    .chat-suggestions {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      justify-content: center; margin-top: 22px;
+    }
+    .chat-suggestion {
+      padding: 10px 16px;
+      background: var(--color-white);
+      border: 1.5px solid var(--color-border);
+      border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .chat-suggestion:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chat-message {
+      display: flex; gap: 10px;
+      max-width: 82%;
+    }
+    .chat-message.user {
+      align-self: flex-start;
+      flex-direction: row-reverse;
+    }
+    .chat-message.assistant {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    [dir="rtl"] .chat-message.user { align-self: flex-end; flex-direction: row; }
+    [dir="rtl"] .chat-message.assistant { align-self: flex-start; flex-direction: row; }
+
+    .chat-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .chat-avatar.user { background: var(--gradient-primary); color: white; }
+    .chat-avatar.assistant { background: linear-gradient(135deg, #9b59b6, #a358df); color: white; font-size: 18px; }
+
+    .chat-bubble {
+      padding: 11px 15px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .chat-bubble.user {
+      background: var(--gradient-primary);
+      color: white;
+      border-bottom-left-radius: 4px;
+    }
+    [dir="rtl"] .chat-bubble.user { border-bottom-left-radius: 16px; border-bottom-right-radius: 4px; }
+    .chat-bubble.assistant {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      border-bottom-right-radius: 4px;
+    }
+    [dir="rtl"] .chat-bubble.assistant { border-bottom-right-radius: 16px; border-bottom-left-radius: 4px; }
+
+    .chat-thinking {
+      display: flex; align-items: center; gap: 8px;
+      padding: 11px 15px;
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      color: var(--color-text-light);
+      font-size: 13px;
+    }
+    .chat-dots { display: inline-flex; gap: 3px; }
+    .chat-dots span {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--color-text-light);
+      animation: chatDot 1.4s ease-in-out infinite;
+    }
+    .chat-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .chat-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes chatDot { 0%,60%,100% { opacity: 0.3; transform: scale(0.8); } 30% { opacity: 1; transform: scale(1); } }
+
+    /* Chat input */
+    .chat-input-area {
+      padding: 14px 18px;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-white);
+    }
+    .chat-input-row {
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    .chat-input {
+      flex: 1;
+      padding: 11px 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: none;
+      max-height: 140px;
+      min-height: 44px;
+      transition: border-color 0.15s;
+    }
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(0,115,234,0.12);
+    }
+    .chat-send-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--gradient-primary);
+      border: none; color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 3px 10px rgba(0,115,234,0.3);
+      flex-shrink: 0;
+    }
+    .chat-send-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(0,115,234,0.4); }
+    .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .chat-send-btn svg { width: 20px; height: 20px; }
+
+    /* Documents view */
+    .docs-area {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .docs-upload-zone {
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 30px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 24px;
+    }
+    .docs-upload-zone:hover, .docs-upload-zone.dragover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-lighter);
+    }
+    .docs-upload-icon { font-size: 42px; margin-bottom: 10px; }
+    .docs-upload-text { font-size: 14px; font-weight: 600; color: var(--color-text); }
+    .docs-upload-hint { font-size: 12px; color: var(--color-text-light); margin-top: 4px; }
+
+    .docs-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .doc-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex; gap: 12px; align-items: flex-start;
+      transition: all 0.15s;
+    }
+    .doc-card:hover {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+    .doc-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: linear-gradient(135deg, #fee, #fdd);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-name {
+      font-size: 13px; font-weight: 700; color: var(--color-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      margin-bottom: 4px;
+    }
+    .doc-meta { font-size: 11px; color: var(--color-text-light); }
+    .doc-actions { display: flex; gap: 6px; margin-top: 10px; }
+    .doc-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--color-border);
+      background: var(--color-white);
+      border-radius: 6px;
+      font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      color: var(--color-text-secondary);
+      transition: all 0.15s;
+      text-decoration: none;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .doc-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .doc-btn.danger:hover { border-color: var(--color-red); color: var(--color-red); background: var(--color-red-light); }
+
+    /* AI not configured banner */
+    .ai-warning {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #fff8e6, #fff0d0);
+      border: 1.5px solid #ffd789;
+      border-radius: var(--radius-lg);
+      margin: 16px 24px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .ai-warning-icon { font-size: 22px; flex-shrink: 0; }
+    .ai-warning-title { font-weight: 700; color: #b87414; margin-bottom: 4px; }
+    .ai-warning-desc { font-size: 13px; color: #8a6414; line-height: 1.5; }
+
+    /* Page tabs */
+    .training-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--color-border);
+      gap: 0;
+      background: var(--color-white);
+    }
+    .training-tab {
+      padding: 14px 22px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .training-tab:hover { color: var(--color-primary); }
+    .training-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text">RePro</div>
+          <div class="sidebar-logo-tagline">Your Job Abroad</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span>דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          <span>מועמדים</span>
+        </a>
+        <a href="training.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+          </svg>
+          <span>הכשרות</span>
+        </a>
+        <a href="team.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>צוות</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+        <button id="lang-switch" class="lang-switch">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          English
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🎓 הכשרות RePro</h1>
+          <div class="page-subtitle">מרכז הלמידה לאנשי גיוס - עם מאמן AI חכם</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="training-tabs">
+        <button class="training-tab active" data-tab="chat">
+          <span>💬</span>
+          <span>מאמן AI</span>
+        </button>
+        <button class="training-tab" data-tab="docs">
+          <span>📁</span>
+          <span>חומרי הכשרה</span>
+        </button>
+      </div>
+
+      <!-- AI not configured warning -->
+      <div id="ai-warning" class="ai-warning" style="display:none">
+        <div class="ai-warning-icon">⚠️</div>
+        <div>
+          <div class="ai-warning-title">סוכן AI עדיין לא מחובר</div>
+          <div class="ai-warning-desc">
+            מנהל המערכת צריך להוסיף משתנה סביבה <code>ANTHROPIC_API_KEY</code> בריילוויי כדי להפעיל את המאמן החכם.
+            עד אז, ניתן להעלות חומרי הכשרה בטאב "חומרי הכשרה".
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Tab 1: Chat ===== -->
+      <div id="tab-chat" class="tab-content" style="margin-top:20px">
+        <div class="training-layout">
+          <!-- Left sidebar: modes + conversations -->
+          <aside class="training-sidebar-panel">
+            <div class="training-modes-title">🎯 מצב שיחה</div>
+            <button class="training-mode-btn active" data-mode="qa">
+              <span class="training-mode-btn-icon">💬</span>
+              <span class="training-mode-btn-text">
+                שאלות ותשובות
+                <span class="training-mode-btn-desc">שאלי על החומר</span>
+              </span>
+            </button>
+            <button class="training-mode-btn" data-mode="consult">
+              <span class="training-mode-btn-icon">🧭</span>
+              <span class="training-mode-btn-text">
+                התייעצות
+                <span class="training-mode-btn-desc">ייעוץ במצבים</span>
+              </span>
+            </button>
+            <button class="training-mode-btn" data-mode="scenario">
+              <span class="training-mode-btn-icon">🎭</span>
+              <span class="training-mode-btn-text">
+                תרגול תרחישים
+                <span class="training-mode-btn-desc">משחק תפקידים</span>
+              </span>
+            </button>
+            <button class="training-mode-btn" data-mode="quiz">
+              <span class="training-mode-btn-icon">📝</span>
+              <span class="training-mode-btn-text">
+                בוחן אותי
+                <span class="training-mode-btn-desc">בדיקת הבנה</span>
+              </span>
+            </button>
+
+            <div class="training-section-title">
+              <span>💾 שיחות קודמות</span>
+              <button id="new-conv-btn" title="שיחה חדשה">+ חדש</button>
+            </div>
+            <div id="conversations-list"></div>
+          </aside>
+
+          <!-- Main chat area -->
+          <section class="training-main-panel">
+            <div class="chat-header">
+              <div class="chat-header-icon">🤖</div>
+              <div>
+                <div class="chat-header-title" id="chat-mode-title">שאלות ותשובות</div>
+                <div class="chat-header-subtitle" id="chat-mode-desc">שאלי אותי על כל נושא מחומרי ההכשרה</div>
+              </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+              <!-- Dynamic messages -->
+            </div>
+
+            <div class="chat-input-area">
+              <div class="chat-input-row">
+                <textarea id="chat-input" class="chat-input" rows="1" placeholder="שאלי משהו... (Enter לשליחה, Shift+Enter לשורה חדשה)"></textarea>
+                <button id="chat-send-btn" class="chat-send-btn" title="שלח">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ===== Tab 2: Documents ===== -->
+      <div id="tab-docs" class="tab-content" style="display:none;margin-top:20px">
+        <div class="training-main-panel" style="height:auto;min-height:500px">
+          <div class="docs-area">
+            <div id="admin-only-upload" style="display:none">
+              <label for="doc-upload-input" class="docs-upload-zone" id="docs-upload-zone">
+                <div class="docs-upload-icon">📄</div>
+                <div class="docs-upload-text">לחצי כאן להעלאת חומרי הכשרה</div>
+                <div class="docs-upload-hint">או גררי קבצים לכאן — PDF / PPTX / DOCX (עד 25MB)</div>
+                <input type="file" id="doc-upload-input" accept=".pdf,.pptx,.ppt,.docx,.doc,.txt" style="display:none">
+              </label>
+            </div>
+
+            <h2 style="font-size:17px;margin-bottom:14px">חומרי ההכשרה (<span id="docs-count">0</span>)</h2>
+            <div id="docs-list" class="docs-list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/i18n.js?v=2"></script>
+  <script src="js/api.js?v=3"></script>
+  <script src="js/training.js?v=1"></script>
+</body>
+</html>

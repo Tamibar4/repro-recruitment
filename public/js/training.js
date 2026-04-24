@@ -1,0 +1,424 @@
+/**
+ * Training page logic - AI tutor chat + document management
+ */
+
+const MODE_META = {
+  qa:       { icon: '💬', title: 'שאלות ותשובות', desc: 'שאלי אותי על כל נושא מחומרי ההכשרה', suggestions: [
+    'מה הן הדרכים הכי יעילות לסנן מועמדים?',
+    'איך פותחים שיחה עם מועמד חדש?',
+    'מה חשוב לזכור בשלב הראשון של השיחה?',
+    'איך מתמודדים עם התנגדויות?'
+  ]},
+  consult:  { icon: '🧭', title: 'התייעצות', desc: 'יעוץ מעשי למצבים שאת נתקלת בהם', suggestions: [
+    'יש לי מועמד שמתלבט בין שתי משרות - איך אני עוזרת לו להחליט?',
+    'המעסיק דוחה מועמדים בלי לתת הסבר - מה עושים?',
+    'מועמד שביקש שכר גבוה מדי, איך אני מגיבה?',
+    'איך אני שומרת על קשר עם מועמד במהלך תהליך ארוך?'
+  ]},
+  scenario: { icon: '🎭', title: 'תרגול תרחישים', desc: 'משחק תפקידים - אני אהיה המועמד/מעסיק', suggestions: [
+    'תתחיל/י בבקשה תרחיש של שיחה ראשונה עם מועמד לתחום הצימיני',
+    'תשחק מועמד שקצת סקפטי ודורש שכר גבוה',
+    'תשחק מעסיק שרוצה לדחות מועמד שאני מציעה',
+    'תשחק מועמד שעובד כבר ומתלבט אם להחליף'
+  ]},
+  quiz:     { icon: '📝', title: 'בוחן אותי', desc: 'שאלות לבדיקת הבנה של החומר', suggestions: [
+    'תתחיל/י את הבוחן',
+    'תתחיל/י בוחן על שלב הסינון',
+    'תתחיל/י בוחן על טכניקות פתיחת שיחה',
+    'תתחיל/י בוחן על ניהול לידים'
+  ]}
+};
+
+let currentMode = 'qa';
+let currentConversationId = null;
+let currentConversation = null;
+let sendingMessage = false;
+let aiEnabled = false;
+
+// ============================================================
+// Init
+// ============================================================
+(async function init() {
+  // Check admin status for upload zone
+  try {
+    const me = await API.request('/auth/me');
+    if (me && me.role === 'admin') {
+      document.getElementById('admin-only-upload').style.display = 'block';
+    }
+  } catch(e) {}
+
+  // Check AI status
+  try {
+    const status = await API.request('/training/status');
+    aiEnabled = !!status.ai_enabled;
+    if (!aiEnabled) document.getElementById('ai-warning').style.display = 'flex';
+  } catch(e) {}
+
+  await loadConversations();
+  await loadDocuments();
+  renderEmptyChat();
+  updateChatHeader();
+
+  setupEventListeners();
+})();
+
+function setupEventListeners() {
+  // Tabs
+  document.querySelectorAll('.training-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.training-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const tabName = tab.dataset.tab;
+      document.getElementById('tab-chat').style.display = tabName === 'chat' ? 'block' : 'none';
+      document.getElementById('tab-docs').style.display = tabName === 'docs' ? 'block' : 'none';
+    });
+  });
+
+  // Mode selector
+  document.querySelectorAll('.training-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (mode === currentMode) return;
+      currentMode = mode;
+      document.querySelectorAll('.training-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateChatHeader();
+      // Start fresh conversation on mode change
+      currentConversationId = null;
+      currentConversation = null;
+      renderEmptyChat();
+    });
+  });
+
+  // New conversation
+  document.getElementById('new-conv-btn').addEventListener('click', () => {
+    currentConversationId = null;
+    currentConversation = null;
+    document.querySelectorAll('.training-conv-item').forEach(i => i.classList.remove('active'));
+    renderEmptyChat();
+    document.getElementById('chat-input').focus();
+  });
+
+  // Chat input - auto-resize + Enter to send
+  const input = document.getElementById('chat-input');
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Send button
+  document.getElementById('chat-send-btn').addEventListener('click', sendMessage);
+
+  // Upload
+  const uploadInput = document.getElementById('doc-upload-input');
+  const uploadZone = document.getElementById('docs-upload-zone');
+  if (uploadInput) {
+    uploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) await uploadDocument(file);
+      uploadInput.value = '';
+    });
+  }
+  if (uploadZone) {
+    ['dragenter', 'dragover'].forEach(ev => uploadZone.addEventListener(ev, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      uploadZone.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(ev => uploadZone.addEventListener(ev, (e) => {
+      e.preventDefault(); e.stopPropagation();
+      uploadZone.classList.remove('dragover');
+    }));
+    uploadZone.addEventListener('drop', async (e) => {
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) await uploadDocument(file);
+    });
+  }
+}
+
+function updateChatHeader() {
+  const meta = MODE_META[currentMode];
+  document.getElementById('chat-mode-title').textContent = meta.title;
+  document.getElementById('chat-mode-desc').textContent = meta.desc;
+  document.querySelector('.chat-header-icon').textContent = meta.icon;
+}
+
+function renderEmptyChat() {
+  const meta = MODE_META[currentMode];
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = `
+    <div class="chat-empty">
+      <div class="chat-empty-icon">${meta.icon}</div>
+      <div class="chat-empty-title">${escapeHtml(meta.title)}</div>
+      <div class="chat-empty-desc">${escapeHtml(meta.desc)}</div>
+      <div class="chat-suggestions">
+        ${meta.suggestions.map(s => `<button class="chat-suggestion" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}
+      </div>
+    </div>
+  `;
+  container.querySelectorAll('.chat-suggestion').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('chat-input').value = btn.dataset.text;
+      sendMessage();
+    });
+  });
+}
+
+// ============================================================
+// Chat
+// ============================================================
+async function sendMessage() {
+  if (sendingMessage) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  if (!aiEnabled) {
+    showToast('סוכן AI עדיין לא מחובר - פני למנהל המערכת', 'error');
+    return;
+  }
+
+  sendingMessage = true;
+  input.disabled = true;
+  document.getElementById('chat-send-btn').disabled = true;
+
+  // If this is a new conversation, clear the empty state
+  const messagesContainer = document.getElementById('chat-messages');
+  if (!currentConversationId) {
+    messagesContainer.innerHTML = '';
+  }
+
+  // Append user bubble
+  appendMessage('user', text);
+
+  // Clear input
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Show thinking indicator
+  const thinkingId = 'thinking-' + Date.now();
+  appendThinking(thinkingId);
+
+  try {
+    const res = await API.request('/training/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversation_id: currentConversationId,
+        message: text,
+        mode: currentMode
+      })
+    });
+    removeThinking(thinkingId);
+    appendMessage('assistant', res.message);
+
+    // Store conversation id for follow-ups
+    if (!currentConversationId) {
+      currentConversationId = res.conversation_id;
+      await loadConversations();
+    }
+  } catch (err) {
+    removeThinking(thinkingId);
+    appendMessage('assistant', '❌ שגיאה: ' + (err.message || 'לא הצלחתי לקבל תשובה. נסי שוב.'));
+  } finally {
+    sendingMessage = false;
+    input.disabled = false;
+    document.getElementById('chat-send-btn').disabled = false;
+    input.focus();
+  }
+}
+
+function appendMessage(role, content) {
+  const container = document.getElementById('chat-messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-message ' + role;
+  wrap.innerHTML = `
+    <div class="chat-avatar ${role}">${role === 'user' ? 'את' : '🤖'}</div>
+    <div class="chat-bubble ${role}">${escapeHtml(content)}</div>
+  `;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendThinking(id) {
+  const container = document.getElementById('chat-messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-message assistant';
+  wrap.id = id;
+  wrap.innerHTML = `
+    <div class="chat-avatar assistant">🤖</div>
+    <div class="chat-thinking">
+      <div class="chat-dots"><span></span><span></span><span></span></div>
+      <span>חושב...</span>
+    </div>
+  `;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeThinking(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ============================================================
+// Conversations
+// ============================================================
+async function loadConversations() {
+  try {
+    const conversations = await API.request('/training/conversations');
+    const container = document.getElementById('conversations-list');
+    if (!conversations || conversations.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--color-text-light);padding:8px 12px">אין שיחות קודמות</div>';
+      return;
+    }
+    container.innerHTML = conversations.slice(0, 20).map(c => {
+      const modeMeta = MODE_META[c.mode] || MODE_META.qa;
+      const isActive = c.id === currentConversationId;
+      return `
+        <div class="training-conv-item ${isActive ? 'active' : ''}" data-id="${c.id}" data-mode="${c.mode || 'qa'}">
+          <span>${modeMeta.icon}</span>
+          <span class="training-conv-item-title">${escapeHtml(c.title || 'שיחה ללא שם')}</span>
+          <button class="training-conv-delete" data-id="${c.id}" title="מחק">🗑</button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.training-conv-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        if (e.target.closest('.training-conv-delete')) return;
+        const id = parseInt(item.dataset.id);
+        await loadConversation(id);
+      });
+    });
+    container.querySelectorAll('.training-conv-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.id);
+        if (!confirm('למחוק את השיחה?')) return;
+        try {
+          await API.request('/training/conversations/' + id, { method: 'DELETE' });
+          if (currentConversationId === id) {
+            currentConversationId = null;
+            currentConversation = null;
+            renderEmptyChat();
+          }
+          await loadConversations();
+        } catch (err) {
+          showToast('שגיאה במחיקה', 'error');
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Failed to load conversations:', err);
+  }
+}
+
+async function loadConversation(id) {
+  try {
+    const conv = await API.request('/training/conversations/' + id);
+    currentConversationId = conv.id;
+    currentConversation = conv;
+    currentMode = conv.mode || 'qa';
+
+    // Update mode buttons
+    document.querySelectorAll('.training-mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === currentMode);
+    });
+    updateChatHeader();
+
+    // Update active conv item
+    document.querySelectorAll('.training-conv-item').forEach(i => i.classList.remove('active'));
+    const activeItem = document.querySelector(`.training-conv-item[data-id="${id}"]`);
+    if (activeItem) activeItem.classList.add('active');
+
+    // Render messages
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = '';
+    (conv.messages || []).forEach(m => {
+      appendMessage(m.role, m.content);
+    });
+  } catch (err) {
+    showToast('שגיאה בטעינת שיחה', 'error');
+  }
+}
+
+// ============================================================
+// Documents
+// ============================================================
+async function loadDocuments() {
+  try {
+    const docs = await API.request('/training/documents');
+    document.getElementById('docs-count').textContent = docs.length;
+    const list = document.getElementById('docs-list');
+    if (!docs || docs.length === 0) {
+      list.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--color-text-light)"><div style="font-size:48px;margin-bottom:12px">📭</div>אין חומרי הכשרה עדיין</div>';
+      return;
+    }
+    list.innerHTML = docs.map(d => renderDocCard(d)).join('');
+
+    list.querySelectorAll('.doc-btn.danger').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        if (!confirm('למחוק את החומר?')) return;
+        try {
+          await API.request('/training/documents/' + id, { method: 'DELETE' });
+          showToast('נמחק');
+          loadDocuments();
+        } catch (err) {
+          showToast('שגיאה במחיקה', 'error');
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Failed to load documents:', err);
+  }
+}
+
+function renderDocCard(d) {
+  const ext = (d.original_name || '').split('.').pop().toLowerCase();
+  const icon = ext === 'pdf' ? '📄' : (ext === 'pptx' || ext === 'ppt') ? '📊' : (ext === 'docx' || ext === 'doc') ? '📝' : '📁';
+  const sizeMB = d.size ? (d.size / 1024 / 1024).toFixed(1) + ' MB' : '';
+  const token = API.getToken();
+  const viewUrl = '/api/training/documents/' + d.id + '/file?token=' + token;
+  return `
+    <div class="doc-card">
+      <div class="doc-icon">${icon}</div>
+      <div class="doc-info">
+        <div class="doc-name" title="${escapeHtml(d.original_name)}">${escapeHtml(d.original_name)}</div>
+        <div class="doc-meta">${sizeMB} · הועלה על ידי ${escapeHtml(d.uploaded_by || 'מערכת')}</div>
+        <div class="doc-actions">
+          <a href="${viewUrl}" target="_blank" class="doc-btn">👁 צפייה</a>
+          <button class="doc-btn danger" data-id="${d.id}">🗑 מחק</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function uploadDocument(file) {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    showToast('מעלה ' + file.name + '...');
+
+    const token = API.getToken();
+    const res = await fetch('/api/training/documents', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+    showToast('✓ הועלה בהצלחה');
+    loadDocuments();
+  } catch (err) {
+    showToast('שגיאה: ' + err.message, 'error');
+  }
+}

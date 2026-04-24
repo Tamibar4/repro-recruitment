@@ -33,6 +33,29 @@ try {
   const dbDir = path.dirname(DB_FILE);
   if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 } catch (e) { console.error('Could not create DB dir:', e.message); }
+
+// Training materials storage (PDFs, presentations) - next to DB on Railway volume
+const TRAINING_DIR = process.env.TRAINING_DIR || path.join(path.dirname(DB_FILE), 'training');
+try {
+  if (!fs.existsSync(TRAINING_DIR)) fs.mkdirSync(TRAINING_DIR, { recursive: true });
+} catch (e) { console.error('Could not create training dir:', e.message); }
+
+// Anthropic SDK for AI tutor (lazy init - only if API key provided)
+let anthropicClient = null;
+function getAnthropicClient() {
+  if (anthropicClient) return anthropicClient;
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    anthropicClient = new Anthropic.default({ apiKey: key });
+    console.log('✓ Anthropic SDK initialized');
+    return anthropicClient;
+  } catch (e) {
+    console.error('Failed to init Anthropic SDK:', e.message);
+    return null;
+  }
+}
 const AUDIT_LOG_FILE = path.join(__dirname, 'audit.log');
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
@@ -262,7 +285,9 @@ function authMiddleware(req, res, next) {
   if (!req.path.startsWith('/api/')) return next();
 
   const auth = req.headers['authorization'];
-  const token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  let token = auth && auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  // Also accept token as query param (for file downloads via <a href>)
+  if (!token && req.query && typeof req.query.token === 'string') token = req.query.token;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   const session = sessions.get(token);
@@ -448,7 +473,9 @@ const defaultData = {
   users: defaultUsers,
   categories: DEFAULT_CATEGORIES,
   countries: DEFAULT_COUNTRIES,
-  counters: { jobs: 0, candidates: 0, stage_history: 0 }
+  training_documents: [],
+  training_conversations: [],
+  counters: { jobs: 0, candidates: 0, stage_history: 0, training_documents: 0, training_conversations: 0 }
 };
 
 let data = defaultData;
@@ -473,6 +500,11 @@ function loadData() {
         data.countries = DEFAULT_COUNTRIES;
         saveData();
       }
+      // Initialize training collections if missing
+      if (!Array.isArray(data.training_documents)) { data.training_documents = []; saveData(); }
+      if (!Array.isArray(data.training_conversations)) { data.training_conversations = []; saveData(); }
+      if (!data.counters.training_documents) { data.counters.training_documents = 0; saveData(); }
+      if (!data.counters.training_conversations) { data.counters.training_conversations = 0; saveData(); }
       // Add default users if missing (migration for existing databases)
       if (!data.users || data.users.length === 0) {
         data.users = defaultUsers;
@@ -1920,6 +1952,284 @@ app.get('/api/team/user/:username/candidates', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ============================================================
+// TRAINING API - Documents + AI Tutor
+// ============================================================
+const multer = require('multer');
+const trainingStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, TRAINING_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '';
+    cb(null, 'td_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex') + ext);
+  }
+});
+const trainingUpload = multer({
+  storage: trainingStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (allowed.includes(file.mimetype) || /\.(pdf|pptx|ppt|doc|docx|txt)$/i.test(file.originalname || '')) {
+      cb(null, true);
+    } else {
+      cb(new Error('סוג קובץ לא נתמך (נתמכים: PDF, PPTX, DOCX, TXT)'));
+    }
+  }
+});
+
+// GET /api/training/documents - list all training documents
+app.get('/api/training/documents', (req, res) => {
+  try {
+    const docs = (data.training_documents || []).map(d => ({
+      id: d.id,
+      original_name: d.original_name,
+      size: d.size,
+      mime_type: d.mime_type,
+      uploaded_by: d.uploaded_by,
+      uploaded_at: d.uploaded_at,
+      description: d.description || null
+    }));
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/training/documents - upload a new document (admin only)
+app.post('/api/training/documents', (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  trainingUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    try {
+      const doc = {
+        id: ++data.counters.training_documents,
+        filename: req.file.filename,
+        original_name: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+        size: req.file.size,
+        mime_type: req.file.mimetype,
+        uploaded_by: req.user.username,
+        uploaded_at: now(),
+        description: req.body.description || null
+      };
+      data.training_documents.push(doc);
+      saveData();
+      res.status(201).json(doc);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
+// GET /api/training/documents/:id/file - download file
+app.get('/api/training/documents/:id/file', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const doc = (data.training_documents || []).find(d => d.id === id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const filePath = path.join(TRAINING_DIR, doc.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing on disk' });
+    res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/training/documents/:id - delete (admin only)
+app.delete('/api/training/documents/:id', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  try {
+    const id = parseInt(req.params.id);
+    const idx = (data.training_documents || []).findIndex(d => d.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    const doc = data.training_documents[idx];
+    const filePath = path.join(TRAINING_DIR, doc.filename);
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+    data.training_documents.splice(idx, 1);
+    saveData();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/training/conversations - list current user's conversations
+app.get('/api/training/conversations', (req, res) => {
+  try {
+    const username = req.user.username;
+    const list = (data.training_conversations || [])
+      .filter(c => c.user_id === username)
+      .map(c => ({
+        id: c.id,
+        mode: c.mode,
+        title: c.title || null,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        message_count: (c.messages || []).length
+      }))
+      .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/training/conversations/:id - full conversation
+app.get('/api/training/conversations/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const conv = (data.training_conversations || []).find(c => c.id === id);
+    if (!conv) return res.status(404).json({ error: 'Not found' });
+    if (conv.user_id !== req.user.username && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json(conv);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/training/conversations/:id
+app.delete('/api/training/conversations/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const idx = (data.training_conversations || []).findIndex(c => c.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    if (data.training_conversations[idx].user_id !== req.user.username && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    data.training_conversations.splice(idx, 1);
+    saveData();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/training/chat - send a message, get AI response
+// Body: { conversation_id?, message, mode: 'qa' | 'consult' | 'scenario' | 'quiz' }
+app.post('/api/training/chat', async (req, res) => {
+  try {
+    const client = getAnthropicClient();
+    if (!client) {
+      return res.status(503).json({
+        error: 'ai_not_configured',
+        message: 'הסוכן AI עדיין לא מחובר. מנהל המערכת צריך להגדיר ANTHROPIC_API_KEY.'
+      });
+    }
+    const { conversation_id, message, mode = 'qa' } = req.body || {};
+    if (!message || !message.trim()) return res.status(400).json({ error: 'message required' });
+
+    // Build or fetch conversation
+    let conv;
+    if (conversation_id) {
+      conv = (data.training_conversations || []).find(c => c.id === conversation_id);
+      if (!conv) return res.status(404).json({ error: 'conversation not found' });
+      if (conv.user_id !== req.user.username) return res.status(403).json({ error: 'Forbidden' });
+    } else {
+      conv = {
+        id: ++data.counters.training_conversations,
+        user_id: req.user.username,
+        mode,
+        title: (message || '').slice(0, 60),
+        messages: [],
+        created_at: now(),
+        updated_at: now()
+      };
+      data.training_conversations.push(conv);
+    }
+
+    // Append user message
+    conv.messages.push({ role: 'user', content: message.trim(), timestamp: now() });
+
+    // Build system prompt based on mode
+    const systemByMode = {
+      qa: 'את/ה סוכן הכשרה של RePro - סוכנות גיוס והשמה בינלאומית. תפקידך לענות על שאלות של מגייסים חדשים על בסיס חומרי ההכשרה. ענה/י בעברית, בצורה ברורה וחמה. אם השאלה לא נמצאת בחומרים - תענה/י על בסיס היגיון כללי אבל תציין/י שהמידע לא נמצא במפורש בחומר. תתייחס/י למגייסים בלשון נקבה כברירת מחדל כשלא ידוע אחרת.',
+      consult: 'את/ה מאמן/ת בכיר/ה ב-RePro. מגייסת פנתה אליך לייעוץ במצב שהיא נתקלת בו. תן/י יעוץ מעשי, ממוקד, מבוסס על חומרי ההכשרה. שאל/י שאלות הבהרה לפני שאת/ה נותן/ת את הטיפ המרכזי. ענה/י בעברית בטון חברי ומקצועי.',
+      scenario: 'את/ה משחק/ת תפקיד של מועמד/ת או מעסיק/ה בסימולציית תרגול. המגייסת מתרגלת שיחות. תגיב/י כמו בן אדם אמיתי - עם התנגדויות, שאלות, היסוסים. אל תקל/י עליה. בסוף התרגול (כשהיא מבקשת) תן/י משוב בונה על מה שהיא עשתה טוב ומה לשפר.',
+      quiz: 'את/ה בוחן/ת את המגייסת על חומר ההכשרה. שאל/י שאלה אחת בכל פעם, חכה/י לתשובתה, ואז תן/י משוב קצר ותסביר/י את התשובה הנכונה. עבור/י בין נושאים שונים. בעברית.'
+    };
+    const systemText = systemByMode[mode] || systemByMode.qa;
+
+    // Load training documents as PDF content blocks (cached)
+    const docs = (data.training_documents || []).filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''));
+    const systemBlocks = [{ type: 'text', text: systemText }];
+    if (docs.length > 0) {
+      // Load each doc as a content block (will be included in the user's first message)
+      // Per Claude API: PDFs go in message content, not system
+    }
+
+    // Build Claude messages array
+    const claudeMessages = [];
+    // On first message, include all PDFs in user content (with cache_control on last doc block)
+    const isFirstMessage = conv.messages.length === 1;
+    if (isFirstMessage && docs.length > 0) {
+      const contentBlocks = [];
+      docs.forEach((doc, idx) => {
+        try {
+          const filePath = path.join(TRAINING_DIR, doc.filename);
+          if (!fs.existsSync(filePath)) return;
+          const b64 = fs.readFileSync(filePath).toString('base64');
+          const block = {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: b64 },
+            title: doc.original_name,
+            context: `חומר הכשרה #${idx + 1}: ${doc.original_name}`
+          };
+          // Cache the last document block → caches everything up to it
+          if (idx === docs.length - 1) {
+            block.cache_control = { type: 'ephemeral' };
+          }
+          contentBlocks.push(block);
+        } catch (e) { console.error('Failed to load doc', doc.filename, e.message); }
+      });
+      contentBlocks.push({ type: 'text', text: message.trim() });
+      claudeMessages.push({ role: 'user', content: contentBlocks });
+    } else {
+      // Subsequent messages: just replay the conversation
+      conv.messages.forEach(m => {
+        claudeMessages.push({ role: m.role, content: m.content });
+      });
+    }
+
+    // Call Claude API
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2048,
+      system: systemText,
+      messages: claudeMessages
+    });
+
+    const assistantText = (response.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
+
+    // Append assistant message + persist
+    conv.messages.push({ role: 'assistant', content: assistantText, timestamp: now() });
+    conv.updated_at = now();
+    saveData();
+
+    res.json({
+      conversation_id: conv.id,
+      message: assistantText,
+      usage: response.usage || null
+    });
+  } catch (err) {
+    console.error('Training chat error:', err);
+    res.status(500).json({ error: err.message || 'AI request failed' });
+  }
+});
+
+// GET /api/training/status - is AI configured?
+app.get('/api/training/status', (req, res) => {
+  res.json({
+    ai_enabled: !!getAnthropicClient(),
+    document_count: (data.training_documents || []).length
+  });
 });
 
 // ============================================================
