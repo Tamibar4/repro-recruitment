@@ -122,7 +122,7 @@ function renderColumn(stage, items) {
   // Card click -> open modal
   container.querySelectorAll('.candidate-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.move-btn')) return;
+      if (e.target.closest('.move-btn') || e.target.closest('.followup-done-btn') || e.target.closest('.whatsapp-btn')) return;
       const id = card.dataset.id;
       const candidate = allCandidates.find(c => c.id == id);
       if (candidate) openCandidateModal(candidate);
@@ -142,6 +142,16 @@ function renderColumn(stage, items) {
       } catch (err) {
         showToast(I18n.t('error'), 'error');
       }
+    });
+  });
+
+  // Follow-up "Mark as done" buttons
+  container.querySelectorAll('.followup-done-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.followupId);
+      const candidate = allCandidates.find(c => c.id === id);
+      if (candidate) openFollowUpCompleteModal(candidate);
     });
   });
 }
@@ -206,12 +216,20 @@ function renderCandidateCard(candidate, stage) {
     }
 
     followUpBadgeHtml = `
-      <div class="follow-up-badge ${followUpStatus}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-        ${fuLabel}
+      <div class="followup-row">
+        <div class="follow-up-badge ${followUpStatus}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          ${fuLabel}
+        </div>
+        <button class="followup-done-btn" data-followup-id="${candidate.id}" title="סמן פולואפ כבוצע + הוסף סיכום">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          סמן כבוצע
+        </button>
       </div>
     `;
   }
@@ -246,7 +264,7 @@ function renderCandidateCard(candidate, stage) {
           <span class="delayed-badge">⏳ זמין מ-${candidate.available_from}</span>
         </div>
       ` : ''}
-      ${followUpBadgeHtml ? `<div style="margin-top:6px">${followUpBadgeHtml}</div>` : ''}
+      ${followUpBadgeHtml}
       ${stage === 'accepted' && (candidate.start_date || candidate.payment_date || candidate.payment_amount) ? `
         <div class="candidate-payment-info">
           ${candidate.payment_plan ? `<div class="payment-row"><span>📋 תוכנית:</span><strong>${{
@@ -996,6 +1014,136 @@ async function loadDelayedAvailability() {
     if (el && d.length > 0) { el.textContent = d.length; el.style.display = ''; }
   } catch(e) {}
 })();
+
+// ============================================================
+// Follow-up Completion Modal
+// ============================================================
+let currentFollowUpCandidate = null;
+
+function openFollowUpCompleteModal(candidate) {
+  currentFollowUpCandidate = candidate;
+
+  // Populate candidate info
+  const info = document.getElementById('fuc-candidate-info');
+  const dueDate = candidate.follow_up_at ? new Date(candidate.follow_up_at) : null;
+  const dueStr = dueDate ? dueDate.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' }) : '';
+  info.innerHTML = `
+    <div style="font-weight:700;font-size:15px;color:var(--color-text)">${escapeHtml(candidate.name)}</div>
+    ${candidate.job_title ? `<div style="color:var(--color-text-secondary);margin-top:2px">💼 ${escapeHtml(candidate.job_title)}${candidate.job_company ? ' · ' + escapeHtml(candidate.job_company) : ''}</div>` : ''}
+    ${dueStr ? `<div style="color:var(--color-text-light);margin-top:4px;font-size:12px">⏰ פולואפ נקבע ל: ${dueStr}</div>` : ''}
+  `;
+
+  // Reset form
+  document.getElementById('fuc-summary').value = '';
+  document.getElementById('fuc-next-date').value = '';
+  document.getElementById('fuc-next-date-row').style.display = 'none';
+  document.getElementById('fuc-next-preview').style.display = 'none';
+  document.querySelectorAll('#fuc-next-options .fuc-next-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('#fuc-next-options .fuc-next-btn[data-days="-1"]').classList.add('active');
+
+  // Render history
+  const histSection = document.getElementById('fuc-history-section');
+  const histList = document.getElementById('fuc-history-list');
+  const history = Array.isArray(candidate.follow_up_history) ? candidate.follow_up_history : [];
+  if (history.length > 0) {
+    histSection.style.display = 'block';
+    histList.innerHTML = history.slice().reverse().map(h => {
+      const d = new Date(h.completed_at);
+      const dStr = d.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' });
+      return `
+        <div class="fuc-history-item">
+          <div class="fuc-history-date">📅 ${dStr}</div>
+          <div class="fuc-history-summary">${escapeHtml(h.summary || '')}</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    histSection.style.display = 'none';
+  }
+
+  openModal('followup-complete-modal');
+  setTimeout(() => document.getElementById('fuc-summary').focus(), 100);
+}
+
+// Next-step button clicks
+document.querySelectorAll('#fuc-next-options .fuc-next-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const days = parseInt(btn.dataset.days);
+    const dateRow = document.getElementById('fuc-next-date-row');
+    const preview = document.getElementById('fuc-next-preview');
+    const dateInput = document.getElementById('fuc-next-date');
+
+    document.querySelectorAll('#fuc-next-options .fuc-next-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (days === -1) {
+      // No new follow-up
+      dateRow.style.display = 'none';
+      preview.style.display = 'none';
+      dateInput.value = '';
+    } else if (days === 0) {
+      // Manual date
+      dateRow.style.display = 'block';
+      preview.style.display = 'none';
+      dateInput.focus();
+    } else {
+      // Quick preset
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      d.setHours(10, 0, 0, 0);
+      const pad = n => String(n).padStart(2, '0');
+      dateInput.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      dateRow.style.display = 'none';
+      const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+      preview.textContent = `📅 פולואפ הבא ביום ${dayNames[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
+      preview.style.display = 'block';
+    }
+  });
+});
+
+// Update preview when manual date changes
+document.getElementById('fuc-next-date').addEventListener('change', () => {
+  const val = document.getElementById('fuc-next-date').value;
+  const preview = document.getElementById('fuc-next-preview');
+  if (val) {
+    const d = new Date(val);
+    const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    preview.textContent = `📅 פולואפ הבא ביום ${dayNames[d.getDay()]}, ${d.toLocaleDateString('he-IL')}`;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+// Save button
+document.getElementById('fuc-save-btn').addEventListener('click', async () => {
+  if (!currentFollowUpCandidate) return;
+  const summary = document.getElementById('fuc-summary').value.trim();
+  const activeBtn = document.querySelector('#fuc-next-options .fuc-next-btn.active');
+  const days = activeBtn ? parseInt(activeBtn.dataset.days) : -1;
+  const nextDate = days === -1 ? null : document.getElementById('fuc-next-date').value || null;
+
+  if (!summary) {
+    if (!confirm('לא הוספת סיכום לשיחה. להמשיך בכל זאת?')) return;
+  }
+
+  try {
+    await API.candidates.completeFollowUp(currentFollowUpCandidate.id, {
+      summary: summary || '(ללא סיכום)',
+      next_follow_up_at: nextDate
+    });
+    showToast(nextDate ? '✓ פולואפ נסגר - נקבע חדש' : '✓ פולואפ נסגר בהצלחה');
+    closeModal('followup-complete-modal');
+    currentFollowUpCandidate = null;
+    loadCandidates();
+  } catch (err) {
+    console.error('Complete follow-up error:', err);
+    showToast(I18n.t('error'), 'error');
+  }
+});
+
+// Expose for inline onclick
+window.openFollowUpCompleteModal = openFollowUpCompleteModal;
 
 // ---------- Initial load ----------
 (async function init() {

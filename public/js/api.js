@@ -103,6 +103,12 @@ const API = {
         body: JSON.stringify({ stage })
       });
     },
+    completeFollowUp(id, { summary, next_follow_up_at } = {}) {
+      return API.request('/candidates/' + id + '/follow-up', {
+        method: 'PATCH',
+        body: JSON.stringify({ follow_up_done: true, summary, next_follow_up_at })
+      });
+    },
     delete(id) {
       return API.request('/candidates/' + id, { method: 'DELETE' });
     }

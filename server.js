@@ -1652,20 +1652,46 @@ app.patch('/api/candidates/:id/stage', (req, res) => {
   }
 });
 
-// PATCH /api/candidates/:id/follow-up - mark follow up done/undone
+// PATCH /api/candidates/:id/follow-up - mark follow up done/undone, optionally with summary + new date
 app.patch('/api/candidates/:id/follow-up', (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const idx = data.candidates.findIndex(c => c.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Candidate not found' });
 
-    const { follow_up_done, follow_up_at } = req.body;
-    if (typeof follow_up_done === 'boolean') data.candidates[idx].follow_up_done = follow_up_done;
-    if (follow_up_at !== undefined) data.candidates[idx].follow_up_at = follow_up_at || null;
-    data.candidates[idx].updated_at = now();
+    const { follow_up_done, follow_up_at, summary, next_follow_up_at } = req.body;
+    const candidate = data.candidates[idx];
 
+    // If marking as done with a summary → archive to history
+    if (follow_up_done === true && typeof summary === 'string' && summary.trim()) {
+      if (!Array.isArray(candidate.follow_up_history)) candidate.follow_up_history = [];
+      candidate.follow_up_history.push({
+        completed_at: now(),
+        due_was: candidate.follow_up_at || null,
+        summary: summary.trim()
+      });
+      // Also append summary to call_summary for visibility
+      const stamp = new Date().toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+      const appended = `\n\n[פולואפ ${stamp}]\n${summary.trim()}`;
+      candidate.call_summary = (candidate.call_summary || '') + appended;
+    }
+
+    if (typeof follow_up_done === 'boolean') candidate.follow_up_done = follow_up_done;
+
+    // Handle new follow-up date OR clear existing follow-up
+    if (next_follow_up_at) {
+      candidate.follow_up_at = next_follow_up_at;
+      candidate.follow_up_done = false;
+    } else if (follow_up_at !== undefined) {
+      candidate.follow_up_at = follow_up_at || null;
+    } else if (follow_up_done === true) {
+      // Default: clear the follow-up when marked done (unless next_follow_up_at was provided)
+      candidate.follow_up_at = null;
+    }
+
+    candidate.updated_at = now();
     saveData();
-    res.json(enrichCandidate(data.candidates[idx]));
+    res.json(enrichCandidate(candidate));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

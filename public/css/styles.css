@@ -3272,6 +3272,88 @@ button:focus-visible,
   background: linear-gradient(180deg, var(--color-red), #ff5577) !important;
 }
 
+/* Follow-up "mark done" quick button on candidate card */
+.followup-done-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  background: linear-gradient(135deg, #00c875, #00a65a);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 2px 6px rgba(0,200,117,0.3);
+  transition: all 0.15s;
+  margin-right: 6px;
+}
+.followup-done-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,200,117,0.4);
+}
+.followup-done-btn svg { width: 11px; height: 11px; }
+
+/* Follow-up badge + done button row */
+.followup-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Follow-up completion dialog - next-step chip buttons */
+.fuc-next-btn {
+  padding: 7px 14px;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.fuc-next-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.fuc-next-btn.active {
+  background: var(--gradient-primary);
+  border-color: var(--color-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0,115,234,0.3);
+}
+.fuc-next-btn[data-days="-1"].active {
+  background: linear-gradient(135deg, #00c875, #00a65a);
+  border-color: #00a65a;
+  box-shadow: 0 2px 8px rgba(0,200,117,0.3);
+}
+
+/* Follow-up history list */
+.fuc-history-item {
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border-right: 3px solid var(--color-primary);
+}
+[dir="ltr"] .fuc-history-item { border-right: none; border-left: 3px solid var(--color-primary); }
+.fuc-history-date {
+  font-size: 11px;
+  color: var(--color-text-light);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.fuc-history-summary {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* ============================================================
    Reminder banner (top of dashboard)
    ============================================================ */
