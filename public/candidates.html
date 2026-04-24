@@ -368,7 +368,23 @@
       </div>
       <div class="modal-body">
         <div id="fuc-candidate-info" style="padding:12px 14px;background:var(--color-bg);border-radius:10px;margin-bottom:16px;font-size:13px"></div>
+
         <div class="form-field full">
+          <label style="font-weight:700">📞 תוצאת השיחה</label>
+          <div id="fuc-outcome-options" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <button type="button" class="fuc-outcome-btn active" data-outcome="spoke">
+              <span style="font-size:15px">✓</span> דיברנו
+            </button>
+            <button type="button" class="fuc-outcome-btn no-answer" data-outcome="no_answer">
+              <span style="font-size:15px">📵</span> לא ענה
+            </button>
+            <button type="button" class="fuc-outcome-btn left-msg" data-outcome="left_message">
+              <span style="font-size:15px">💬</span> השארתי הודעה
+            </button>
+          </div>
+        </div>
+
+        <div class="form-field full" style="margin-top:16px">
           <label style="font-weight:700">📝 סיכום השיחה <span style="color:var(--color-text-light);font-weight:500">(מה נאמר בפולואפ)</span></label>
           <textarea id="fuc-summary" rows="4" placeholder="למשל: דיברנו על המשרה בבוסטון, מעוניין להתקדם - שלחתי פרטים..." style="width:100%;padding:11px 14px;border:1.5px solid var(--color-border);border-radius:10px;font-family:inherit;font-size:14px;resize:vertical"></textarea>
         </div>
@@ -403,6 +419,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=3"></script>
-  <script src="js/candidates.js?v=4"></script>
+  <script src="js/candidates.js?v=5"></script>
 </body>
 </html>

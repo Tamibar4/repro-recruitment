@@ -1041,6 +1041,10 @@ function openFollowUpCompleteModal(candidate) {
   document.querySelectorAll('#fuc-next-options .fuc-next-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('#fuc-next-options .fuc-next-btn[data-days="-1"]').classList.add('active');
 
+  // Reset outcome to default "spoke"
+  document.querySelectorAll('#fuc-outcome-options .fuc-outcome-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('#fuc-outcome-options .fuc-outcome-btn[data-outcome="spoke"]').classList.add('active');
+
   // Render history
   const histSection = document.getElementById('fuc-history-section');
   const histList = document.getElementById('fuc-history-list');
@@ -1064,6 +1068,40 @@ function openFollowUpCompleteModal(candidate) {
   openModal('followup-complete-modal');
   setTimeout(() => document.getElementById('fuc-summary').focus(), 100);
 }
+
+// Outcome button clicks (spoke / no_answer / left_message)
+document.querySelectorAll('#fuc-outcome-options .fuc-outcome-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const outcome = btn.dataset.outcome;
+    document.querySelectorAll('#fuc-outcome-options .fuc-outcome-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const summaryInput = document.getElementById('fuc-summary');
+
+    // Smart defaults based on outcome
+    if (outcome === 'no_answer') {
+      // Pre-fill summary if empty
+      if (!summaryInput.value.trim()) {
+        summaryInput.value = '📵 לא ענה - ניסיתי להתקשר';
+      }
+      // Auto-select "tomorrow" as default next follow-up (user usually wants to retry soon)
+      const tomorrowBtn = document.querySelector('#fuc-next-options .fuc-next-btn[data-days="1"]');
+      if (tomorrowBtn && !document.querySelector('#fuc-next-options .fuc-next-btn.active[data-days="1"]')) {
+        tomorrowBtn.click();
+      }
+    } else if (outcome === 'left_message') {
+      if (!summaryInput.value.trim()) {
+        summaryInput.value = '💬 השארתי הודעה - ממתין לחזרה';
+      }
+      // Auto-select "3 days" as default next follow-up
+      const threeDaysBtn = document.querySelector('#fuc-next-options .fuc-next-btn[data-days="3"]');
+      if (threeDaysBtn && !document.querySelector('#fuc-next-options .fuc-next-btn.active[data-days="3"]')) {
+        threeDaysBtn.click();
+      }
+    }
+    // For 'spoke' - don't auto-fill anything, let user type
+  });
+});
 
 // Next-step button clicks
 document.querySelectorAll('#fuc-next-options .fuc-next-btn').forEach(btn => {
@@ -1119,20 +1157,38 @@ document.getElementById('fuc-next-date').addEventListener('change', () => {
 document.getElementById('fuc-save-btn').addEventListener('click', async () => {
   if (!currentFollowUpCandidate) return;
   const summary = document.getElementById('fuc-summary').value.trim();
-  const activeBtn = document.querySelector('#fuc-next-options .fuc-next-btn.active');
-  const days = activeBtn ? parseInt(activeBtn.dataset.days) : -1;
+  const activeNextBtn = document.querySelector('#fuc-next-options .fuc-next-btn.active');
+  const days = activeNextBtn ? parseInt(activeNextBtn.dataset.days) : -1;
   const nextDate = days === -1 ? null : document.getElementById('fuc-next-date').value || null;
 
-  if (!summary) {
+  // Get selected outcome
+  const activeOutcomeBtn = document.querySelector('#fuc-outcome-options .fuc-outcome-btn.active');
+  const outcome = activeOutcomeBtn ? activeOutcomeBtn.dataset.outcome : 'spoke';
+  const outcomeEmoji = { spoke: '✓', no_answer: '📵', left_message: '💬' }[outcome] || '';
+  const outcomeLabel = { spoke: 'דיברנו', no_answer: 'לא ענה', left_message: 'השארתי הודעה' }[outcome] || '';
+
+  // Build full summary: outcome tag + summary text
+  let fullSummary = `${outcomeEmoji} ${outcomeLabel}`;
+  if (summary && !summary.startsWith(outcomeEmoji)) {
+    fullSummary += `\n${summary}`;
+  } else if (summary) {
+    fullSummary = summary;
+  }
+
+  // For "no answer" without summary text, don't force confirm - it's a valid entry on its own
+  if (outcome === 'spoke' && !summary) {
     if (!confirm('לא הוספת סיכום לשיחה. להמשיך בכל זאת?')) return;
   }
 
   try {
     await API.candidates.completeFollowUp(currentFollowUpCandidate.id, {
-      summary: summary || '(ללא סיכום)',
+      summary: fullSummary,
       next_follow_up_at: nextDate
     });
-    showToast(nextDate ? '✓ פולואפ נסגר - נקבע חדש' : '✓ פולואפ נסגר בהצלחה');
+    const msg = outcome === 'no_answer' ? '📵 תועד - לא ענה'
+              : outcome === 'left_message' ? '💬 תועד - הודעה נשארה'
+              : '✓ פולואפ נסגר';
+    showToast(nextDate ? `${msg} - נקבע פולואפ חדש` : msg);
     closeModal('followup-complete-modal');
     currentFollowUpCandidate = null;
     loadCandidates();
