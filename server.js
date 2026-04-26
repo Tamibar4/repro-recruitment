@@ -1791,12 +1791,12 @@ app.get('/api/stats', (req, res) => {
     const rejected = userCandidates.filter(c => c.stage === 'rejected').length;
     const totalCandidates = userCandidates.length;
 
-    // Accepted this week (Sunday-Saturday based on stage_history)
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // back to Sunday
-    weekStart.setHours(0, 0, 0, 0);
+    // Accepted this month (based on stage_history)
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
     const acceptedThisMonth = data.stage_history.filter(h =>
-      h.to_stage === 'accepted' && new Date(h.changed_at) >= weekStart
+      h.to_stage === 'accepted' && new Date(h.changed_at) >= monthStart
     ).length;
 
     // Candidates by category
