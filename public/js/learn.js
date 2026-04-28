@@ -17,7 +17,10 @@
   let userName = ''
   let modulesCache = []
 
-  const DISCLAIMER_VERSION = 'v1'
+  // v2 introduces the full multi-section legal agreement (Israeli law,
+  // RePro-specific IP/non-compete clauses). Anyone who accepted v1 will
+  // be re-prompted to acknowledge v2.
+  const DISCLAIMER_VERSION = 'v2'
   function disclaimerKey() { return `repro_learn_disclaimer_${DISCLAIMER_VERSION}_${userEmail || 'anon'}` }
   function progressKey() { return `repro_learn_progress_${userEmail || 'anon'}` }
 

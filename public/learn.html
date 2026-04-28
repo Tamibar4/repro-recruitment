@@ -358,7 +358,7 @@
     /* ===== Disclaimer modal ===== */
     .disclaimer-overlay {
       position: fixed; inset: 0; z-index: 10000;
-      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(10px);
       display: flex; align-items: center; justify-content: center; padding: 20px;
       animation: disclaimer-fade 0.3s ease;
     }
@@ -366,7 +366,7 @@
 
     .disclaimer-card {
       background: var(--learn-card); border-radius: 24px;
-      max-width: 600px; width: 100%; max-height: 90vh; overflow: hidden;
+      max-width: 720px; width: 100%; max-height: 92vh; overflow: hidden;
       display: flex; flex-direction: column;
       box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4);
       animation: disclaimer-slide 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.15);
@@ -374,7 +374,7 @@
     @keyframes disclaimer-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
     .disclaimer-header {
-      padding: 28px 32px 18px;
+      padding: 28px 36px 22px;
       background: linear-gradient(135deg, var(--learn-accent-soft), var(--learn-purple-soft));
       border-bottom: 1px solid var(--learn-border); text-align: center;
     }
@@ -385,35 +385,74 @@
       box-shadow: 0 4px 12px rgba(94,92,230,0.18);
       font-size: 28px;
     }
-    .disclaimer-title { font-size: 20px; font-weight: 700; color: var(--learn-text); margin-bottom: 4px; }
-    .disclaimer-subtitle { font-size: 13px; color: var(--learn-text-soft); }
-    .disclaimer-body { flex: 1; overflow-y: auto; padding: 24px 32px; }
-    .disclaimer-intro {
-      font-size: 13.5px; color: var(--learn-text-soft); line-height: 1.7;
-      margin-bottom: 18px; padding-bottom: 16px;
-      border-bottom: 1px solid var(--learn-border);
+    .disclaimer-title { font-size: 22px; font-weight: 800; color: var(--learn-text); margin-bottom: 4px; letter-spacing: -0.3px; }
+    .disclaimer-subtitle { font-size: 13.5px; color: var(--learn-text-soft); font-weight: 500; }
+    .disclaimer-meta { margin-top: 12px; font-size: 11.5px; color: var(--learn-text-light); letter-spacing: 0.3px; }
+
+    .disclaimer-body {
+      flex: 1; overflow-y: auto; padding: 28px 36px 8px;
+      scroll-behavior: smooth;
     }
-    .disclaimer-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
-    .disclaimer-item { display: flex; gap: 14px; align-items: flex-start; }
-    .disclaimer-item-num {
-      flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+    .disclaimer-body::-webkit-scrollbar { width: 6px; }
+    .disclaimer-body::-webkit-scrollbar-thumb { background: var(--learn-border); border-radius: 99px; }
+
+    .disclaimer-section { margin-bottom: 22px; }
+    .disclaimer-section h3 {
+      font-size: 14.5px; font-weight: 700;
+      color: var(--learn-text);
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1.5px solid var(--learn-accent-soft);
+    }
+    .disclaimer-section p {
+      font-size: 13px; line-height: 1.75;
+      color: var(--learn-text); margin: 0 0 8px;
+    }
+    .disclaimer-section p:last-child { margin-bottom: 0; }
+    .disclaimer-section ul {
+      margin: 6px 0 0; padding-right: 22px;
+      font-size: 13px; line-height: 1.75; color: var(--learn-text);
+    }
+    .disclaimer-section ul li { margin-bottom: 4px; }
+    .disclaimer-section strong { color: var(--learn-text); font-weight: 700; }
+    .disclaimer-section .law-tag {
+      display: inline-block; padding: 1px 8px;
       background: var(--learn-accent-soft); color: var(--learn-accent);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 13px;
+      border-radius: 6px; font-size: 11.5px; font-weight: 600;
+      margin: 0 2px;
     }
-    .disclaimer-item-text { flex: 1; font-size: 13.5px; line-height: 1.65; color: var(--learn-text); }
-    .disclaimer-item-text strong { color: var(--learn-text); }
-    .disclaimer-checkbox-row {
-      margin-top: 22px; padding: 16px;
-      background: var(--learn-bg); border-radius: 12px;
-      border: 1px solid var(--learn-border);
-      display: flex; align-items: center; gap: 12px;
+
+    .disclaimer-section.critical {
+      background: linear-gradient(135deg, #fef2f2, #fff7ed);
+      border: 1px solid #fecaca;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 22px;
     }
-    .disclaimer-checkbox { width: 22px; height: 22px; accent-color: var(--learn-accent); cursor: pointer; flex-shrink: 0; }
-    .disclaimer-checkbox-label { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--learn-text); cursor: pointer; user-select: none; }
-    .disclaimer-footer {
-      padding: 20px 32px 28px;
+    .disclaimer-section.critical h3 {
+      color: #b91c1c;
+      border-bottom-color: #fecaca;
+    }
+
+    /* Sticky footer area below the scroll */
+    .disclaimer-bottom {
+      padding: 18px 36px 24px;
+      background: var(--learn-card);
       border-top: 1px solid var(--learn-border);
+      flex-shrink: 0;
+    }
+    .disclaimer-checkbox-row {
+      padding: 14px 16px;
+      background: var(--learn-bg); border-radius: 12px;
+      border: 1.5px solid var(--learn-border);
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px;
+      transition: border-color 0.15s;
+    }
+    .disclaimer-checkbox-row:has(:checked) { border-color: var(--learn-accent); background: var(--learn-accent-soft); }
+    .disclaimer-checkbox { width: 22px; height: 22px; accent-color: var(--learn-accent); cursor: pointer; flex-shrink: 0; }
+    .disclaimer-checkbox-label { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--learn-text); cursor: pointer; user-select: none; }
+    .disclaimer-footer {
       display: flex; gap: 12px; justify-content: flex-end;
     }
     @media (max-width: 480px) { .disclaimer-footer { flex-direction: column-reverse; } .disclaimer-footer button { width: 100%; } }
@@ -494,42 +533,252 @@
   <div id="disclaimer-overlay" class="disclaimer-overlay" style="display:none">
     <div class="disclaimer-card">
       <header class="disclaimer-header">
-        <div class="disclaimer-icon">🔒</div>
-        <div class="disclaimer-title">הסכם סודיות וזכויות שימוש</div>
-        <div class="disclaimer-subtitle">קראי לפני הגישה לחומרי ההכשרה</div>
+        <div class="disclaimer-icon">⚖️</div>
+        <div class="disclaimer-title">הסכם משתמש וגילוי משפטי</div>
+        <div class="disclaimer-subtitle">תנאי שירות, הגבלת אחריות והסכם משפטי · RePro</div>
+        <div class="disclaimer-meta">פלטפורמת גיוס והשמה בינלאומית</div>
       </header>
+
       <div class="disclaimer-body">
-        <p class="disclaimer-intro">
-          חומרי ההכשרה שתראי בעמוד זה הם <strong>רכוש בלעדי של חברת RePro</strong>.
-          באישור התנאים את/ה מתחייב/ת להגן על המידע ולעמוד בכל הסעיפים הבאים:
-        </p>
-        <ol class="disclaimer-list">
-          <li class="disclaimer-item">
-            <div class="disclaimer-item-num">1</div>
-            <div class="disclaimer-item-text"><strong>סודיות מלאה.</strong> כל החומרים נועדו ללמידה אישית בלבד. אסור להעתיק, לצלם, להוריד, להעביר, או לשתף אותם עם אף גורם.</div>
-          </li>
-          <li class="disclaimer-item">
-            <div class="disclaimer-item-num">2</div>
-            <div class="disclaimer-item-text"><strong>איסור שימוש לרעה.</strong> אסור להשתמש במידע נגד החברה — לרבות מעבר למתחרה תוך שימוש בידע, או שימוש בפרטי לקוחות, מועמדים או מעסיקים.</div>
-          </li>
-          <li class="disclaimer-item">
-            <div class="disclaimer-item-num">3</div>
-            <div class="disclaimer-item-text"><strong>סיום ההעסקה.</strong> בעזיבת החברה, הזכות לעיין ולהשתמש בחומרים אלה <strong>נפסקת מיידית</strong>.</div>
-          </li>
-          <li class="disclaimer-item">
-            <div class="disclaimer-item-num">4</div>
-            <div class="disclaimer-item-text"><strong>אכיפה.</strong> הפרת ההסכם תגרור צעדים משפטיים. צילומי מסך נושאים חתימת מים אישית שמאפשרת איתור מקור הדליפה.</div>
-          </li>
-        </ol>
+
+        <div class="disclaimer-section">
+          <h3>הסכם</h3>
+          <p>
+            בכניסה, רישום, או שימוש בכל חלק מהאתר, הפלטפורמה, חומרי ההכשרה, הכלים, התוכן או השירותים הקשורים (להלן: "השירותים"),
+            את/ה מאשר/ת שקראת, הבנת והסכמת להיות מחויב/ת חוקית להסכם זה במלואו.
+          </p>
+          <p>
+            אם אינך מסכים/ה לתנאים אלה, עליך להפסיק מיידית את השימוש בשירותים.
+          </p>
+          <p>
+            הסכם זה מהווה חוזה מחייב משפטית בין המשתמש/ת לבין חברת RePro בהתאם ל<span class="law-tag">חוק החוזים (חלק כללי), 1973</span>,
+            <span class="law-tag">חוק הגנת הצרכן, 1981</span> ו<span class="law-tag">חוק החוזים האחידים, 1982</span> של מדינת ישראל.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>מהות מערכת היחסים</h3>
+          <p>
+            RePro מספקת פלטפורמה טכנולוגית, חינוכית והכשרתית בתחום הגיוס וההשמה הבינלאומית.
+            החברה <strong>אינה מבטיחה השמה מוצלחת</strong>, רווחים, או תוצאות גיוס מסוג כלשהו.
+          </p>
+          <p>
+            לא נוצרים יחסי שותפות, סוכנות, נאמנות, או ייעוץ משפטי בין המשתמש/ת לחברה תחת השירותים שבעמוד זה.
+            המשתמש/ת מאשר/ת במפורש שאין הסתמכות על תוכן השירותים, הכלים או חומרי ההכשרה בעת קבלת החלטות גיוס,
+            וכל ההחלטות מתקבלות באופן עצמאי על דעתו/ה הבלעדית.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>סיווג השירותים</h3>
+          <p>השירותים ניתנים אך ורק כפלטפורמת טכנולוגיה, ניתוח, חינוך והכשרה. שום דבר בשירותים אינו מהווה:</p>
+          <ul>
+            <li>ייעוץ משפטי בנושאי הגירת עבודה, ויזות או חוקי עבודה זרים</li>
+            <li>ייעוץ במס בינלאומי או רואה חשבון</li>
+            <li>שירותי הסדרת אישורי עבודה במדינות חוץ</li>
+            <li>ערבות לקבלה למשרה ספציפית או לתוצאת גיוס</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>הצהרות ואחריות המשתמש/ת</h3>
+          <p>
+            המשתמש/ת מצהיר/ה שיש לו/לה <strong>ידע, ניסיון ויכולת מקצועיים מספיקים</strong> להבין את האתגרים
+            בתחום הגיוס הבינלאומי, את הסיכונים הכרוכים בהמלצה על מועמדים, ביחסי לקוח-מעסיק ובאחריות מקצועית.
+          </p>
+          <p>
+            המשתמש/ת מאשר/ה אחריות מלאה לכל ההחלטות, הפעולות והתוצאות הנובעות מהשימוש בשירותים, לרבות
+            בחירת מועמדים, פנייה ללקוחות, ניהול תקשורת, ועמידה בחוקי המדינות הרלוונטיות.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>אופי השירותים</h3>
+          <p>השירותים ניתנים אך ורק למטרות מידע, חינוך, ניתוח וטכנולוגיה. הם כוללים:</p>
+          <ul>
+            <li>חומרי הכשרה, מצגות, וקורסים</li>
+            <li>כלי ניהול לידים, מועמדים ומשרות</li>
+            <li>מעקב אחר השמות וסטטיסטיקות פנימיות</li>
+            <li>תקשורת עם המאמן AI (כלי עזר טכנולוגי)</li>
+          </ul>
+          <p>
+            שום פלט, ניתוח או תוכן שמופק על ידי AI אינו מהווה ערבות לתוצאה ספציפית או המלצה אישית.
+            הפלטים הם <strong>מידעיים בלבד</strong>.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>כלים, ניתוחים ובינה מלאכותית</h3>
+          <p>
+            תכונות AI, פלטים אוטומטיים או תכנים שנוצרים על ידי המודל עשויים להיות לא מדויקים, חלקיים, מאוחרים או לא עקביים.
+            הם הסתברותיים, מוגבלי הקשר ואינם דטרמיניסטיים.
+          </p>
+          <p>
+            המשתמש/ת לוקח/ת אחריות מלאה לאימות, פיקוח ושימוש בכל פלט אוטומטי. אסור להסתמך עליהם כבסיס יחיד להחלטה.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>אין אחריות לתוצאות גיוס</h3>
+          <p>
+            החברה אינה נושאת באחריות לתוצאות גיוס, השמה מוצלחת, פספוס הזדמנויות, ביצועי מועמד אצל מעסיק,
+            החלטות מעסיק, או תוצאות התנהגותיות. כל תוצאות הגיוס הן תוצאה ישירה של החלטות שמתקבלות על ידי המשתמש/ת.
+          </p>
+        </div>
+
+        <div class="disclaimer-section critical">
+          <h3>🔒 קניין רוחני וסודיות מלאה</h3>
+          <p>
+            כל חומרי ההכשרה, המתודולוגיות, המצגות, הסקריפטים, הטמפלייטים, רשימות הלקוחות, רשימות המעסיקים,
+            רשימות המועמדים, פרטי השמות, סטטיסטיקות החברה, וכל מידע נוסף שנחשפת אליו —
+            הם <strong>רכוש בלעדי של RePro</strong>.
+          </p>
+          <p>המשתמש/ת מקבל/ת רישיון מוגבל, ניתן לביטול, לא בלעדי ולא ניתן להעברה, לשימוש אישי בלבד. <strong>אסור</strong>:</p>
+          <ul>
+            <li>להעתיק, להפיץ, לשנות, להנדס לאחור או לחלץ מתודולוגיות</li>
+            <li>ליצור עבודות נגזרות או תוכן מסחרי מבוסס</li>
+            <li>לשתף עם גורם שלישי, מתחרה או חברת גיוס אחרת</li>
+            <li>להשתמש בחומרים מחוץ למסגרת העבודה ב-RePro</li>
+            <li>להעביר את החשבון, הסיסמה או הגישה לאדם אחר</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section critical">
+          <h3>🚫 איסור שימוש לרעה והגנה תחרותית</h3>
+          <p>המשתמש/ת מתחייב/ת:</p>
+          <ul>
+            <li><strong>לא לעבור למתחרה</strong> תוך שימוש בידע, מתודולוגיות או מאגרי נתונים של RePro</li>
+            <li><strong>לא לפנות ישירות למעסיקים</strong> שהכיר/ה דרך RePro לתועלת אישית או של חברה אחרת</li>
+            <li><strong>לא לפנות ישירות למועמדים</strong> שהיו במאגר RePro לתועלת אישית או של חברה אחרת</li>
+            <li><strong>לא להעביר ידע, רשימות או נתונים</strong> שנרכשו ב-RePro לכל גורם חיצוני</li>
+            <li><strong>לא לבצע פעולות תחרותיות</strong> במקביל בעודה/ו במערך RePro</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section critical">
+          <h3>📅 סיום ההעסקה / הקשר</h3>
+          <p>בעזיבת RePro או בסיום ההסכם:</p>
+          <ul>
+            <li>הזכות לעיין ולהשתמש בכל החומרים <strong>נפסקת מיידית</strong></li>
+            <li>כל המסמכים, הקבצים והרישומים שנמצאים אצל המשתמש/ת חייבים להיות <strong>מוחזרים או מושמדים</strong></li>
+            <li>חובת הסודיות נמשכת <strong>ללא הגבלת זמן</strong></li>
+            <li>איסור פנייה למעסיקים, מועמדים או לקוחות שהכיר/ה ב-RePro לתקופה של <strong>24 חודשים</strong> מסיום הקשר</li>
+          </ul>
+          <p>הפרת תנאים אלה תיחשב <strong>הפרת חוזה מהותית</strong> ועלולה להוביל לתביעה משפטית עם פיצויים כספיים ניכרים.</p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>נתוני מועמדים, מעסיקים ולקוחות</h3>
+          <p>המשתמש/ת מאשר/ה אחריות מלאה ל:</p>
+          <ul>
+            <li>שמירת סודיות נתוני מועמדים בהתאם ל<span class="law-tag">חוק הגנת הפרטיות, 1981</span></li>
+            <li>אי שימוש בנתונים אלה לצרכים פרטיים או מסחריים מחוץ ל-RePro</li>
+            <li>אי העברת נתונים לגורם שלישי ללא אישור מפורש בכתב מהחברה</li>
+            <li>מחיקת נתונים בסיום הקשר או על פי דרישת החברה</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>פרטיות והגנת מידע</h3>
+          <p>
+            החברה אוספת, מעבדת ושומרת נתונים אישיים בהתאם ל<span class="law-tag">חוק הגנת הפרטיות, 1981</span>.
+          </p>
+          <p>למשתמש/ת הזכות:</p>
+          <ul>
+            <li>לדעת איזה נתונים אישיים נאספים</li>
+            <li>לבקש גישה לנתונים השמורים</li>
+            <li>לבקש תיקון או מחיקה של מידע לא נכון או בלתי חוקי</li>
+          </ul>
+          <p>
+            נתונים אישיים לא יועברו לצדדים שלישיים אלא במקרים הנדרשים על פי חוק, לצורך מתן השירות
+            (כגון ספקי אחסון או אבטחה), או באישור המשתמש/ת.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>תוכן משתמשים ותקשורת</h3>
+          <p>
+            החברה אינה אחראית לתוכן, הצהרות, דעות או תקשורת שנעשית על ידי משתמשים אחרים בפלטפורמה,
+            צ'אטים, פורומים או רשתות חברתיות. כל הסתמכות על תוכן זה היא על אחריותו של המשתמש/ת.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>הגבלת אחריות</h3>
+          <p>
+            במידה המקסימלית המותרת על ידי החוק, RePro לא תהיה אחראית לכל נזק ישיר, עקיף, מקרי, תוצאתי, עונשי או מיוחד —
+            לרבות הפסדים כספיים, אובדן רווחים, שיבוש עסקי, פגיעה במוניטין או אובדן נתונים.
+          </p>
+          <p>כל אחריות, אם תיקבע, תוגבל לסכום הנמוך מבין:</p>
+          <ul>
+            <li>100 USD, או</li>
+            <li>הסכום הכולל ששילם המשתמש/ת לחברה במהלך 12 החודשים שקדמו לאירוע</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>שיפוי</h3>
+          <p>המשתמש/ת מסכים/ה לשפות את RePro ואת מנהליה, נושאי המשרה, העובדים והקבלנים שלה מכל תביעות, חבויות, נזקים, הפסדים או הוצאות הנובעים מ:</p>
+          <ul>
+            <li>שימוש או שימוש לרעה בשירותים</li>
+            <li>פעילות גיוס שגויה או הצעות שיווק כוזבות</li>
+            <li>הפרת הסכם זה או הפרת חוק</li>
+            <li>תביעות צד שלישי הנובעות מפעילות המשתמש/ת</li>
+          </ul>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>השעיה וסיום</h3>
+          <p>
+            RePro רשאית להשעות או לסיים את הגישה לשירותים בכל עת, עם או בלי הודעה, מכל סיבה שהיא, כולל הפרת הסכם זה.
+            עם סיום, כל הרישיונות מבוטלים והגישה מסתיימת.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>אבטחת מידע וכוח עליון</h3>
+          <p>
+            RePro מיישמת אמצעי אבטחה סבירים, אך אין מערכת מאובטחת לחלוטין.
+            החברה לא תהיה אחראית לאירועים מעבר לשליטתה: מתקפות סייבר, כשלי תשתית, פעולות רגולטוריות,
+            אסונות טבע, מלחמה או פעולות ממשלתיות.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>יישוב סכסוכים ודין שולט</h3>
+          <p>
+            הסכם זה כפוף ל<strong>דיני מדינת ישראל</strong>. כל מחלוקת תיושב בישראל,
+            בפני בתי המשפט המוסמכים בלבד. המשתמש/ת מוותר/ת על הזכות להשתתפות בתביעות ייצוגיות.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>הסכם שלם וראיות</h3>
+          <p>
+            הסכם זה מהווה את ההסכם השלם בין המשתמש/ת ל-RePro. רשומות אלקטרוניות, יומני מערכת, חותמות זמן,
+            יומני IP, וחתימות מים על צילומי מסך — מהווים <strong>ראיה קבילה</strong> לקבלה ושימוש בשירותים.
+          </p>
+        </div>
+
+        <div class="disclaimer-section">
+          <h3>אישור</h3>
+          <p>
+            בלחיצה על "אני מאשר/ת", המשתמש/ת מאשר/ת קבלה <strong>מודעת, מרצון ומחייבת משפטית</strong> של הסכם זה.
+            תאריך, שעה וכתובת IP יישמרו ביומן הביקורת.
+          </p>
+        </div>
+      </div>
+
+      <div class="disclaimer-bottom">
         <label class="disclaimer-checkbox-row" for="disclaimer-checkbox">
           <input type="checkbox" id="disclaimer-checkbox" class="disclaimer-checkbox">
-          <span class="disclaimer-checkbox-label">קראתי, הבנתי והסכמתי לכל התנאים שלעיל</span>
+          <span class="disclaimer-checkbox-label">קראתי במלואו, הבנתי, והסכמתי לכל תנאי ההסכם</span>
         </label>
+        <div class="disclaimer-footer">
+          <button class="disclaimer-btn disclaimer-btn-cancel" id="disclaimer-cancel">לא מסכים/ה</button>
+          <button class="disclaimer-btn disclaimer-btn-accept" id="disclaimer-accept" disabled>אני מאשר/ת</button>
+        </div>
       </div>
-      <footer class="disclaimer-footer">
-        <button class="disclaimer-btn disclaimer-btn-cancel" id="disclaimer-cancel">לא מסכים/ה</button>
-        <button class="disclaimer-btn disclaimer-btn-accept" id="disclaimer-accept" disabled>אני מאשר/ת</button>
-      </footer>
     </div>
   </div>
 
@@ -552,7 +801,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=4"></script>
+  <script src="js/learn.js?v=5"></script>
   <script src="js/ai-widget.js?v=2"></script>
 </body>
 </html>
