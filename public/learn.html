@@ -238,25 +238,39 @@
       box-shadow: 0 5px 12px rgba(94,92,230,0.45);
     }
 
-    /* ===== Floating sticker mascots — RePro categories ===== */
+    /* ===== Floating sticker mascots — RePro categories =====
+       Eight pastel "stickers" floating along the journey path, each
+       matching one of RePro's recruitment categories. */
     .mascot {
       position: absolute; z-index: 1;
-      width: 64px; height: 64px;
+      width: 56px; height: 56px;
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 32px;
-      box-shadow: 0 6px 18px rgba(94,92,230,0.25), 0 0 0 4px rgba(255,255,255,0.6);
+      font-size: 28px;
+      box-shadow: 0 6px 18px rgba(94,92,230,0.22), 0 0 0 4px rgba(255,255,255,0.6);
       background: white;
       animation: mascot-float 3s ease-in-out infinite;
       user-select: none;
     }
-    /* Each sticker has a distinct soft pastel ring matching its category */
-    .mascot-1 { top: 18%; left: 10%; background: linear-gradient(135deg, #fef3c7, #fde68a); animation-delay: 0s; }       /* 🚪 garage door */
-    .mascot-2 { top: 45%; right: 8%;  background: linear-gradient(135deg, #ecfeff, #cffafe); animation-delay: -1s; }     /* 💨 air duct */
-    .mascot-3 { top: 72%; left: 14%;  background: linear-gradient(135deg, #fdf4ff, #fae8ff); animation-delay: -2s; }     /* 💄 cosmetics */
+    /* Spread along the path, alternating sides, with varied delays
+       so they don't all bob in unison. Soft pastel rings per theme. */
+    .mascot-1 { top:  4%; left:  6%; background: linear-gradient(135deg,#ecfeff,#cffafe); animation-delay: 0s;     }  /* 💨 אייר דאקט */
+    .mascot-2 { top: 14%; right: 4%; background: linear-gradient(135deg,#fff5f5,#ffe2e2); animation-delay: -0.4s; }  /* 🔥 צ'ימיני */
+    .mascot-3 { top: 24%; left:  8%; background: linear-gradient(135deg,#f1f5f9,#e2e8f0); animation-delay: -0.8s; }  /* 🌀 דרייר */
+    .mascot-4 { top: 35%; right: 8%; background: linear-gradient(135deg,#fef3c7,#fde68a); animation-delay: -1.2s; }  /* 🚪 גארז' דור */
+    .mascot-5 { top: 46%; left:  4%; background: linear-gradient(135deg,#fdf4ff,#fae8ff); animation-delay: -1.6s; }  /* 💄 קוסמטיקה */
+    .mascot-6 { top: 57%; right: 6%; background: linear-gradient(135deg,#ffedd5,#fdba74); animation-delay: -2.0s; }  /* 🔨 קונסטרקשן */
+    .mascot-7 { top: 68%; left:  8%; background: linear-gradient(135deg,#dcfce7,#bbf7d0); animation-delay: -2.4s; }  /* 🏠 נדל"ן */
+    .mascot-8 { top: 79%; right: 4%; background: linear-gradient(135deg,#fae8ff,#f3e8ff); animation-delay: -2.8s; }  /* 💇‍♀ מוצרי שיער */
+    .mascot-9 { top: 90%; left:  6%; background: linear-gradient(135deg,#fef9c3,#fde68a); animation-delay: -3.2s; }  /* 🔑 לוקסמיט */
     @keyframes mascot-float {
       0%, 100% { transform: translateY(0) rotate(-4deg); }
       50% { transform: translateY(-12px) rotate(4deg); }
+    }
+    /* On medium-small screens hide alternating mascots so the page
+       doesn't feel cluttered next to the cards */
+    @media (max-width: 768px) {
+      .mascot-3, .mascot-5, .mascot-7, .mascot-9 { display: none; }
     }
     @media (max-width: 600px) { .mascot { display: none; } }
 
@@ -504,10 +518,16 @@
         <!-- SVG path drawn between cards once they're rendered -->
         <svg class="journey-svg" id="journey-svg" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg>
 
-        <!-- Floating category emoji mascots: garage door / air duct / cosmetics -->
-        <div class="mascot mascot-1" title="גארז' דור">🚪</div>
-        <div class="mascot mascot-2" title="אייר דאקט">💨</div>
-        <div class="mascot mascot-3" title="קוסמטיקה">💄</div>
+        <!-- Floating emoji mascots — one per RePro recruitment category -->
+        <div class="mascot mascot-1" title="אייר דאקט">💨</div>
+        <div class="mascot mascot-2" title="צ'ימיני">🔥</div>
+        <div class="mascot mascot-3" title="דרייר">🌀</div>
+        <div class="mascot mascot-4" title="גארז' דור">🚪</div>
+        <div class="mascot mascot-5" title="קוסמטיקה">💄</div>
+        <div class="mascot mascot-6" title="קונסטרקשן">🔨</div>
+        <div class="mascot mascot-7" title="נדל&quot;ן">🏠</div>
+        <div class="mascot mascot-8" title="מוצרי שיער">💇‍♀️</div>
+        <div class="mascot mascot-9" title="לוקסמיט">🔑</div>
 
         <div class="journey-stack" id="journey-stack">
           <div class="learn-empty">
