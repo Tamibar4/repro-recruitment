@@ -56,6 +56,22 @@ function getAnthropicClient() {
     return null;
   }
 }
+
+// Extract text from a PDF file. Lazy-load pdf-parse so the app boots even
+// if the library is missing (e.g. fresh deploy before npm install completes).
+// Returns the text or '' on any failure.
+async function extractPdfText(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return '';
+    const pdfParse = require('pdf-parse').default || require('pdf-parse');
+    const buf = fs.readFileSync(filePath);
+    const result = await pdfParse(buf);
+    return (result && result.text ? result.text : '').trim();
+  } catch (e) {
+    console.error('PDF text extraction failed:', e.message);
+    return '';
+  }
+}
 const AUDIT_LOG_FILE = path.join(__dirname, 'audit.log');
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
@@ -1999,10 +2015,18 @@ app.get('/api/training/documents', (req, res) => {
 // POST /api/training/documents - upload a new document (admin only)
 app.post('/api/training/documents', (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-  trainingUpload.single('file')(req, res, (err) => {
+  trainingUpload.single('file')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
+      const filePath = path.join(TRAINING_DIR, req.file.filename);
+      const isPdf = /pdf/i.test(req.file.mimetype || '') || /\.pdf$/i.test(req.file.originalname || '');
+      // Extract text on upload so the chat endpoint can send a small text
+      // payload instead of base64-encoded PDFs (which blow past the 30K
+      // tokens/min rate limit).
+      let extractedText = '';
+      if (isPdf) extractedText = await extractPdfText(filePath);
+
       const doc = {
         id: ++data.counters.training_documents,
         filename: req.file.filename,
@@ -2011,11 +2035,12 @@ app.post('/api/training/documents', (req, res, next) => {
         mime_type: req.file.mimetype,
         uploaded_by: req.user.username,
         uploaded_at: now(),
-        description: req.body.description || null
+        description: req.body.description || null,
+        extracted_text: extractedText,
       };
       data.training_documents.push(doc);
       saveData();
-      res.status(201).json(doc);
+      res.status(201).json({ ...doc, extracted_text: undefined }); // don't ship full text back
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
@@ -2154,53 +2179,70 @@ app.post('/api/training/chat', async (req, res) => {
     };
     const systemText = systemByMode[mode] || systemByMode.qa;
 
-    // Load training documents as PDF content blocks (cached)
+    // Load training docs and ensure each has extracted text (back-fills any
+    // pre-existing PDFs from before the text-extraction feature shipped).
     const docs = (data.training_documents || []).filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''));
-    const systemBlocks = [{ type: 'text', text: systemText }];
-    if (docs.length > 0) {
-      // Load each doc as a content block (will be included in the user's first message)
-      // Per Claude API: PDFs go in message content, not system
+    let backfilled = false;
+    for (const doc of docs) {
+      if (!doc.extracted_text || doc.extracted_text.length === 0) {
+        const filePath = path.join(TRAINING_DIR, doc.filename);
+        doc.extracted_text = await extractPdfText(filePath);
+        backfilled = true;
+      }
+    }
+    if (backfilled) saveData();
+
+    // Build a SINGLE compact text block that summarizes all training
+    // materials. Send it as a cached system block — that way:
+    //   1. Each document's text only counts once toward our 30K/min limit.
+    //   2. After the first request, the cache hit keeps subsequent calls
+    //      under ~1K input tokens (huge cost saver).
+    //   3. It scales to many documents better than sending raw PDFs.
+    const MAX_DOC_CHARS = 60000; // ~15K tokens, well under 30K/min
+    const usableDocs = docs.filter(d => d.extracted_text && d.extracted_text.length > 0);
+    let trainingContext = '';
+    if (usableDocs.length > 0) {
+      let total = 0;
+      const parts = [];
+      for (let i = 0; i < usableDocs.length; i++) {
+        const d = usableDocs[i];
+        const header = `\n\n=== חומר הכשרה ${i + 1}: ${d.original_name} ===\n\n`;
+        const remaining = MAX_DOC_CHARS - total - header.length;
+        if (remaining <= 200) {
+          parts.push(`\n\n[נחתך — נותרו ${usableDocs.length - i} חומרי הכשרה נוספים שלא נכנסו לקונטקסט]`);
+          break;
+        }
+        const text = d.extracted_text.length > remaining
+          ? d.extracted_text.slice(0, remaining) + '\n\n[נחתך]'
+          : d.extracted_text;
+        parts.push(header + text);
+        total += header.length + text.length;
+      }
+      trainingContext = parts.join('');
     }
 
-    // Build Claude messages array
-    const claudeMessages = [];
-    // On first message, include all PDFs in user content (with cache_control on last doc block)
-    const isFirstMessage = conv.messages.length === 1;
-    if (isFirstMessage && docs.length > 0) {
-      const contentBlocks = [];
-      docs.forEach((doc, idx) => {
-        try {
-          const filePath = path.join(TRAINING_DIR, doc.filename);
-          if (!fs.existsSync(filePath)) return;
-          const b64 = fs.readFileSync(filePath).toString('base64');
-          const block = {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: b64 },
-            title: doc.original_name,
-            context: `חומר הכשרה #${idx + 1}: ${doc.original_name}`
-          };
-          // Cache the last document block → caches everything up to it
-          if (idx === docs.length - 1) {
-            block.cache_control = { type: 'ephemeral' };
-          }
-          contentBlocks.push(block);
-        } catch (e) { console.error('Failed to load doc', doc.filename, e.message); }
-      });
-      contentBlocks.push({ type: 'text', text: message.trim() });
-      claudeMessages.push({ role: 'user', content: contentBlocks });
-    } else {
-      // Subsequent messages: just replay the conversation
-      conv.messages.forEach(m => {
-        claudeMessages.push({ role: m.role, content: m.content });
-      });
-    }
+    // Build the system parameter — text + cached training context.
+    const systemParam = trainingContext
+      ? [
+          { type: 'text', text: systemText },
+          {
+            type: 'text',
+            text: `להלן חומרי ההכשרה של RePro שעלייך להתבסס עליהם בתשובות:${trainingContext}`,
+            cache_control: { type: 'ephemeral' },
+          },
+        ]
+      : systemText;
+
+    // Replay the conversation in messages — no PDF/document blocks needed
+    // because the docs now live in the cached system prompt.
+    const claudeMessages = conv.messages.map((m) => ({ role: m.role, content: m.content }));
 
     // Call Claude API
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 2048,
-      system: systemText,
-      messages: claudeMessages
+      system: systemParam,
+      messages: claudeMessages,
     });
 
     const assistantText = (response.content || [])

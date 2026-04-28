@@ -435,108 +435,13 @@
     <main class="main">
       <div class="page-header">
         <div>
-          <h1 class="page-title">🎓 הכשרות RePro</h1>
-          <div class="page-subtitle">מרכז הלמידה לאנשי גיוס - עם מאמן AI חכם</div>
+          <h1 class="page-title">🎓 חומרי הכשרה</h1>
+          <div class="page-subtitle">העלאת והנהלת מצגות, מסמכים וחומרי לימוד · המאמן AI זמין דרך הכפתור הצף בכל עמוד</div>
         </div>
       </div>
 
-      <!-- Tabs -->
-      <div class="training-tabs">
-        <button class="training-tab active" data-tab="chat">
-          <span>💬</span>
-          <span>מאמן AI</span>
-        </button>
-        <button class="training-tab" data-tab="docs">
-          <span>📁</span>
-          <span>חומרי הכשרה</span>
-        </button>
-      </div>
-
-      <!-- AI not configured warning -->
-      <div id="ai-warning" class="ai-warning" style="display:none">
-        <div class="ai-warning-icon">⚠️</div>
-        <div>
-          <div class="ai-warning-title">סוכן AI עדיין לא מחובר</div>
-          <div class="ai-warning-desc">
-            מנהל המערכת צריך להוסיף משתנה סביבה <code>ANTHROPIC_API_KEY</code> בריילוויי כדי להפעיל את המאמן החכם.
-            עד אז, ניתן להעלות חומרי הכשרה בטאב "חומרי הכשרה".
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== Tab 1: Chat ===== -->
-      <div id="tab-chat" class="tab-content" style="margin-top:20px">
-        <div class="training-layout">
-          <!-- Left sidebar: modes + conversations -->
-          <aside class="training-sidebar-panel">
-            <div class="training-modes-title">🎯 מצב שיחה</div>
-            <button class="training-mode-btn active" data-mode="qa">
-              <span class="training-mode-btn-icon">💬</span>
-              <span class="training-mode-btn-text">
-                שאלות ותשובות
-                <span class="training-mode-btn-desc">שאלי על החומר</span>
-              </span>
-            </button>
-            <button class="training-mode-btn" data-mode="consult">
-              <span class="training-mode-btn-icon">🧭</span>
-              <span class="training-mode-btn-text">
-                התייעצות
-                <span class="training-mode-btn-desc">ייעוץ במצבים</span>
-              </span>
-            </button>
-            <button class="training-mode-btn" data-mode="scenario">
-              <span class="training-mode-btn-icon">🎭</span>
-              <span class="training-mode-btn-text">
-                תרגול תרחישים
-                <span class="training-mode-btn-desc">משחק תפקידים</span>
-              </span>
-            </button>
-            <button class="training-mode-btn" data-mode="quiz">
-              <span class="training-mode-btn-icon">📝</span>
-              <span class="training-mode-btn-text">
-                בוחן אותי
-                <span class="training-mode-btn-desc">בדיקת הבנה</span>
-              </span>
-            </button>
-
-            <div class="training-section-title">
-              <span>💾 שיחות קודמות</span>
-              <button id="new-conv-btn" title="שיחה חדשה">+ חדש</button>
-            </div>
-            <div id="conversations-list"></div>
-          </aside>
-
-          <!-- Main chat area -->
-          <section class="training-main-panel">
-            <div class="chat-header">
-              <div class="chat-header-icon">🤖</div>
-              <div>
-                <div class="chat-header-title" id="chat-mode-title">שאלות ותשובות</div>
-                <div class="chat-header-subtitle" id="chat-mode-desc">שאלי אותי על כל נושא מחומרי ההכשרה</div>
-              </div>
-            </div>
-
-            <div class="chat-messages" id="chat-messages">
-              <!-- Dynamic messages -->
-            </div>
-
-            <div class="chat-input-area">
-              <div class="chat-input-row">
-                <textarea id="chat-input" class="chat-input" rows="1" placeholder="שאלי משהו... (Enter לשליחה, Shift+Enter לשורה חדשה)"></textarea>
-                <button id="chat-send-btn" class="chat-send-btn" title="שלח">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"/>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <!-- ===== Tab 2: Documents ===== -->
-      <div id="tab-docs" class="tab-content" style="display:none;margin-top:20px">
+      <!-- Documents area -->
+      <div style="margin-top:24px">
         <div class="training-main-panel" style="height:auto;min-height:500px">
           <div class="docs-area">
             <div id="admin-only-upload" style="display:none">
@@ -552,6 +457,18 @@
             <div id="docs-list" class="docs-list"></div>
           </div>
         </div>
+      </div>
+
+      <!-- Hidden elements kept for legacy training.js compatibility -->
+      <div style="display:none">
+        <div id="ai-warning"></div>
+        <div id="conversations-list"></div>
+        <div id="chat-messages"></div>
+        <div id="chat-mode-title"></div>
+        <div id="chat-mode-desc"></div>
+        <textarea id="chat-input"></textarea>
+        <button id="chat-send-btn"></button>
+        <button id="new-conv-btn"></button>
       </div>
     </main>
   </div>
