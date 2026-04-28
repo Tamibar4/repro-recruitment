@@ -383,7 +383,10 @@ app.use((req, res, next) => {
       "connect-src 'self' https://cdnjs.cloudflare.com",
       "frame-src 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      // 'self' instead of 'none' so the PDF iframe in /learn.html can
+      // load /api/training/modules/:id/view (same-origin). 'none' was
+      // causing 'refused to connect' on every guide click.
+      "frame-ancestors 'self'",
       "base-uri 'self'",
       "object-src 'none'"
     ].join('; ')
