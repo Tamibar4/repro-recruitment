@@ -487,26 +487,93 @@ function renderDocCard(d, idx, total) {
   `;
 }
 
-async function uploadDocument(file) {
-  try {
+// Upload with XHR so we get a real progress event during the upload —
+// fetch() doesn't expose progress for the request body. The user reported
+// 'pressing upload does nothing'; the progress bar makes it obvious that
+// an upload IS happening, and any HTTP/network error surfaces clearly
+// instead of silently failing.
+function uploadDocument(file) {
+  const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+  console.log(`[upload] starting: ${file.name} (${sizeMB} MB)`);
+
+  // Render a progress bar inside the upload zone so the user sees activity
+  const zone = document.getElementById('docs-upload-zone');
+  if (zone) {
+    zone.innerHTML = `
+      <div class="docs-upload-icon">⬆️</div>
+      <div class="docs-upload-text" id="upload-progress-text">מעלה ${file.name}... 0%</div>
+      <div style="margin-top:14px;height:6px;background:var(--color-border);border-radius:99px;overflow:hidden">
+        <div id="upload-progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#0073ea,#5559df);transition:width 0.2s ease;border-radius:99px"></div>
+      </div>
+    `;
+  }
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const token = API.getToken();
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      console.log(`[upload] progress ${pct}%`);
+      const txt = document.getElementById('upload-progress-text');
+      const fill = document.getElementById('upload-progress-fill');
+      if (txt) txt.textContent = `מעלה ${file.name}... ${pct}%`;
+      if (fill) fill.style.width = pct + '%';
+    });
+
+    xhr.addEventListener('load', () => {
+      console.log(`[upload] HTTP ${xhr.status}`, xhr.responseText && xhr.responseText.slice(0, 200));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        showToast('✓ הקובץ הועלה בהצלחה');
+        loadDocuments(); // re-render the docs list (also re-renders the upload zone)
+      } else {
+        let msg = `קוד שגיאה ${xhr.status}`;
+        try {
+          const j = JSON.parse(xhr.responseText);
+          if (j && j.error) msg = j.error;
+        } catch {}
+        showToast('שגיאה בהעלאה: ' + msg, 'error');
+        loadDocuments(); // restore the upload zone
+      }
+      resolve();
+    });
+
+    xhr.addEventListener('error', () => {
+      console.error('[upload] network error', xhr);
+      showToast('שגיאת רשת — בדקי את החיבור ונסי שוב', 'error');
+      loadDocuments();
+      resolve();
+    });
+
+    xhr.addEventListener('abort', () => {
+      console.warn('[upload] aborted');
+      showToast('ההעלאה בוטלה', 'error');
+      loadDocuments();
+      resolve();
+    });
+
+    xhr.addEventListener('timeout', () => {
+      console.error('[upload] timeout');
+      showToast('ההעלאה ארכה זמן רב מדי — נסי קובץ קטן יותר', 'error');
+      loadDocuments();
+      resolve();
+    });
+
     const formData = new FormData();
     formData.append('file', file);
 
-    showToast('מעלה ' + file.name + '...');
-
-    const token = API.getToken();
-    const res = await fetch('/api/training/documents', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Upload failed');
+    xhr.open('POST', '/api/training/documents');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    // 5-minute timeout — generous for large PDFs over slow networks
+    xhr.timeout = 5 * 60 * 1000;
+    try {
+      xhr.send(formData);
+    } catch (e) {
+      console.error('[upload] xhr.send threw', e);
+      showToast('שגיאה: ' + e.message, 'error');
+      loadDocuments();
+      resolve();
     }
-    showToast('✓ הועלה בהצלחה');
-    loadDocuments();
-  } catch (err) {
-    showToast('שגיאה: ' + err.message, 'error');
-  }
+  });
 }
