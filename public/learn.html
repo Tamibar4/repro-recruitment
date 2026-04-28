@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RePro | מרכז הלמידה</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="icon" type="image/png" href="assets/logo.png?v=2">
+  <link rel="apple-touch-icon" href="assets/logo.png?v=2">
+  <style>
+    /* ===== Brand palette (soft) =====
+       Built on top of the existing RePro blue (#0073ea) but kept gentle —
+       lots of whitespace, washed-out tints for backgrounds, and only the
+       darker shades for accents. Designed to feel like a quiet, classy
+       reading room, not a Monday board. */
+    :root {
+      --learn-bg: #fafbff;
+      --learn-card: #ffffff;
+      --learn-border: #e8edf7;
+      --learn-text: #1a2540;
+      --learn-text-soft: #6b7591;
+      --learn-text-light: #9ba4be;
+      --learn-accent: #4a6ad6;       /* softer blue */
+      --learn-accent-soft: #e8edff;
+      --learn-purple: #8b80c8;       /* dusty lavender */
+      --learn-purple-soft: #efedfb;
+      --learn-shadow: 0 1px 2px rgba(26,37,64,0.04), 0 8px 24px -8px rgba(74,106,214,0.10);
+      --learn-shadow-hover: 0 2px 4px rgba(26,37,64,0.06), 0 16px 36px -10px rgba(74,106,214,0.20);
+    }
+
+    body { background: var(--learn-bg); }
+
+    .learn-hero {
+      padding: 48px 0 32px;
+      text-align: center;
+      max-width: 720px; margin: 0 auto;
+    }
+    .learn-hero h1 {
+      font-size: 32px; font-weight: 700;
+      letter-spacing: -0.5px; color: var(--learn-text);
+      margin-bottom: 12px;
+    }
+    .learn-hero p {
+      font-size: 15px; color: var(--learn-text-soft);
+      line-height: 1.7; max-width: 540px; margin: 0 auto;
+    }
+    .learn-hero-divider {
+      width: 60px; height: 3px; margin: 24px auto 0;
+      background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
+      border-radius: 2px;
+    }
+
+    /* ----- Module cards grid ----- */
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 22px;
+      margin: 40px auto;
+      max-width: 1100px;
+      padding: 0 20px;
+    }
+    @media (max-width: 600px) { .modules-grid { gap: 16px; padding: 0 12px; } }
+
+    .module-card {
+      background: var(--learn-card);
+      border: 1px solid var(--learn-border);
+      border-radius: 18px;
+      padding: 26px 24px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: var(--learn-shadow);
+    }
+    .module-card::before {
+      content: '';
+      position: absolute; top: 0; right: 0; left: 0; height: 4px;
+      background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .module-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--learn-shadow-hover);
+      border-color: var(--learn-accent-soft);
+    }
+    .module-card:hover::before { opacity: 1; }
+
+    .module-number {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px;
+      background: var(--learn-accent-soft);
+      color: var(--learn-accent);
+      border-radius: 12px;
+      font-weight: 700; font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .module-title {
+      font-size: 18px; font-weight: 600;
+      color: var(--learn-text); line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .module-intro {
+      font-size: 13.5px; color: var(--learn-text-soft);
+      line-height: 1.65; margin-bottom: 18px;
+      flex: 1;
+      display: -webkit-box; -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .module-meta {
+      display: flex; align-items: center; gap: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--learn-border);
+      font-size: 12px; color: var(--learn-text-light);
+    }
+    .module-meta-item { display: inline-flex; align-items: center; gap: 5px; }
+    .module-meta svg { width: 14px; height: 14px; opacity: 0.7; }
+
+    /* ----- Empty state ----- */
+    .learn-empty {
+      max-width: 480px; margin: 60px auto;
+      text-align: center; padding: 40px 20px;
+    }
+    .learn-empty-icon { font-size: 56px; margin-bottom: 20px; opacity: 0.6; }
+    .learn-empty h3 { font-size: 18px; color: var(--learn-text); margin-bottom: 8px; }
+    .learn-empty p { font-size: 13px; color: var(--learn-text-soft); line-height: 1.6; }
+
+    /* ----- Reader overlay ----- */
+    .reader-overlay {
+      position: fixed; inset: 0; z-index: 9990;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: stretch; justify-content: center;
+      padding: 0;
+      animation: reader-fade 0.2s ease;
+    }
+    @keyframes reader-fade { from { opacity: 0; } to { opacity: 1; } }
+
+    .reader {
+      background: var(--learn-bg);
+      width: 100%; max-width: 800px;
+      max-height: 100vh;
+      display: flex; flex-direction: column;
+      animation: reader-slide 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+      /* Anti-piracy / DRM-lite */
+      user-select: none; -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    @keyframes reader-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .reader-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--learn-border);
+      background: var(--learn-card);
+    }
+    .reader-header-num {
+      width: 44px; height: 44px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; flex-shrink: 0;
+    }
+    .reader-title { flex: 1; font-size: 18px; font-weight: 600; color: var(--learn-text); }
+    .reader-close {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--learn-bg); border: 1px solid var(--learn-border);
+      color: var(--learn-text-soft); cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; font-family: inherit;
+    }
+    .reader-close:hover {
+      background: var(--learn-card);
+      color: var(--learn-text);
+      border-color: var(--learn-text-light);
+    }
+
+    .reader-body {
+      flex: 1; overflow-y: auto;
+      padding: 40px 60px 80px;
+      position: relative;
+    }
+    @media (max-width: 600px) { .reader-body { padding: 30px 24px 60px; } }
+
+    .reader-content {
+      max-width: 640px; margin: 0 auto;
+      font-size: 16px; line-height: 1.85;
+      color: var(--learn-text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Watermark — diagonal repeating user identifier so any screenshot
+       carries the recruiter's email. Pure CSS, no JS to disable. */
+    .reader-watermark {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      overflow: hidden;
+      opacity: 0.06;
+    }
+    .reader-watermark span {
+      position: absolute;
+      transform: rotate(-30deg);
+      font-size: 18px; font-weight: 600; color: var(--learn-text);
+      white-space: nowrap; letter-spacing: 2px;
+    }
+
+    .reader-loading {
+      text-align: center; padding: 60px 20px; color: var(--learn-text-soft);
+    }
+
+    /* Disable common keyboard shortcuts on the reader. JS handles Ctrl+P/S
+       but `print` media query also blanks the page if they bypass it. */
+    @media print {
+      body * { visibility: hidden; }
+      body::before {
+        content: 'הדפסה לא זמינה לחומרי הכשרה';
+        visibility: visible;
+        display: block; padding: 40px; text-align: center;
+        font-size: 18px;
+      }
+    }
+
+    /* Soft hint at bottom of reader */
+    .reader-protected-note {
+      max-width: 640px; margin: 32px auto 0;
+      text-align: center; font-size: 11px; color: var(--learn-text-light);
+      padding-top: 20px; border-top: 1px solid var(--learn-border);
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
+        <div class="sidebar-logo-text-block">
+          <div class="sidebar-logo-text">RePro</div>
+          <div class="sidebar-logo-tagline">Your Job Abroad</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+          <span>דשבורד</span>
+        </a>
+        <a href="jobs.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>משרות</span>
+        </a>
+        <a href="candidates.html" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+          <span>מועמדים</span>
+        </a>
+        <a href="learn.html" class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+          <span>הכשרות</span>
+        </a>
+        <a href="team.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>צוות</span>
+        </a>
+        <a href="admin.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>ניהול</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="user-badge-container"></div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="learn-hero">
+        <h1>מרכז הלמידה</h1>
+        <p>חומרי הכשרה מקצועיים שיעזרו לך להפוך למגייסת מצוינת. קחי את הזמן, קראי לפי הסדר.</p>
+        <div class="learn-hero-divider"></div>
+      </div>
+
+      <div id="modules-container">
+        <div class="learn-empty">
+          <div class="learn-empty-icon">📚</div>
+          <h3>טוען חומרי הכשרה...</h3>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Reader overlay (hidden by default) -->
+  <div id="reader-overlay" class="reader-overlay" style="display:none">
+    <div class="reader" id="reader" oncontextmenu="return false">
+      <header class="reader-header">
+        <div class="reader-header-num" id="reader-num">1</div>
+        <div class="reader-title" id="reader-title">...</div>
+        <button class="reader-close" id="reader-close" aria-label="סגור">✕</button>
+      </header>
+      <div class="reader-body">
+        <div class="reader-watermark" id="reader-watermark"></div>
+        <div class="reader-content" id="reader-content"></div>
+        <div class="reader-protected-note">
+          חומר זה מוגן · אין לצלם או להוריד · השימוש מותר ללמידה אישית בלבד
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=3"></script>
+  <script src="js/learn.js?v=1"></script>
+  <script src="js/ai-widget.js?v=1"></script>
+</body>
+</html>

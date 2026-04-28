@@ -2177,15 +2177,37 @@ app.post('/api/training/chat', async (req, res) => {
     conv.messages.push({ role: 'user', content: message.trim(), timestamp: now() });
 
     // Build system prompt based on mode.
-    // IMPORTANT: do not preface answers with "I'm a RePro coach" / "I'm
-    // your AI assistant" / etc. Answer the user's question directly.
-    // Only reveal context (RePro role, training background) if the user
-    // explicitly asks who you are or who built you.
+    // Personality: warm, human, practical. Use 1-3 emojis per answer where
+    // they add real meaning (not stuffed in randomly). Direct & actionable —
+    // give concrete tips/steps, not abstract platitudes. Format with short
+    // bullet points or numbered lists when listing more than ~3 things.
+    // No self-introductions ("היי, אני העוזר שלך…") unless explicitly asked.
+    const PERSONA_BASE =
+      'אישיות: חבר/ה חכם/ה, חמ/ה ופרקטי/ת. ענה/י בעברית בטון של מישהו שיושב לידך ועוזר. ' +
+      'השתמש/י באימוג\'ים בחכמה (1-3 בתשובה) כדי להוסיף חיים — לא לכל משפט. ' +
+      'תמיד תן/י עצה קונקרטית או צעד מעשי, לא רק תיאוריה. ' +
+      'כשרושמים יותר מ-3 דברים — בולטים או רשימה ממוספרת. תשובות קצרות וממוקדות עדיפות על מונולוגים. ' +
+      'אל תפתח/י את התשובה בהצגה עצמית או ברכות מיותרות (לא "שלום!", לא "אני העוזר…"). ' +
+      'אם המשתמש/ת שואל/ת במפורש מי את/ה — אז וגם רק אז ספר/י שאת/ה עוזר/ת AI מבוסס על חומרי ההכשרה. ' +
+      'ברירת מחדל לפנייה: נקבה.';
+
     const systemByMode = {
-      qa: 'את/ה עוזר/ת מבוסס/ת על חומרי ההכשרה של חברת גיוס בינלאומית. ענה/י על שאלות בעברית, בצורה ברורה וחמה, ישר לעניין. אל תפתח/י את התשובה בהצגה עצמית, ברכות מיותרות, או הצהרה על מי את/ה ולאיזה חברה את/ה שייך/ת — פשוט ענה/י על השאלה. אם המשתמש/ת שואל/ת במפורש מי את/ה, אז ספר/י שאת/ה עוזר/ת AI שמבוסס/ת על חומרי ההכשרה. אם השאלה לא נמצאת בחומרים, ענה/י על בסיס היגיון כללי תוך ציון שהמידע לא במפורש בחומר. ברירת מחדל ללשון פנייה: נקבה.',
-      consult: 'את/ה יועץ/ת מקצועי/ת לתחום הגיוס. ענה/י לשאלת הייעוץ שנשאלה ישר לעניין, בעברית, בטון חברי ומקצועי. אל תפתח/י בהצגה עצמית או ברכות. שאל/י שאלות הבהרה רק אם באמת חסר מידע מהותי. בסס/י על חומרי ההכשרה כשהם רלוונטיים. רק אם המשתמש/ת שואל/ת מי את/ה, ספר/י שאת/ה עוזר/ת AI.',
-      scenario: 'את/ה משחק/ת תפקיד של מועמד/ת או מעסיק/ה בסימולציית תרגול שיחה. תגיב/י כמו בן אדם אמיתי בלי לפתוח את התרחיש בהצגת עצמך כ-AI — פשוט תיכנס/י לתפקיד. צור/י התנגדויות, שאלות, היסוסים. אל תקל/י על המגייסת. בסוף התרגול (כשמבקשים), תן/י משוב בונה.',
-      quiz: 'את/ה בוחן/ת את המשתמש/ת על חומרי ההכשרה. בלי הצגה עצמית — שאל/י את השאלה הראשונה ישר. שאלה אחת בכל פעם, חכה/י לתשובה, תן/י משוב קצר עם הסבר. עברי בין נושאים שונים בחומר. בעברית.'
+      qa:
+        PERSONA_BASE +
+        ' תפקיד: לענות על שאלות מבוססות חומרי ההכשרה. אם השאלה לא בחומרים — ענה/י לפי היגיון מקצועי, אבל תציין/י שהמידע לא נמצא במפורש בחומר. שלב/י דוגמה ספציפית כשאפשר. 💡',
+      consult:
+        PERSONA_BASE +
+        ' תפקיד: יעוץ מעשי במצבים שהמגייסת נתקלת בהם. שאל/י שאלת הבהרה רק אם באמת חסר מידע. ' +
+        'תן/י עצה קונקרטית: מה לומר, מה לעשות, באיזה סדר. אם רלוונטי, צי\'/ני 2-3 דרכי פעולה אפשריות והסבר/י את היתרונות/חסרונות של כל אחת. 🎯',
+      scenario:
+        PERSONA_BASE +
+        ' תפקיד: משחק/ת תפקיד של מועמד/ת או מעסיק/ה לתרגול. כנס/י לתפקיד מיידית בלי לקרוא לעצמך AI. ' +
+        'צור/י דמות אמינה — שם, רקע, אופי. השלבי התנגדויות וקושיות אמיתיות. אם המגייסת מבקשת משוב, צא/י מהדמות ותן/י משוב בונה ומפורט: מה היה טוב, מה ניסי לשפר. 🎭',
+      quiz:
+        PERSONA_BASE +
+        ' תפקיד: בוחן/ת על חומר ההכשרה. שאלה אחת בכל פעם — בלי הקדמות. ' +
+        'אחרי כל תשובה תן/י משוב קצר ומדויק (✓ נכון / ✗ לא נכון) + הסבר. עבור/י בין נושאים. ' +
+        'אחרי 5 שאלות תן/י סיכום קצר של ההתקדמות. 📝',
     };
     const systemText = systemByMode[mode] || systemByMode.qa;
 
@@ -2273,6 +2295,69 @@ app.post('/api/training/chat', async (req, res) => {
   } catch (err) {
     console.error('Training chat error:', err);
     res.status(500).json({ error: err.message || 'AI request failed' });
+  }
+});
+
+// GET /api/training/modules - list training modules visible to recruiters.
+// Returns title + intro text (first ~280 chars) for each PDF, but NEVER
+// links to the file itself. Anyone authenticated can call this.
+app.get('/api/training/modules', async (req, res) => {
+  try {
+    const docs = (data.training_documents || [])
+      .filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''));
+    // Back-fill extracted_text for legacy uploads.
+    let backfilled = false;
+    for (const doc of docs) {
+      if (!doc.extracted_text) {
+        const filePath = path.join(TRAINING_DIR, doc.filename);
+        doc.extracted_text = await extractPdfText(filePath);
+        backfilled = true;
+      }
+    }
+    if (backfilled) saveData();
+
+    const modules = docs.map((d, i) => {
+      const text = d.extracted_text || '';
+      const intro = text.replace(/\s+/g, ' ').slice(0, 280).trim();
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      return {
+        id: d.id,
+        order: i + 1,
+        title: (d.original_name || '').replace(/\.pdf$/i, ''),
+        intro,
+        word_count: wordCount,
+        // Estimated reading time (Hebrew avg ~180 wpm)
+        reading_minutes: Math.max(1, Math.round(wordCount / 180)),
+      };
+    });
+    res.json(modules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/training/modules/:id - return the styled-readable text body
+// for a single module. No download URL, no raw PDF — just the extracted
+// text so the client renders it in a custom viewer.
+app.get('/api/training/modules/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const doc = (data.training_documents || []).find(d => d.id === id);
+    if (!doc) return res.status(404).json({ error: 'Module not found' });
+
+    if (!doc.extracted_text) {
+      const filePath = path.join(TRAINING_DIR, doc.filename);
+      doc.extracted_text = await extractPdfText(filePath);
+      saveData();
+    }
+    res.json({
+      id: doc.id,
+      title: (doc.original_name || '').replace(/\.pdf$/i, ''),
+      content: doc.extracted_text || '',
+      uploaded_at: doc.uploaded_at,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
