@@ -368,15 +368,19 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
   // Strict Content Security Policy - blocks XSS, inline scripts, external resources
+  // cdnjs.cloudflare.com is allowlisted because /learn.html lazy-loads PDF.js
+  // from there to render training PDFs in-browser. blob: lets PDF.js spawn
+  // its web worker.
   res.setHeader(
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data:",
-      "connect-src 'self'",
+      "img-src 'self' data: blob:",
+      "connect-src 'self' https://cdnjs.cloudflare.com",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
@@ -2348,6 +2352,27 @@ app.get('/api/training/modules', async (req, res) => {
       };
     });
     res.json(modules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/training/modules/:id/view - stream the raw PDF for in-browser
+// rendering by PDF.js. Any authenticated user can view; the file is
+// streamed inline with no-store caching headers + same-origin frame
+// protection so other sites can't embed it.
+app.get('/api/training/modules/:id/view', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const doc = (data.training_documents || []).find(d => d.id === id);
+    if (!doc) return res.status(404).json({ error: 'Module not found' });
+    const filePath = path.join(TRAINING_DIR, doc.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

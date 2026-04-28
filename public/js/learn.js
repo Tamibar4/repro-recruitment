@@ -256,36 +256,96 @@
       titleEl.textContent = mod.title
       numEl.textContent = mod.order || '•'
 
-      const content = (mod.content || '').trim()
-      if (!content || content.length < 50) {
-        // PDF was image-only (e.g. Canva slides) — show a friendly fallback
-        // pointing the recruiter at the AI tutor button instead of a blank page.
-        contentEl.innerHTML = `
-          <div class="reader-fallback">
-            <div class="reader-fallback-icon">📚</div>
-            <h3>הקורס מוצג כתמונות</h3>
-            <p>
-              הקורס הזה מורכב משקפים גרפיים שלא ניתן להציג כטקסט.<br>
-              <strong>אבל!</strong> את יכולה לשאול את המאמן AI כל שאלה על הנושא — הוא יודע את כל החומר 🤖
-            </p>
-            <button class="ask-btn" id="ask-ai-from-fallback">
-              <span>💬</span> שאלי את המאמן AI
-            </button>
-          </div>
-        `
-        document.getElementById('ask-ai-from-fallback')?.addEventListener('click', () => {
-          // Close reader and open the floating AI widget
-          closeReader()
-          const aiBtn = document.querySelector('.aiw-btn')
-          if (aiBtn) aiBtn.click()
-        })
-      } else {
-        // Light formatting: collapse 3+ blank lines to 2
-        const cleaned = content.replace(/\n{3,}/g, '\n\n')
-        contentEl.textContent = cleaned
+      // Always render the PDF visually (PDF.js → canvas). Canva slides
+      // don't have extractable text, so showing the actual rendered page
+      // is the only way to display them.
+      contentEl.innerHTML = '<div class="pdf-pages" id="pdf-pages"></div>'
+      await renderPdfVisual(id, document.getElementById('pdf-pages'))
+    } catch (err) {
+      console.error(err)
+      contentEl.innerHTML = `<div class="reader-fallback"><div class="reader-fallback-icon">⚠️</div><h3>שגיאה</h3><p>לא הצלחנו לטעון את הקורס.</p></div>`
+    }
+  }
+
+  // ----- PDF.js renderer ----------------------------------------------
+  // Lazy-loads PDF.js from a CDN on first use, then renders the entire
+  // PDF as <canvas> elements so the user gets a faithful visual of the
+  // Canva slides without ever exposing the raw PDF for download.
+  async function loadPdfJsLib() {
+    if (window.pdfjsLib) return window.pdfjsLib
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+      s.onload = resolve
+      s.onerror = () => reject(new Error('PDF.js failed to load'))
+      document.head.appendChild(s)
+    })
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    return window.pdfjsLib
+  }
+
+  async function renderPdfVisual(moduleId, container) {
+    const token = localStorage.getItem('auth_token')
+    const url = '/api/training/modules/' + moduleId + '/view?token=' + encodeURIComponent(token)
+
+    container.innerHTML = '<div class="pdf-loading">טוען מצגת...</div>'
+
+    try {
+      const pdfjsLib = await loadPdfJsLib()
+      const loadingTask = pdfjsLib.getDocument({
+        url,
+        withCredentials: false,
+      })
+      const pdf = await loadingTask.promise
+      container.innerHTML = ''
+
+      // Compute target render scale to fit nicely in the reader (~720px wide)
+      const targetWidth = Math.min(880, container.clientWidth || 800)
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum)
+        const baseViewport = page.getViewport({ scale: 1 })
+        const scale = targetWidth / baseViewport.width
+        // Bump scale for crisper rendering on retina displays
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        const viewport = page.getViewport({ scale: scale * dpr })
+
+        const wrap = document.createElement('div')
+        wrap.className = 'pdf-page-wrap'
+        wrap.dataset.page = pageNum
+
+        const canvas = document.createElement('canvas')
+        canvas.className = 'pdf-page-canvas'
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        // Keep CSS size at the target width (crisp on retina via dpr scaling)
+        canvas.style.width = (viewport.width / dpr) + 'px'
+        canvas.style.height = (viewport.height / dpr) + 'px'
+        wrap.appendChild(canvas)
+
+        // Per-page page number badge
+        const badge = document.createElement('div')
+        badge.className = 'pdf-page-badge'
+        badge.textContent = pageNum + ' / ' + pdf.numPages
+        wrap.appendChild(badge)
+
+        container.appendChild(wrap)
+
+        await page.render({
+          canvasContext: canvas.getContext('2d'),
+          viewport,
+        }).promise
       }
     } catch (err) {
-      contentEl.innerHTML = `<div class="reader-fallback"><div class="reader-fallback-icon">⚠️</div><h3>שגיאה</h3><p>לא הצלחנו לטעון את הקורס.</p></div>`
+      console.error('PDF render error:', err)
+      container.innerHTML = `
+        <div class="reader-fallback">
+          <div class="reader-fallback-icon">⚠️</div>
+          <h3>לא הצלחנו לטעון את המצגת</h3>
+          <p>נסי לרענן את העמוד. אם הבעיה ממשיכה, פני למנהל המערכת.</p>
+        </div>
+      `
     }
   }
 

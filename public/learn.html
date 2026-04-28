@@ -294,10 +294,45 @@
     @media (max-width: 600px) { .reader-body { padding: 30px 24px 60px; } }
 
     .reader-content {
-      max-width: 660px; margin: 0 auto;
+      max-width: 880px; margin: 0 auto;
       font-size: 16px; line-height: 1.85;
       color: var(--learn-text);
       white-space: pre-wrap; word-break: break-word;
+    }
+
+    /* ---- PDF.js page rendering ---- */
+    .pdf-pages {
+      display: flex; flex-direction: column; gap: 24px;
+      align-items: center;
+    }
+    .pdf-page-wrap {
+      position: relative;
+      max-width: 100%;
+      animation: pdf-page-fade 0.4s ease;
+    }
+    @keyframes pdf-page-fade {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .pdf-page-canvas {
+      display: block; max-width: 100%; height: auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(26,31,58,0.12), 0 1px 3px rgba(26,31,58,0.06);
+      /* Belt-and-suspenders content protection */
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .pdf-page-badge {
+      position: absolute; bottom: 10px; left: 10px;
+      background: rgba(15,23,42,0.7); backdrop-filter: blur(6px);
+      color: white; font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 10px;
+      letter-spacing: 0.3px;
+    }
+    .pdf-loading {
+      text-align: center; padding: 60px 20px;
+      color: var(--learn-text-soft); font-size: 14px;
     }
 
     /* Helpful empty state inside the reader (e.g. when PDF is image-only) */
@@ -801,7 +836,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=5"></script>
+  <script src="js/learn.js?v=6"></script>
   <script src="js/ai-widget.js?v=2"></script>
 </body>
 </html>
