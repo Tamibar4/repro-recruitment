@@ -1991,7 +1991,8 @@ const trainingStorage = multer.diskStorage({
 });
 const trainingUpload = multer({
   storage: trainingStorage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
+  // 75 MB — Canva PDFs with images can be 30-60 MB
+  limits: { fileSize: 75 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (allowed.includes(file.mimetype) || /\.(pdf|pptx|ppt|doc|docx|txt)$/i.test(file.originalname || '')) {
@@ -2037,18 +2038,20 @@ app.get('/api/training/documents', (req, res) => {
 // POST /api/training/documents - upload a new document (admin only)
 app.post('/api/training/documents', (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-  trainingUpload.single('file')(req, res, async (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  trainingUpload.single('file')(req, res, (err) => {
+    if (err) {
+      // Translate common multer errors to friendly Hebrew
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'הקובץ גדול מדי (מקסימום 75MB). נסי לכווץ את הקובץ או לפצל לשני חלקים.' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) return res.status(400).json({ error: 'לא הועלה קובץ' });
     try {
-      const filePath = path.join(TRAINING_DIR, req.file.filename);
-      const isPdf = /pdf/i.test(req.file.mimetype || '') || /\.pdf$/i.test(req.file.originalname || '');
-      // Extract text on upload so the chat endpoint can send a small text
-      // payload instead of base64-encoded PDFs (which blow past the 30K
-      // tokens/min rate limit).
-      let extractedText = '';
-      if (isPdf) extractedText = await extractPdfText(filePath);
-
+      // NOTE: we no longer extract PDF text synchronously here — that was
+      // taking 10-30s per Canva-image PDF and timing the request out. The
+      // AI chat endpoint runs its own lazy extraction the first time it
+      // needs the text. Upload now returns immediately.
       const doc = {
         id: ++data.counters.training_documents,
         filename: req.file.filename,
@@ -2058,11 +2061,10 @@ app.post('/api/training/documents', (req, res, next) => {
         uploaded_by: req.user.username,
         uploaded_at: now(),
         description: req.body.description || null,
-        extracted_text: extractedText,
       };
       data.training_documents.push(doc);
       saveData();
-      res.status(201).json({ ...doc, extracted_text: undefined }); // don't ship full text back
+      res.status(201).json(doc);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
