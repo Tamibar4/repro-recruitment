@@ -2298,6 +2298,22 @@ app.post('/api/training/chat', async (req, res) => {
   }
 });
 
+// Cleans up a raw PDF filename → human-readable Hebrew title.
+//   "REPRO_2.pdf"  → "מודול 2"
+//   "MODULE_3.pdf" → "מודול 3"
+//   "intro_lesson.pdf" → "Intro Lesson"
+function prettifyDocTitle(originalName, fallbackOrder) {
+  let s = (originalName || '').replace(/\.pdf$/i, '').trim();
+  // Common pattern: "REPRO_3" or "MODULE_5" → "מודול 3"
+  const m = s.match(/^(?:repro|module|lesson|chapter)[_\s-]*(\d+)$/i);
+  if (m) return `מודול ${m[1]}`;
+  // Replace underscores/dashes with spaces, normalize whitespace
+  s = s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // If we still have nothing useful, fall back to "מודול N"
+  if (!s) return `מודול ${fallbackOrder}`;
+  return s;
+}
+
 // GET /api/training/modules - list training modules visible to recruiters.
 // Returns title + intro text (first ~280 chars) for each PDF, but NEVER
 // links to the file itself. Anyone authenticated can call this.
@@ -2323,9 +2339,10 @@ app.get('/api/training/modules', async (req, res) => {
       return {
         id: d.id,
         order: i + 1,
-        title: (d.original_name || '').replace(/\.pdf$/i, ''),
+        title: prettifyDocTitle(d.original_name, i + 1),
         intro,
         word_count: wordCount,
+        has_text: text.length > 100,
         // Estimated reading time (Hebrew avg ~180 wpm)
         reading_minutes: Math.max(1, Math.round(wordCount / 180)),
       };
@@ -2350,9 +2367,16 @@ app.get('/api/training/modules/:id', async (req, res) => {
       doc.extracted_text = await extractPdfText(filePath);
       saveData();
     }
+    // Find the doc's order in the prettified module list so the title
+    // here matches the card label the user just clicked.
+    const allDocs = (data.training_documents || []).filter(d =>
+      /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''),
+    );
+    const order = allDocs.findIndex(d => d.id === doc.id) + 1;
     res.json({
       id: doc.id,
-      title: (doc.original_name || '').replace(/\.pdf$/i, ''),
+      order,
+      title: prettifyDocTitle(doc.original_name, order),
       content: doc.extracted_text || '',
       uploaded_at: doc.uploaded_at,
     });

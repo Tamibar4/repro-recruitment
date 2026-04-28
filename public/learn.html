@@ -3,62 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RePro | מרכז הלמידה</title>
+  <title>RePro | מועדון הלמידה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css?v=5">
   <link rel="icon" type="image/png" href="assets/logo.png?v=2">
   <link rel="apple-touch-icon" href="assets/logo.png?v=2">
   <style>
-    /* ===== Brand palette (soft) =====
-       Built on top of the existing RePro blue (#0073ea) but kept gentle —
-       lots of whitespace, washed-out tints for backgrounds, and only the
-       darker shades for accents. Designed to feel like a quiet, classy
-       reading room, not a Monday board. */
     :root {
-      --learn-bg: #fafbff;
+      --learn-bg: #f8f7ff;
       --learn-card: #ffffff;
-      --learn-border: #e8edf7;
-      --learn-text: #1a2540;
-      --learn-text-soft: #6b7591;
-      --learn-text-light: #9ba4be;
-      --learn-accent: #4a6ad6;       /* softer blue */
-      --learn-accent-soft: #e8edff;
-      --learn-purple: #8b80c8;       /* dusty lavender */
+      --learn-border: #e8e6f7;
+      --learn-text: #1a1f3a;
+      --learn-text-soft: #6b6e8a;
+      --learn-text-light: #a0a3b8;
+      --learn-accent: #5e5ce6;        /* RePro purple-blue */
+      --learn-accent-soft: #ece9ff;
+      --learn-accent-deep: #4a4ad6;
+      --learn-purple: #8b80c8;
       --learn-purple-soft: #efedfb;
-      --learn-shadow: 0 1px 2px rgba(26,37,64,0.04), 0 8px 24px -8px rgba(74,106,214,0.10);
-      --learn-shadow-hover: 0 2px 4px rgba(26,37,64,0.06), 0 16px 36px -10px rgba(74,106,214,0.20);
+      --learn-green: #34d399;
+      --learn-green-soft: #d1fae5;
+      --learn-orange: #fb923c;
+      --learn-orange-soft: #ffedd5;
+      --learn-shadow: 0 1px 3px rgba(26,31,58,0.04), 0 8px 24px -8px rgba(94,92,230,0.10);
+      --learn-shadow-hover: 0 4px 8px rgba(26,31,58,0.06), 0 20px 40px -10px rgba(94,92,230,0.25);
     }
 
-    body { background: var(--learn-bg); }
+    body { background: var(--learn-bg); font-family: 'Rubik', sans-serif; }
 
+    /* ===== Hero ===== */
     .learn-hero {
-      padding: 48px 0 32px;
+      padding: 56px 20px 32px;
       text-align: center;
-      max-width: 720px; margin: 0 auto;
+      max-width: 880px; margin: 0 auto;
     }
     .learn-hero h1 {
-      font-size: 32px; font-weight: 700;
-      letter-spacing: -0.5px; color: var(--learn-text);
-      margin-bottom: 12px;
+      font-size: 36px; font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 14px;
     }
     .learn-hero p {
-      font-size: 15px; color: var(--learn-text-soft);
-      line-height: 1.7; max-width: 540px; margin: 0 auto;
+      font-size: 16px; color: var(--learn-text-soft);
+      line-height: 1.7; max-width: 560px; margin: 0 auto;
     }
-    .learn-hero-divider {
-      width: 60px; height: 3px; margin: 24px auto 0;
+    @media (max-width: 600px) { .learn-hero h1 { font-size: 28px; } .learn-hero p { font-size: 14px; } }
+
+    /* ===== Progress strip ===== */
+    .progress-strip {
+      max-width: 920px; margin: 24px auto 0;
+      padding: 18px 24px;
+      background: var(--learn-card);
+      border: 1px solid var(--learn-border);
+      border-radius: 16px;
+      display: flex; align-items: center; gap: 18px;
+      box-shadow: var(--learn-shadow);
+    }
+    .progress-emoji { font-size: 28px; }
+    .progress-text { flex: 1; min-width: 0; }
+    .progress-label { font-size: 13px; font-weight: 600; color: var(--learn-text); margin-bottom: 6px; }
+    .progress-bar-bg {
+      height: 8px; background: var(--learn-accent-soft);
+      border-radius: 99px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
       background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
-      border-radius: 2px;
+      border-radius: 99px;
+      transition: width 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+    }
+    .progress-count {
+      font-size: 14px; font-weight: 700; color: var(--learn-accent);
+      flex-shrink: 0;
     }
 
-    /* ----- Module cards grid ----- */
+    /* ===== Course cards grid ===== */
     .modules-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 22px;
-      margin: 40px auto;
+      margin: 36px auto;
       max-width: 1100px;
       padding: 0 20px;
     }
@@ -67,59 +95,144 @@
     .module-card {
       background: var(--learn-card);
       border: 1px solid var(--learn-border);
-      border-radius: 18px;
-      padding: 26px 24px;
-      cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
+      border-radius: 20px;
       overflow: hidden;
-      display: flex; flex-direction: column;
+      transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
       box-shadow: var(--learn-shadow);
-    }
-    .module-card::before {
-      content: '';
-      position: absolute; top: 0; right: 0; left: 0; height: 4px;
-      background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
-      opacity: 0; transition: opacity 0.25s;
+      display: flex; flex-direction: column;
+      position: relative;
     }
     .module-card:hover {
       transform: translateY(-4px);
       box-shadow: var(--learn-shadow-hover);
       border-color: var(--learn-accent-soft);
     }
-    .module-card:hover::before { opacity: 1; }
 
-    .module-number {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px;
-      background: var(--learn-accent-soft);
-      color: var(--learn-accent);
-      border-radius: 12px;
-      font-weight: 700; font-size: 14px;
-      margin-bottom: 16px;
+    /* Status ribbon (top-left of card image) */
+    .module-status-ribbon {
+      position: absolute; top: 14px; right: 14px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+      backdrop-filter: blur(8px);
+      z-index: 2;
+      display: inline-flex; align-items: center; gap: 4px;
     }
-    .module-title {
-      font-size: 18px; font-weight: 600;
-      color: var(--learn-text); line-height: 1.4;
+    .module-status-ribbon.in-progress {
+      background: rgba(251, 146, 60, 0.95); color: white;
+    }
+    .module-status-ribbon.done {
+      background: rgba(52, 211, 153, 0.95); color: white;
+    }
+
+    /* Card image area (gradient banner with module number) */
+    .module-banner {
+      height: 140px;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .module-banner::before, .module-banner::after {
+      content: ''; position: absolute;
+      border-radius: 50%;
+      filter: blur(20px); opacity: 0.4;
+    }
+    .module-banner::before {
+      width: 120px; height: 120px;
+      background: rgba(255,255,255,0.4);
+      top: -40px; right: -30px;
+    }
+    .module-banner::after {
+      width: 100px; height: 100px;
+      background: rgba(139, 128, 200, 0.5);
+      bottom: -30px; left: -20px;
+    }
+    .module-banner-icon {
+      font-size: 56px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+      z-index: 1;
+    }
+    /* Vary banner gradients by module index so they're not all identical */
+    .module-card:nth-child(2n) .module-banner {
+      background: linear-gradient(135deg, #8b80c8, #5e5ce6);
+    }
+    .module-card:nth-child(3n) .module-banner {
+      background: linear-gradient(135deg, #fb923c, #f59e0b);
+    }
+    .module-card:nth-child(4n) .module-banner {
+      background: linear-gradient(135deg, #34d399, #10b981);
+    }
+    .module-card:nth-child(5n) .module-banner {
+      background: linear-gradient(135deg, #f472b6, #db2777);
+    }
+
+    .module-body { padding: 22px 22px 18px; flex: 1; display: flex; flex-direction: column; }
+
+    .module-number-badge {
+      display: inline-flex; align-items: center;
+      gap: 6px; font-size: 11px; font-weight: 700;
+      color: var(--learn-accent);
+      background: var(--learn-accent-soft);
+      padding: 4px 10px; border-radius: 20px;
+      align-self: flex-start;
       margin-bottom: 10px;
     }
+    .module-title {
+      font-size: 18px; font-weight: 700;
+      color: var(--learn-text); line-height: 1.4;
+      margin-bottom: 8px;
+    }
     .module-intro {
-      font-size: 13.5px; color: var(--learn-text-soft);
-      line-height: 1.65; margin-bottom: 18px;
+      font-size: 13px; color: var(--learn-text-soft);
+      line-height: 1.6; margin-bottom: 16px;
       flex: 1;
-      display: -webkit-box; -webkit-line-clamp: 4;
+      display: -webkit-box; -webkit-line-clamp: 2;
       -webkit-box-orient: vertical; overflow: hidden;
     }
     .module-meta {
       display: flex; align-items: center; gap: 14px;
-      padding-top: 14px;
-      border-top: 1px solid var(--learn-border);
       font-size: 12px; color: var(--learn-text-light);
+      margin-bottom: 16px;
     }
     .module-meta-item { display: inline-flex; align-items: center; gap: 5px; }
-    .module-meta svg { width: 14px; height: 14px; opacity: 0.7; }
+    .module-meta svg { width: 13px; height: 13px; opacity: 0.7; }
 
-    /* ----- Empty state ----- */
+    /* Action row */
+    .module-actions {
+      display: flex; gap: 8px;
+      padding-top: 14px;
+      border-top: 1px solid var(--learn-border);
+    }
+    .module-btn {
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .module-btn-primary {
+      flex: 1;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white;
+      box-shadow: 0 3px 10px rgba(94,92,230,0.3);
+    }
+    .module-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 14px rgba(94,92,230,0.4);
+    }
+    .module-btn-done {
+      background: var(--learn-card);
+      color: var(--learn-green);
+      border: 1.5px solid var(--learn-green);
+    }
+    .module-btn-done.active {
+      background: var(--learn-green-soft);
+    }
+    .module-btn-done:hover { background: var(--learn-green-soft); }
+
+    /* ===== Empty / loading states ===== */
     .learn-empty {
       max-width: 480px; margin: 60px auto;
       text-align: center; padding: 40px 20px;
@@ -128,11 +241,11 @@
     .learn-empty h3 { font-size: 18px; color: var(--learn-text); margin-bottom: 8px; }
     .learn-empty p { font-size: 13px; color: var(--learn-text-soft); line-height: 1.6; }
 
-    /* ----- Reader overlay ----- */
+    /* ===== Reader overlay ===== */
     .reader-overlay {
       position: fixed; inset: 0; z-index: 9990;
-      background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(6px);
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(8px);
       display: flex; align-items: stretch; justify-content: center;
       padding: 0;
       animation: reader-fade 0.2s ease;
@@ -141,11 +254,10 @@
 
     .reader {
       background: var(--learn-bg);
-      width: 100%; max-width: 800px;
+      width: 100%; max-width: 880px;
       max-height: 100vh;
       display: flex; flex-direction: column;
       animation: reader-slide 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
-      /* Anti-piracy / DRM-lite */
       user-select: none; -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
@@ -164,7 +276,7 @@
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 16px; flex-shrink: 0;
     }
-    .reader-title { flex: 1; font-size: 18px; font-weight: 600; color: var(--learn-text); }
+    .reader-title { flex: 1; font-size: 18px; font-weight: 700; color: var(--learn-text); }
     .reader-close {
       width: 40px; height: 40px; border-radius: 50%;
       background: var(--learn-bg); border: 1px solid var(--learn-border);
@@ -172,11 +284,7 @@
       display: flex; align-items: center; justify-content: center;
       transition: all 0.15s; font-family: inherit;
     }
-    .reader-close:hover {
-      background: var(--learn-card);
-      color: var(--learn-text);
-      border-color: var(--learn-text-light);
-    }
+    .reader-close:hover { background: var(--learn-card); color: var(--learn-text); }
 
     .reader-body {
       flex: 1; overflow-y: auto;
@@ -186,33 +294,50 @@
     @media (max-width: 600px) { .reader-body { padding: 30px 24px 60px; } }
 
     .reader-content {
-      max-width: 640px; margin: 0 auto;
+      max-width: 660px; margin: 0 auto;
       font-size: 16px; line-height: 1.85;
       color: var(--learn-text);
-      white-space: pre-wrap;
-      word-break: break-word;
+      white-space: pre-wrap; word-break: break-word;
     }
 
-    /* Watermark — diagonal repeating user identifier so any screenshot
-       carries the recruiter's email. Pure CSS, no JS to disable. */
+    /* Helpful empty state inside the reader (e.g. when PDF is image-only) */
+    .reader-fallback {
+      max-width: 540px; margin: 40px auto;
+      text-align: center; padding: 40px 24px;
+      background: var(--learn-card);
+      border: 1px solid var(--learn-border);
+      border-radius: 18px;
+      box-shadow: var(--learn-shadow);
+    }
+    .reader-fallback-icon {
+      width: 72px; height: 72px; border-radius: 22px;
+      background: linear-gradient(135deg, var(--learn-accent-soft), var(--learn-purple-soft));
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 36px; margin-bottom: 18px;
+    }
+    .reader-fallback h3 { font-size: 18px; color: var(--learn-text); margin-bottom: 10px; }
+    .reader-fallback p { font-size: 14px; color: var(--learn-text-soft); line-height: 1.7; margin-bottom: 18px; }
+    .reader-fallback .ask-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 22px;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white; border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: all 0.15s;
+      box-shadow: 0 4px 14px rgba(94,92,230,0.3);
+    }
+    .reader-fallback .ask-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(94,92,230,0.4); }
+
     .reader-watermark {
       position: fixed; inset: 0; pointer-events: none; z-index: 1;
-      overflow: hidden;
-      opacity: 0.06;
+      overflow: hidden; opacity: 0.06;
     }
     .reader-watermark span {
-      position: absolute;
-      transform: rotate(-30deg);
+      position: absolute; transform: rotate(-30deg);
       font-size: 18px; font-weight: 600; color: var(--learn-text);
       white-space: nowrap; letter-spacing: 2px;
     }
 
-    .reader-loading {
-      text-align: center; padding: 60px 20px; color: var(--learn-text-soft);
-    }
-
-    /* Disable common keyboard shortcuts on the reader. JS handles Ctrl+P/S
-       but `print` media query also blanks the page if they bypass it. */
     @media print {
       body * { visibility: hidden; }
       body::before {
@@ -223,30 +348,25 @@
       }
     }
 
-    /* Soft hint at bottom of reader */
     .reader-protected-note {
-      max-width: 640px; margin: 32px auto 0;
+      max-width: 660px; margin: 32px auto 0;
       text-align: center; font-size: 11px; color: var(--learn-text-light);
       padding-top: 20px; border-top: 1px solid var(--learn-border);
       letter-spacing: 0.3px;
     }
 
-    /* ========== Disclaimer modal ========== */
+    /* ===== Disclaimer modal ===== */
     .disclaimer-overlay {
       position: fixed; inset: 0; z-index: 10000;
-      background: rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(8px);
-      display: flex; align-items: center; justify-content: center;
-      padding: 20px;
+      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
       animation: disclaimer-fade 0.3s ease;
     }
     @keyframes disclaimer-fade { from { opacity: 0; } to { opacity: 1; } }
 
     .disclaimer-card {
-      background: var(--learn-card);
-      border-radius: 24px;
-      max-width: 600px; width: 100%;
-      max-height: 90vh; overflow: hidden;
+      background: var(--learn-card); border-radius: 24px;
+      max-width: 600px; width: 100%; max-height: 90vh; overflow: hidden;
       display: flex; flex-direction: column;
       box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4);
       animation: disclaimer-slide 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.15);
@@ -256,118 +376,57 @@
     .disclaimer-header {
       padding: 28px 32px 18px;
       background: linear-gradient(135deg, var(--learn-accent-soft), var(--learn-purple-soft));
-      border-bottom: 1px solid var(--learn-border);
-      text-align: center;
+      border-bottom: 1px solid var(--learn-border); text-align: center;
     }
     .disclaimer-icon {
-      width: 56px; height: 56px;
-      background: white;
-      border-radius: 18px;
+      width: 56px; height: 56px; background: white; border-radius: 18px;
       display: inline-flex; align-items: center; justify-content: center;
       margin-bottom: 14px;
-      box-shadow: 0 4px 12px rgba(74,106,214,0.18);
+      box-shadow: 0 4px 12px rgba(94,92,230,0.18);
       font-size: 28px;
     }
-    .disclaimer-title {
-      font-size: 20px; font-weight: 700;
-      color: var(--learn-text); margin-bottom: 4px;
-    }
-    .disclaimer-subtitle {
-      font-size: 13px; color: var(--learn-text-soft);
-    }
-
-    .disclaimer-body {
-      flex: 1; overflow-y: auto;
-      padding: 24px 32px;
-    }
+    .disclaimer-title { font-size: 20px; font-weight: 700; color: var(--learn-text); margin-bottom: 4px; }
+    .disclaimer-subtitle { font-size: 13px; color: var(--learn-text-soft); }
+    .disclaimer-body { flex: 1; overflow-y: auto; padding: 24px 32px; }
     .disclaimer-intro {
-      font-size: 13.5px; color: var(--learn-text-soft);
-      line-height: 1.7; margin-bottom: 18px;
-      padding-bottom: 16px;
+      font-size: 13.5px; color: var(--learn-text-soft); line-height: 1.7;
+      margin-bottom: 18px; padding-bottom: 16px;
       border-bottom: 1px solid var(--learn-border);
     }
-    .disclaimer-list {
-      list-style: none; padding: 0; margin: 0;
-      display: flex; flex-direction: column; gap: 14px;
-    }
-    .disclaimer-item {
-      display: flex; gap: 14px; align-items: flex-start;
-    }
+    .disclaimer-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+    .disclaimer-item { display: flex; gap: 14px; align-items: flex-start; }
     .disclaimer-item-num {
-      flex-shrink: 0;
-      width: 28px; height: 28px; border-radius: 50%;
-      background: var(--learn-accent-soft);
-      color: var(--learn-accent);
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+      background: var(--learn-accent-soft); color: var(--learn-accent);
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 13px;
     }
-    .disclaimer-item-text {
-      flex: 1; font-size: 13.5px; line-height: 1.65;
-      color: var(--learn-text);
-    }
+    .disclaimer-item-text { flex: 1; font-size: 13.5px; line-height: 1.65; color: var(--learn-text); }
     .disclaimer-item-text strong { color: var(--learn-text); }
-
     .disclaimer-checkbox-row {
       margin-top: 22px; padding: 16px;
-      background: var(--learn-bg);
-      border-radius: 12px;
+      background: var(--learn-bg); border-radius: 12px;
       border: 1px solid var(--learn-border);
       display: flex; align-items: center; gap: 12px;
     }
-    .disclaimer-checkbox {
-      width: 22px; height: 22px;
-      accent-color: var(--learn-accent);
-      cursor: pointer; flex-shrink: 0;
-    }
-    .disclaimer-checkbox-label {
-      flex: 1; font-size: 13.5px; font-weight: 500;
-      color: var(--learn-text);
-      cursor: pointer; user-select: none;
-    }
-
+    .disclaimer-checkbox { width: 22px; height: 22px; accent-color: var(--learn-accent); cursor: pointer; flex-shrink: 0; }
+    .disclaimer-checkbox-label { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--learn-text); cursor: pointer; user-select: none; }
     .disclaimer-footer {
       padding: 20px 32px 28px;
       border-top: 1px solid var(--learn-border);
       display: flex; gap: 12px; justify-content: flex-end;
     }
-    @media (max-width: 480px) {
-      .disclaimer-footer { flex-direction: column-reverse; }
-      .disclaimer-footer button { width: 100%; }
-    }
-    .disclaimer-btn {
-      padding: 12px 24px;
-      border-radius: 12px;
-      font-family: inherit;
-      font-size: 14px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s;
-    }
-    .disclaimer-btn-cancel {
-      background: var(--learn-card);
-      color: var(--learn-text-soft);
-      border: 1.5px solid var(--learn-border);
-    }
-    .disclaimer-btn-cancel:hover {
-      border-color: var(--learn-text-light);
-      color: var(--learn-text);
-    }
-    .disclaimer-btn-accept {
-      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
-      color: white; border: none;
-      box-shadow: 0 4px 14px rgba(74,106,214,0.35);
-    }
-    .disclaimer-btn-accept:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(74,106,214,0.45);
-    }
-    .disclaimer-btn-accept:disabled {
-      opacity: 0.4; cursor: not-allowed;
-      box-shadow: none;
-    }
+    @media (max-width: 480px) { .disclaimer-footer { flex-direction: column-reverse; } .disclaimer-footer button { width: 100%; } }
+    .disclaimer-btn { padding: 12px 24px; border-radius: 12px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .disclaimer-btn-cancel { background: var(--learn-card); color: var(--learn-text-soft); border: 1.5px solid var(--learn-border); }
+    .disclaimer-btn-cancel:hover { border-color: var(--learn-text-light); color: var(--learn-text); }
+    .disclaimer-btn-accept { background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple)); color: white; border: none; box-shadow: 0 4px 14px rgba(94,92,230,0.35); }
+    .disclaimer-btn-accept:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(94,92,230,0.45); }
+    .disclaimer-btn-accept:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
   </style>
 </head>
 <body>
   <div class="app">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-logo">
         <img src="assets/logo.png" alt="RePro" class="sidebar-logo-img">
@@ -407,24 +466,31 @@
       </div>
     </aside>
 
-    <!-- Main Content -->
     <main class="main">
       <div class="learn-hero">
-        <h1>מרכז הלמידה</h1>
-        <p>חומרי הכשרה מקצועיים שיעזרו לך להפוך למגייסת מצוינת. קחי את הזמן, קראי לפי הסדר.</p>
-        <div class="learn-hero-divider"></div>
+        <h1>ברוכים הבאים למועדון הלמידה 🎓</h1>
+        <p>קורסי ההכשרה שיהפכו אותך למגייסת מצוינת. כל קורס מסודר לפי הסדר — לחצי "התחל" וקדמי בקצב שלך.</p>
+      </div>
+
+      <div id="progress-strip" style="display:none" class="progress-strip">
+        <div class="progress-emoji">🚀</div>
+        <div class="progress-text">
+          <div class="progress-label">ההתקדמות שלך</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+        </div>
+        <div class="progress-count" id="progress-count">0 / 0</div>
       </div>
 
       <div id="modules-container">
         <div class="learn-empty">
           <div class="learn-empty-icon">📚</div>
-          <h3>טוען חומרי הכשרה...</h3>
+          <h3>טוען קורסים...</h3>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- Disclaimer modal — shown to first-time users -->
+  <!-- Disclaimer modal -->
   <div id="disclaimer-overlay" class="disclaimer-overlay" style="display:none">
     <div class="disclaimer-card">
       <header class="disclaimer-header">
@@ -432,56 +498,34 @@
         <div class="disclaimer-title">הסכם סודיות וזכויות שימוש</div>
         <div class="disclaimer-subtitle">קראי לפני הגישה לחומרי ההכשרה</div>
       </header>
-
       <div class="disclaimer-body">
         <p class="disclaimer-intro">
           חומרי ההכשרה שתראי בעמוד זה הם <strong>רכוש בלעדי של חברת RePro</strong>.
           באישור התנאים את/ה מתחייב/ת להגן על המידע ולעמוד בכל הסעיפים הבאים:
         </p>
-
         <ol class="disclaimer-list">
           <li class="disclaimer-item">
             <div class="disclaimer-item-num">1</div>
-            <div class="disclaimer-item-text">
-              <strong>סודיות מלאה.</strong> כל החומרים נועדו ללמידה אישית בלבד.
-              אסור להעתיק, לצלם, להוריד, להעביר, או לשתף אותם עם אף גורם — לא במייל,
-              לא בוואטסאפ, לא ברשתות חברתיות, ולא באמצעי כלשהו.
-            </div>
+            <div class="disclaimer-item-text"><strong>סודיות מלאה.</strong> כל החומרים נועדו ללמידה אישית בלבד. אסור להעתיק, לצלם, להוריד, להעביר, או לשתף אותם עם אף גורם.</div>
           </li>
           <li class="disclaimer-item">
             <div class="disclaimer-item-num">2</div>
-            <div class="disclaimer-item-text">
-              <strong>איסור שימוש לרעה.</strong> אסור להשתמש במידע נגד החברה —
-              לרבות מעבר למתחרה תוך שימוש בידע, העברת מתודולוגיות, או שימוש
-              בפרטי לקוחות, ספקים, מועמדים או מעסיקים שנחשפת אליהם.
-            </div>
+            <div class="disclaimer-item-text"><strong>איסור שימוש לרעה.</strong> אסור להשתמש במידע נגד החברה — לרבות מעבר למתחרה תוך שימוש בידע, או שימוש בפרטי לקוחות, מועמדים או מעסיקים.</div>
           </li>
           <li class="disclaimer-item">
             <div class="disclaimer-item-num">3</div>
-            <div class="disclaimer-item-text">
-              <strong>סיום ההעסקה.</strong> בעזיבת החברה, הזכות לעיין ולהשתמש
-              בחומרים אלה <strong>נפסקת מיידית</strong>. כל שימוש בידע
-              שנרכש כאן לאחר עזיבה — ייחשב הפרת חוזה.
-            </div>
+            <div class="disclaimer-item-text"><strong>סיום ההעסקה.</strong> בעזיבת החברה, הזכות לעיין ולהשתמש בחומרים אלה <strong>נפסקת מיידית</strong>.</div>
           </li>
           <li class="disclaimer-item">
             <div class="disclaimer-item-num">4</div>
-            <div class="disclaimer-item-text">
-              <strong>אכיפה.</strong> הפרת ההסכם תגרור צעדים משפטיים, כולל
-              תביעת פיצויים על הנזק שנגרם. צילומי מסך נושאים חתימת מים אישית
-              שמאפשרת איתור מקור הדליפה.
-            </div>
+            <div class="disclaimer-item-text"><strong>אכיפה.</strong> הפרת ההסכם תגרור צעדים משפטיים. צילומי מסך נושאים חתימת מים אישית שמאפשרת איתור מקור הדליפה.</div>
           </li>
         </ol>
-
         <label class="disclaimer-checkbox-row" for="disclaimer-checkbox">
           <input type="checkbox" id="disclaimer-checkbox" class="disclaimer-checkbox">
-          <span class="disclaimer-checkbox-label">
-            קראתי, הבנתי והסכמתי לכל התנאים שלעיל
-          </span>
+          <span class="disclaimer-checkbox-label">קראתי, הבנתי והסכמתי לכל התנאים שלעיל</span>
         </label>
       </div>
-
       <footer class="disclaimer-footer">
         <button class="disclaimer-btn disclaimer-btn-cancel" id="disclaimer-cancel">לא מסכים/ה</button>
         <button class="disclaimer-btn disclaimer-btn-accept" id="disclaimer-accept" disabled>אני מאשר/ת</button>
@@ -489,7 +533,7 @@
     </div>
   </div>
 
-  <!-- Reader overlay (hidden by default) -->
+  <!-- Reader overlay -->
   <div id="reader-overlay" class="reader-overlay" style="display:none">
     <div class="reader" id="reader" oncontextmenu="return false">
       <header class="reader-header">
@@ -508,7 +552,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=3"></script>
-  <script src="js/ai-widget.js?v=1"></script>
+  <script src="js/learn.js?v=4"></script>
+  <script src="js/ai-widget.js?v=2"></script>
 </body>
 </html>

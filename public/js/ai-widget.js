@@ -100,6 +100,49 @@
       }
       @media (max-width: 640px) { .aiw-btn { bottom: 84px; left: 14px; width: 54px; height: 54px; font-size: 24px; } }
 
+      /* Greeting bubble — peeks out from the floating button until the
+         user dismisses it or opens the chat. Once dismissed (per session)
+         it stays away. */
+      .aiw-greeting {
+        position: fixed; bottom: 32px; left: 92px; z-index: 9997;
+        background: white; color: #1a1d2e;
+        padding: 12px 16px 12px 14px;
+        border-radius: 18px 18px 18px 4px;
+        font-size: 13.5px; font-weight: 500;
+        box-shadow: 0 4px 16px rgba(85, 89, 223, 0.18), 0 0 0 1px rgba(155, 89, 182, 0.12);
+        display: flex; align-items: center; gap: 8px;
+        max-width: 240px;
+        animation: aiw-greet-pop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.4) 1.5s both;
+        cursor: pointer;
+      }
+      .aiw-greeting::after {
+        content: ''; position: absolute;
+        bottom: -6px; left: 14px;
+        width: 0; height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid white;
+        filter: drop-shadow(0 1px 1px rgba(85,89,223,0.06));
+      }
+      .aiw-greeting:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(85, 89, 223, 0.28), 0 0 0 1px rgba(155, 89, 182, 0.18);
+      }
+      .aiw-greeting-close {
+        background: none; border: none; cursor: pointer;
+        color: #9699a6; padding: 0; margin-right: 4px;
+        font-size: 14px; line-height: 1; opacity: 0.6;
+        transition: opacity 0.15s;
+      }
+      .aiw-greeting-close:hover { opacity: 1; }
+      @keyframes aiw-greet-pop {
+        from { transform: translateY(8px) scale(0.8); opacity: 0; }
+        to { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      @media (max-width: 640px) {
+        .aiw-greeting { bottom: 92px; left: 78px; max-width: 200px; font-size: 12.5px; }
+      }
+
       .aiw-panel {
         position: fixed; bottom: 22px; left: 22px; z-index: 9999;
         width: 380px; height: min(620px, calc(100vh - 44px));
@@ -317,19 +360,53 @@
   let panelEl = null
   let buttonEl = null
 
+  let greetingEl = null
+  const GREETING_DISMISSED_KEY = 'aiw_greeting_dismissed'
+
+  function dismissGreeting() {
+    if (greetingEl) { greetingEl.remove(); greetingEl = null }
+    try { sessionStorage.setItem(GREETING_DISMISSED_KEY, '1') } catch {}
+  }
+
+  function renderGreeting() {
+    // Don't show again if dismissed in this session
+    try { if (sessionStorage.getItem(GREETING_DISMISSED_KEY)) return } catch {}
+    if (greetingEl) return
+    greetingEl = document.createElement('div')
+    greetingEl.className = 'aiw-greeting'
+    greetingEl.setAttribute('role', 'button')
+    greetingEl.innerHTML = `
+      <button class="aiw-greeting-close" aria-label="סגור">✕</button>
+      <span>יש לך שאלות? אני כאן 👋</span>
+    `
+    greetingEl.addEventListener('click', (e) => {
+      // Click on close → just dismiss; click on the rest → open chat
+      if (e.target.classList.contains('aiw-greeting-close')) {
+        e.stopPropagation()
+        dismissGreeting()
+        return
+      }
+      dismissGreeting()
+      if (buttonEl) buttonEl.click()
+    })
+    document.body.appendChild(greetingEl)
+  }
+
   function renderButton() {
     if (buttonEl) return
     buttonEl = document.createElement('button')
     buttonEl.className = 'aiw-btn aiw-btn-pulse'
-    buttonEl.title = 'מאמן AI'
+    buttonEl.title = 'יש לך שאלות? אני כאן 👋'
     buttonEl.innerHTML = '🤖'
     buttonEl.addEventListener('click', () => {
+      dismissGreeting()
       isOpen = !isOpen
       if (isOpen) renderPanel()
       else if (panelEl) { panelEl.remove(); panelEl = null }
       buttonEl.style.display = isOpen ? 'none' : 'flex'
     })
     document.body.appendChild(buttonEl)
+    renderGreeting()
   }
 
   function renderPanel() {
