@@ -51,7 +51,8 @@ let aiEnabled = false;
   try {
     const status = await API.request('/training/status');
     aiEnabled = !!status.ai_enabled;
-    if (!aiEnabled) document.getElementById('ai-warning').style.display = 'flex';
+    const warning = document.getElementById('ai-warning');
+    if (!aiEnabled && warning) warning.style.display = 'flex';
   } catch(e) {}
 
   await loadConversations();
@@ -143,14 +144,22 @@ function setupEventListeners() {
 
 function updateChatHeader() {
   const meta = MODE_META[currentMode];
-  document.getElementById('chat-mode-title').textContent = meta.title;
-  document.getElementById('chat-mode-desc').textContent = meta.desc;
-  document.querySelector('.chat-header-icon').textContent = meta.icon;
+  // Defensive: the chat tab was removed from training.html (it now lives in
+  // the floating widget), but the file-upload code still calls these
+  // helpers via init(). Bail out if the chat DOM isn't on this page.
+  const titleEl = document.getElementById('chat-mode-title');
+  const descEl = document.getElementById('chat-mode-desc');
+  const iconEl = document.querySelector('.chat-header-icon');
+  if (!titleEl || !descEl || !iconEl) return;
+  titleEl.textContent = meta.title;
+  descEl.textContent = meta.desc;
+  iconEl.textContent = meta.icon;
 }
 
 function renderEmptyChat() {
   const meta = MODE_META[currentMode];
   const container = document.getElementById('chat-messages');
+  if (!container) return; // chat removed from training.html
   container.innerHTML = `
     <div class="chat-empty">
       <div class="chat-empty-icon">${meta.icon}</div>
@@ -269,8 +278,9 @@ function removeThinking(id) {
 // ============================================================
 async function loadConversations() {
   try {
-    const conversations = await API.request('/training/conversations');
     const container = document.getElementById('conversations-list');
+    if (!container) return; // chat tab removed from this page
+    const conversations = await API.request('/training/conversations');
     if (!conversations || conversations.length === 0) {
       container.innerHTML = '<div style="font-size:12px;color:var(--color-text-light);padding:8px 12px">אין שיחות קודמות</div>';
       return;
