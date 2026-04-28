@@ -25,26 +25,45 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   }
 
+  // Raw fetch helper that does NOT auto-logout on 401 (unlike API.request).
+  // Keeps recruiters from being kicked out of the site if a single call
+  // hiccups — they should always see at least the basic page.
+  async function safeFetch(path, options = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
+    const token = localStorage.getItem('auth_token')
+    if (token) headers['Authorization'] = 'Bearer ' + token
+    const res = await fetch('/api' + path, { ...options, headers })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const e = new Error(err.error || err.message || `HTTP ${res.status}`)
+      e.status = res.status
+      throw e
+    }
+    if (res.status === 204) return null
+    return res.json()
+  }
+
   // ----- Init -----------------------------------------------------------
   async function init() {
+    // Best-effort auth check — if there's no token at all, redirect.
+    // But never auto-redirect on a failed /auth/me call: that's what was
+    // throwing recruiters off the site.
     if (!localStorage.getItem('auth_token')) {
       window.location.href = 'login.html'
       return
     }
     try {
-      const me = await API.request('/auth/me')
+      const me = await safeFetch('/auth/me')
       userEmail = me?.email || me?.username || ''
       userName = me?.display_name || me?.username || ''
-      // Hydrate user badge in sidebar (uses existing helper if present)
       if (typeof renderUserBadge === 'function') renderUserBadge(me)
-      // Show admin-only nav links if the current user is admin
       if (me?.role === 'admin') {
         document.querySelectorAll('.admin-only-nav').forEach(el => { el.style.display = '' })
       }
     } catch (e) {
-      // not logged in or token expired
-      window.location.href = 'login.html'
-      return
+      // Silent — keep loading the page even if /auth/me failed for
+      // some transient reason. The watermark just won't have an email.
+      console.warn('learn: /auth/me failed', e)
     }
 
     await loadModules()
@@ -55,7 +74,7 @@
   async function loadModules() {
     const container = document.getElementById('modules-container')
     try {
-      const modules = await API.request('/training/modules')
+      const modules = await safeFetch('/training/modules')
       if (!modules || modules.length === 0) {
         container.innerHTML = `
           <div class="learn-empty">
@@ -136,7 +155,7 @@
     watermarkEl.innerHTML = wmTiles.join('')
 
     try {
-      const mod = await API.request('/training/modules/' + id)
+      const mod = await safeFetch('/training/modules/' + id)
       titleEl.textContent = mod.title
       // Find the order number from the existing card (so the badge matches)
       const card = document.querySelector(`.module-card[data-id="${id}"]`)
