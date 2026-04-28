@@ -238,16 +238,25 @@
       box-shadow: 0 5px 12px rgba(94,92,230,0.45);
     }
 
-    /* ===== Mascot bear, decorative ===== */
+    /* ===== Floating sticker mascots — RePro categories ===== */
     .mascot {
       position: absolute; z-index: 1;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 6px 18px rgba(94,92,230,0.25), 0 0 0 4px rgba(255,255,255,0.6);
+      background: white;
       animation: mascot-float 3s ease-in-out infinite;
+      user-select: none;
     }
-    .mascot-1 { top: 24%; left: 14%; width: 72px; height: 72px; }
-    .mascot-2 { top: 62%; right: 12%; width: 60px; height: 60px; animation-delay: -1.5s; }
+    /* Each sticker has a distinct soft pastel ring matching its category */
+    .mascot-1 { top: 18%; left: 10%; background: linear-gradient(135deg, #fef3c7, #fde68a); animation-delay: 0s; }       /* 🚪 garage door */
+    .mascot-2 { top: 45%; right: 8%;  background: linear-gradient(135deg, #ecfeff, #cffafe); animation-delay: -1s; }     /* 💨 air duct */
+    .mascot-3 { top: 72%; left: 14%;  background: linear-gradient(135deg, #fdf4ff, #fae8ff); animation-delay: -2s; }     /* 💄 cosmetics */
     @keyframes mascot-float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
+      0%, 100% { transform: translateY(0) rotate(-4deg); }
+      50% { transform: translateY(-12px) rotate(4deg); }
     }
     @media (max-width: 600px) { .mascot { display: none; } }
 
@@ -310,23 +319,19 @@
       white-space: pre-wrap; word-break: break-word;
     }
 
-    /* PDF.js page rendering */
-    .pdf-pages { display: flex; flex-direction: column; gap: 24px; align-items: center; }
-    .pdf-page-wrap { position: relative; max-width: 100%; animation: pdf-page-fade 0.4s ease; }
-    @keyframes pdf-page-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .pdf-page-canvas {
-      display: block; max-width: 100%; height: auto;
-      border-radius: 12px;
+    /* PDF iframe rendering — uses the browser's native PDF viewer so
+       Hebrew renders correctly. The toolbar is hidden via URL fragment. */
+    .pdf-iframe {
+      display: block; width: 100%;
+      height: calc(100vh - 200px); min-height: 600px;
+      border: none; border-radius: 12px;
+      background: white;
       box-shadow: 0 4px 16px rgba(26,31,58,0.12), 0 1px 3px rgba(26,31,58,0.06);
-      pointer-events: none; user-select: none; -webkit-user-drag: none;
     }
-    .pdf-page-badge {
-      position: absolute; bottom: 10px; left: 10px;
-      background: rgba(15,23,42,0.7); backdrop-filter: blur(6px);
-      color: white; font-size: 11px; font-weight: 600;
-      padding: 4px 10px; border-radius: 10px; letter-spacing: 0.3px;
+    .pdf-loading {
+      text-align: center; padding: 60px 20px;
+      color: var(--learn-text-soft); font-size: 14px;
     }
-    .pdf-loading { text-align: center; padding: 60px 20px; color: var(--learn-text-soft); font-size: 14px; }
 
     .reader-fallback {
       max-width: 540px; margin: 40px auto;
@@ -499,45 +504,10 @@
         <!-- SVG path drawn between cards once they're rendered -->
         <svg class="journey-svg" id="journey-svg" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg>
 
-        <!-- Decorative mascot bears (SVG) -->
-        <div class="mascot mascot-1">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- Ears -->
-            <circle cx="22" cy="22" r="14" fill="#7c3aed"/>
-            <circle cx="78" cy="22" r="14" fill="#7c3aed"/>
-            <circle cx="22" cy="22" r="7" fill="#5e5ce6"/>
-            <circle cx="78" cy="22" r="7" fill="#5e5ce6"/>
-            <!-- Head -->
-            <circle cx="50" cy="55" r="34" fill="#8b5cf6"/>
-            <!-- Snout -->
-            <ellipse cx="50" cy="68" rx="16" ry="12" fill="#e9d5ff"/>
-            <!-- Eyes -->
-            <circle cx="38" cy="50" r="6" fill="white"/>
-            <circle cx="62" cy="50" r="6" fill="white"/>
-            <circle cx="38" cy="51" r="3" fill="#1a1f3a"/>
-            <circle cx="62" cy="51" r="3" fill="#1a1f3a"/>
-            <!-- Nose -->
-            <ellipse cx="50" cy="64" rx="3.5" ry="2.5" fill="#1a1f3a"/>
-            <!-- Smile -->
-            <path d="M 44 72 Q 50 76 56 72" stroke="#1a1f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div class="mascot mascot-2">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="22" cy="22" r="14" fill="#ec4899"/>
-            <circle cx="78" cy="22" r="14" fill="#ec4899"/>
-            <circle cx="22" cy="22" r="7" fill="#db2777"/>
-            <circle cx="78" cy="22" r="7" fill="#db2777"/>
-            <circle cx="50" cy="55" r="34" fill="#f472b6"/>
-            <ellipse cx="50" cy="68" rx="16" ry="12" fill="#fce7f3"/>
-            <circle cx="38" cy="50" r="6" fill="white"/>
-            <circle cx="62" cy="50" r="6" fill="white"/>
-            <circle cx="38" cy="51" r="3" fill="#1a1f3a"/>
-            <circle cx="62" cy="51" r="3" fill="#1a1f3a"/>
-            <ellipse cx="50" cy="64" rx="3.5" ry="2.5" fill="#1a1f3a"/>
-            <path d="M 44 72 Q 50 76 56 72" stroke="#1a1f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <!-- Floating category emoji mascots: garage door / air duct / cosmetics -->
+        <div class="mascot mascot-1" title="גארז' דור">🚪</div>
+        <div class="mascot mascot-2" title="אייר דאקט">💨</div>
+        <div class="mascot mascot-3" title="קוסמטיקה">💄</div>
 
         <div class="journey-stack" id="journey-stack">
           <div class="learn-empty">
@@ -641,7 +611,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=7"></script>
+  <script src="js/learn.js?v=8"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>

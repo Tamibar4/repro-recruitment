@@ -381,6 +381,7 @@ app.use((req, res, next) => {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
       "connect-src 'self' https://cdnjs.cloudflare.com",
+      "frame-src 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",

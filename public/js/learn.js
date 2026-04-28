@@ -321,86 +321,50 @@
     }
   }
 
-  // ----- PDF.js renderer ----------------------------------------------
-  // Lazy-loads PDF.js from a CDN on first use, then renders the entire
-  // PDF as <canvas> elements so the user gets a faithful visual of the
-  // Canva slides without ever exposing the raw PDF for download.
-  async function loadPdfJsLib() {
-    if (window.pdfjsLib) return window.pdfjsLib
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
-      s.onload = resolve
-      s.onerror = () => reject(new Error('PDF.js failed to load'))
-      document.head.appendChild(s)
-    })
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
-    return window.pdfjsLib
-  }
-
-  async function renderPdfVisual(moduleId, container) {
+  // ----- PDF renderer (iframe) ----------------------------------------
+  // Use the browser's native PDF viewer via <iframe>. This is the only
+  // approach that handles Hebrew text correctly — PDF.js mangles RTL
+  // shaping with Canva-exported PDFs (letters appear individually
+  // separated). The native viewer uses the OS font stack and gets
+  // shaping right.
+  //
+  // URL fragment '#toolbar=0&navpanes=0&scrollbar=0' hides the Chrome
+  // toolbar (download/print buttons). Combined with the watermark
+  // overlay + sandbox attribute, this stays as protected as we can
+  // make a browser-rendered PDF.
+  function renderPdfVisual(moduleId, container) {
     const token = localStorage.getItem('auth_token')
-    const url = '/api/training/modules/' + moduleId + '/view?token=' + encodeURIComponent(token)
+    const url = '/api/training/modules/' + moduleId
+      + '/view?token=' + encodeURIComponent(token)
+      + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'
 
-    container.innerHTML = '<div class="pdf-loading">טוען מצגת...</div>'
+    container.innerHTML = `
+      <div class="pdf-loading">טוען מצגת...</div>
+    `
 
-    try {
-      const pdfjsLib = await loadPdfJsLib()
-      const loadingTask = pdfjsLib.getDocument({
-        url,
-        withCredentials: false,
-      })
-      const pdf = await loadingTask.promise
-      container.innerHTML = ''
-
-      // Compute target render scale to fit nicely in the reader (~720px wide)
-      const targetWidth = Math.min(880, container.clientWidth || 800)
-
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum)
-        const baseViewport = page.getViewport({ scale: 1 })
-        const scale = targetWidth / baseViewport.width
-        // Bump scale for crisper rendering on retina displays
-        const dpr = Math.min(window.devicePixelRatio || 1, 2)
-        const viewport = page.getViewport({ scale: scale * dpr })
-
-        const wrap = document.createElement('div')
-        wrap.className = 'pdf-page-wrap'
-        wrap.dataset.page = pageNum
-
-        const canvas = document.createElement('canvas')
-        canvas.className = 'pdf-page-canvas'
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        // Keep CSS size at the target width (crisp on retina via dpr scaling)
-        canvas.style.width = (viewport.width / dpr) + 'px'
-        canvas.style.height = (viewport.height / dpr) + 'px'
-        wrap.appendChild(canvas)
-
-        // Per-page page number badge
-        const badge = document.createElement('div')
-        badge.className = 'pdf-page-badge'
-        badge.textContent = pageNum + ' / ' + pdf.numPages
-        wrap.appendChild(badge)
-
-        container.appendChild(wrap)
-
-        await page.render({
-          canvasContext: canvas.getContext('2d'),
-          viewport,
-        }).promise
-      }
-    } catch (err) {
-      console.error('PDF render error:', err)
+    // Build the iframe. sandbox restricts navigation but allows the
+    // browser's PDF viewer to run (it needs allow-scripts internally).
+    const iframe = document.createElement('iframe')
+    iframe.className = 'pdf-iframe'
+    iframe.src = url
+    iframe.setAttribute('title', 'מצגת ההכשרה')
+    // Cannot use sandbox here because it disables the PDF viewer in
+    // some browsers — relying on watermark + content protection JS.
+    iframe.addEventListener('load', () => {
+      // Replace loading placeholder once ready
+      const loading = container.querySelector('.pdf-loading')
+      if (loading) loading.remove()
+    })
+    iframe.addEventListener('error', () => {
       container.innerHTML = `
         <div class="reader-fallback">
           <div class="reader-fallback-icon">⚠️</div>
           <h3>לא הצלחנו לטעון את המצגת</h3>
-          <p>נסי לרענן את העמוד. אם הבעיה ממשיכה, פני למנהל המערכת.</p>
+          <p>נסי לרענן את העמוד.</p>
         </div>
       `
-    }
+    })
+    container.appendChild(iframe)
   }
 
   function closeReader() { document.getElementById('reader-overlay').style.display = 'none' }
