@@ -100,14 +100,14 @@
       }
       @media (max-width: 640px) { .aiw-btn { bottom: 84px; left: 14px; width: 54px; height: 54px; font-size: 24px; } }
 
-      /* Greeting bubble — peeks out from the floating button until the
-         user dismisses it or opens the chat. Once dismissed (per session)
-         it stays away. */
+      /* Greeting bubble — appears ABOVE the floating button with a small
+         tail pointing down to it. Auto-pops 1.5s after page load and
+         stays until dismissed (per-session). */
       .aiw-greeting {
-        position: fixed; bottom: 32px; left: 92px; z-index: 9997;
+        position: fixed; bottom: 96px; left: 22px; z-index: 9997;
         background: white; color: #1a1d2e;
-        padding: 12px 16px 12px 14px;
-        border-radius: 18px 18px 18px 4px;
+        padding: 12px 14px 12px 16px;
+        border-radius: 18px 18px 4px 18px;
         font-size: 13.5px; font-weight: 500;
         box-shadow: 0 4px 16px rgba(85, 89, 223, 0.18), 0 0 0 1px rgba(155, 89, 182, 0.12);
         display: flex; align-items: center; gap: 8px;
@@ -115,9 +115,10 @@
         animation: aiw-greet-pop 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.4) 1.5s both;
         cursor: pointer;
       }
+      /* Speech tail pointing DOWN-LEFT toward the button below */
       .aiw-greeting::after {
         content: ''; position: absolute;
-        bottom: -6px; left: 14px;
+        bottom: -7px; left: 16px;
         width: 0; height: 0;
         border-left: 8px solid transparent;
         border-right: 8px solid transparent;
@@ -140,7 +141,8 @@
         to { transform: translateY(0) scale(1); opacity: 1; }
       }
       @media (max-width: 640px) {
-        .aiw-greeting { bottom: 92px; left: 78px; max-width: 200px; font-size: 12.5px; }
+        /* Mobile: button is at bottom: 84px, so greeting goes to 152px */
+        .aiw-greeting { bottom: 156px; left: 14px; max-width: 200px; font-size: 12.5px; }
       }
 
       .aiw-panel {
