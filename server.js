@@ -2408,9 +2408,13 @@ app.get('/api/training/modules', (req, res) => {
 });
 
 // GET /api/training/modules/:id/view - stream the raw PDF for in-browser
-// rendering by PDF.js. Any authenticated user can view; the file is
-// streamed inline with no-store caching headers + same-origin frame
-// protection so other sites can't embed it.
+// rendering. Any authenticated user can view; the file is streamed inline
+// with same-origin frame protection so other sites can't embed it.
+//
+// Caching: we use ETag + private 1-hour cache. After a recruiter views
+// a guide once, the PDF lives in her browser cache; subsequent clicks
+// load instantly without re-downloading the (often 10MB+) file.
+// 'private' keeps it out of any shared CDN/proxy cache for safety.
 app.get('/api/training/modules/:id/view', (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -2418,10 +2422,27 @@ app.get('/api/training/modules/:id/view', (req, res) => {
     if (!doc) return res.status(404).json({ error: 'Module not found' });
     const filePath = path.join(TRAINING_DIR, doc.filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing' });
+
+    // ETag derived from id + size + uploaded_at — changes only if the
+    // file is replaced (delete + re-upload), in which case the etag
+    // shifts and the browser re-downloads.
+    const stat = fs.statSync(filePath);
+    const etag = '"m' + id + '-' + stat.size + '-' + stat.mtimeMs.toString(36) + '"';
+    res.setHeader('ETag', etag);
+
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Length', stat.size);
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    // Private 1-hour cache so opening the same guide twice is instant.
+    // 'must-revalidate' makes the browser re-check with the server when
+    // the cache expires; combined with ETag, that's a fast 304 round-trip.
+    res.setHeader('Cache-Control', 'private, max-age=3600, must-revalidate');
+
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     res.status(500).json({ error: err.message });

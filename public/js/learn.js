@@ -15,6 +15,7 @@
 
   let userEmail = ''
   let userName = ''
+  let userIsAdmin = false
   let modulesCache = []
 
   // v2 introduces the full multi-section legal agreement (Israeli law,
@@ -70,10 +71,11 @@
     }
     try {
       const me = await safeFetch('/auth/me')
-      userEmail = me?.email || me?.username || ''
+      userEmail = me?.email || ''
       userName = me?.display_name || me?.username || ''
+      userIsAdmin = me?.role === 'admin'
       if (typeof renderUserBadge === 'function') renderUserBadge(me)
-      if (me?.role === 'admin') {
+      if (userIsAdmin) {
         document.querySelectorAll('.admin-only-nav').forEach(el => { el.style.display = '' })
       }
     } catch (e) {
@@ -295,15 +297,21 @@
     titleEl.textContent = '...'
     contentEl.innerHTML = '<div class="reader-fallback"><div class="reader-fallback-icon">⏳</div><h3>טוען...</h3></div>'
 
-    // Watermark — repeats user email diagonally
-    const wmText = userEmail || userName || 'RePro'
-    const wmTiles = []
-    for (let r = 0; r < 14; r++) {
-      for (let c = 0; c < 6; c++) {
-        wmTiles.push(`<span style="top:${r * 80}px;right:${c * 280 - 100}px">${escapeHtml(wmText)}</span>`)
+    // Watermark — repeats user identifier diagonally over the reader.
+    // Skip entirely for admin (you don't need to watermark your OWN content)
+    // and use email > display_name > username for everyone else.
+    if (userIsAdmin) {
+      watermarkEl.innerHTML = ''
+    } else {
+      const wmText = userEmail || userName || 'RePro'
+      const wmTiles = []
+      for (let r = 0; r < 14; r++) {
+        for (let c = 0; c < 6; c++) {
+          wmTiles.push(`<span style="top:${r * 80}px;right:${c * 280 - 100}px">${escapeHtml(wmText)}</span>`)
+        }
       }
+      watermarkEl.innerHTML = wmTiles.join('')
     }
-    watermarkEl.innerHTML = wmTiles.join('')
 
     try {
       const mod = await safeFetch('/training/modules/' + id)
@@ -332,6 +340,11 @@
   // toolbar (download/print buttons). Combined with the watermark
   // overlay + sandbox attribute, this stays as protected as we can
   // make a browser-rendered PDF.
+  //
+  // Loading UX: spinner overlay sits ON TOP of the (initially invisible)
+  // iframe and fades out once the iframe fires its 'load' event. The
+  // server sends Cache-Control: private + ETag so a second view of the
+  // same guide is instant.
   function renderPdfVisual(moduleId, container) {
     const token = localStorage.getItem('auth_token')
     const url = '/api/training/modules/' + moduleId
@@ -339,32 +352,42 @@
       + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'
 
     container.innerHTML = `
-      <div class="pdf-loading">טוען מצגת...</div>
+      <div class="pdf-stage">
+        <div class="pdf-loading" id="pdf-loading">
+          <div class="pdf-loading-spinner"></div>
+          <div class="pdf-loading-text">טוען את המדריך...</div>
+          <div class="pdf-loading-hint">בטעינה ראשונה זה לוקח מספר שניות. בכניסות הבאות זה יהיה מיידי ⚡</div>
+        </div>
+        <iframe id="pdf-frame" class="pdf-iframe" title="מצגת המדריך" src="${url}"></iframe>
+      </div>
     `
 
-    // Build the iframe. sandbox restricts navigation but allows the
-    // browser's PDF viewer to run (it needs allow-scripts internally).
-    const iframe = document.createElement('iframe')
-    iframe.className = 'pdf-iframe'
-    iframe.src = url
-    iframe.setAttribute('title', 'מצגת ההכשרה')
-    // Cannot use sandbox here because it disables the PDF viewer in
-    // some browsers — relying on watermark + content protection JS.
-    iframe.addEventListener('load', () => {
-      // Replace loading placeholder once ready
-      const loading = container.querySelector('.pdf-loading')
-      if (loading) loading.remove()
-    })
+    const iframe = container.querySelector('#pdf-frame')
+    const loading = container.querySelector('#pdf-loading')
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      iframe.classList.add('ready')
+      if (loading) {
+        loading.classList.add('fade-out')
+        // Remove from DOM after the fade transition so it doesn't block clicks
+        setTimeout(() => loading.remove(), 400)
+      }
+    }
+    iframe.addEventListener('load', finish)
     iframe.addEventListener('error', () => {
       container.innerHTML = `
         <div class="reader-fallback">
           <div class="reader-fallback-icon">⚠️</div>
-          <h3>לא הצלחנו לטעון את המצגת</h3>
+          <h3>לא הצלחנו לטעון את המדריך</h3>
           <p>נסי לרענן את העמוד.</p>
         </div>
       `
     })
-    container.appendChild(iframe)
+    // Safety net — some browsers don't fire 'load' for plugins.
+    // After 8s, force-show the iframe regardless.
+    setTimeout(finish, 8000)
   }
 
   function closeReader() { document.getElementById('reader-overlay').style.display = 'none' }
