@@ -230,6 +230,139 @@
       padding-top: 20px; border-top: 1px solid var(--learn-border);
       letter-spacing: 0.3px;
     }
+
+    /* ========== Disclaimer modal ========== */
+    .disclaimer-overlay {
+      position: fixed; inset: 0; z-index: 10000;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: disclaimer-fade 0.3s ease;
+    }
+    @keyframes disclaimer-fade { from { opacity: 0; } to { opacity: 1; } }
+
+    .disclaimer-card {
+      background: var(--learn-card);
+      border-radius: 24px;
+      max-width: 600px; width: 100%;
+      max-height: 90vh; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 25px 60px -10px rgba(0,0,0,0.4);
+      animation: disclaimer-slide 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+    }
+    @keyframes disclaimer-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .disclaimer-header {
+      padding: 28px 32px 18px;
+      background: linear-gradient(135deg, var(--learn-accent-soft), var(--learn-purple-soft));
+      border-bottom: 1px solid var(--learn-border);
+      text-align: center;
+    }
+    .disclaimer-icon {
+      width: 56px; height: 56px;
+      background: white;
+      border-radius: 18px;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 12px rgba(74,106,214,0.18);
+      font-size: 28px;
+    }
+    .disclaimer-title {
+      font-size: 20px; font-weight: 700;
+      color: var(--learn-text); margin-bottom: 4px;
+    }
+    .disclaimer-subtitle {
+      font-size: 13px; color: var(--learn-text-soft);
+    }
+
+    .disclaimer-body {
+      flex: 1; overflow-y: auto;
+      padding: 24px 32px;
+    }
+    .disclaimer-intro {
+      font-size: 13.5px; color: var(--learn-text-soft);
+      line-height: 1.7; margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--learn-border);
+    }
+    .disclaimer-list {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .disclaimer-item {
+      display: flex; gap: 14px; align-items: flex-start;
+    }
+    .disclaimer-item-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--learn-accent-soft);
+      color: var(--learn-accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .disclaimer-item-text {
+      flex: 1; font-size: 13.5px; line-height: 1.65;
+      color: var(--learn-text);
+    }
+    .disclaimer-item-text strong { color: var(--learn-text); }
+
+    .disclaimer-checkbox-row {
+      margin-top: 22px; padding: 16px;
+      background: var(--learn-bg);
+      border-radius: 12px;
+      border: 1px solid var(--learn-border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .disclaimer-checkbox {
+      width: 22px; height: 22px;
+      accent-color: var(--learn-accent);
+      cursor: pointer; flex-shrink: 0;
+    }
+    .disclaimer-checkbox-label {
+      flex: 1; font-size: 13.5px; font-weight: 500;
+      color: var(--learn-text);
+      cursor: pointer; user-select: none;
+    }
+
+    .disclaimer-footer {
+      padding: 20px 32px 28px;
+      border-top: 1px solid var(--learn-border);
+      display: flex; gap: 12px; justify-content: flex-end;
+    }
+    @media (max-width: 480px) {
+      .disclaimer-footer { flex-direction: column-reverse; }
+      .disclaimer-footer button { width: 100%; }
+    }
+    .disclaimer-btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .disclaimer-btn-cancel {
+      background: var(--learn-card);
+      color: var(--learn-text-soft);
+      border: 1.5px solid var(--learn-border);
+    }
+    .disclaimer-btn-cancel:hover {
+      border-color: var(--learn-text-light);
+      color: var(--learn-text);
+    }
+    .disclaimer-btn-accept {
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white; border: none;
+      box-shadow: 0 4px 14px rgba(74,106,214,0.35);
+    }
+    .disclaimer-btn-accept:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(74,106,214,0.45);
+    }
+    .disclaimer-btn-accept:disabled {
+      opacity: 0.4; cursor: not-allowed;
+      box-shadow: none;
+    }
   </style>
 </head>
 <body>
@@ -291,6 +424,71 @@
     </main>
   </div>
 
+  <!-- Disclaimer modal — shown to first-time users -->
+  <div id="disclaimer-overlay" class="disclaimer-overlay" style="display:none">
+    <div class="disclaimer-card">
+      <header class="disclaimer-header">
+        <div class="disclaimer-icon">🔒</div>
+        <div class="disclaimer-title">הסכם סודיות וזכויות שימוש</div>
+        <div class="disclaimer-subtitle">קראי לפני הגישה לחומרי ההכשרה</div>
+      </header>
+
+      <div class="disclaimer-body">
+        <p class="disclaimer-intro">
+          חומרי ההכשרה שתראי בעמוד זה הם <strong>רכוש בלעדי של חברת RePro</strong>.
+          באישור התנאים את/ה מתחייב/ת להגן על המידע ולעמוד בכל הסעיפים הבאים:
+        </p>
+
+        <ol class="disclaimer-list">
+          <li class="disclaimer-item">
+            <div class="disclaimer-item-num">1</div>
+            <div class="disclaimer-item-text">
+              <strong>סודיות מלאה.</strong> כל החומרים נועדו ללמידה אישית בלבד.
+              אסור להעתיק, לצלם, להוריד, להעביר, או לשתף אותם עם אף גורם — לא במייל,
+              לא בוואטסאפ, לא ברשתות חברתיות, ולא באמצעי כלשהו.
+            </div>
+          </li>
+          <li class="disclaimer-item">
+            <div class="disclaimer-item-num">2</div>
+            <div class="disclaimer-item-text">
+              <strong>איסור שימוש לרעה.</strong> אסור להשתמש במידע נגד החברה —
+              לרבות מעבר למתחרה תוך שימוש בידע, העברת מתודולוגיות, או שימוש
+              בפרטי לקוחות, ספקים, מועמדים או מעסיקים שנחשפת אליהם.
+            </div>
+          </li>
+          <li class="disclaimer-item">
+            <div class="disclaimer-item-num">3</div>
+            <div class="disclaimer-item-text">
+              <strong>סיום ההעסקה.</strong> בעזיבת החברה, הזכות לעיין ולהשתמש
+              בחומרים אלה <strong>נפסקת מיידית</strong>. כל שימוש בידע
+              שנרכש כאן לאחר עזיבה — ייחשב הפרת חוזה.
+            </div>
+          </li>
+          <li class="disclaimer-item">
+            <div class="disclaimer-item-num">4</div>
+            <div class="disclaimer-item-text">
+              <strong>אכיפה.</strong> הפרת ההסכם תגרור צעדים משפטיים, כולל
+              תביעת פיצויים על הנזק שנגרם. צילומי מסך נושאים חתימת מים אישית
+              שמאפשרת איתור מקור הדליפה.
+            </div>
+          </li>
+        </ol>
+
+        <label class="disclaimer-checkbox-row" for="disclaimer-checkbox">
+          <input type="checkbox" id="disclaimer-checkbox" class="disclaimer-checkbox">
+          <span class="disclaimer-checkbox-label">
+            קראתי, הבנתי והסכמתי לכל התנאים שלעיל
+          </span>
+        </label>
+      </div>
+
+      <footer class="disclaimer-footer">
+        <button class="disclaimer-btn disclaimer-btn-cancel" id="disclaimer-cancel">לא מסכים/ה</button>
+        <button class="disclaimer-btn disclaimer-btn-accept" id="disclaimer-accept" disabled>אני מאשר/ת</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Reader overlay (hidden by default) -->
   <div id="reader-overlay" class="reader-overlay" style="display:none">
     <div class="reader" id="reader" oncontextmenu="return false">
@@ -310,7 +508,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=2"></script>
+  <script src="js/learn.js?v=3"></script>
   <script src="js/ai-widget.js?v=1"></script>
 </body>
 </html>

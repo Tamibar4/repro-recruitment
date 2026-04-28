@@ -2361,6 +2361,31 @@ app.get('/api/training/modules/:id', async (req, res) => {
   }
 });
 
+// POST /api/training/disclaimer-accept - log that this user agreed to the
+// confidentiality disclaimer. Best-effort audit trail kept in audit.log
+// so we have a paper trail if someone leaves and misuses materials.
+app.post('/api/training/disclaimer-accept', (req, res) => {
+  try {
+    const version = (req.body && req.body.version) || 'unknown';
+    auditLog('training_disclaimer_accepted', {
+      username: req.user.username,
+      role: req.user.role,
+      ip: getClientIp(req),
+      version,
+    });
+    // Also stamp the user's record so admins can see it from /api/auth/users.
+    const userIdx = (data.users || []).findIndex(u => u.username === req.user.username);
+    if (userIdx !== -1) {
+      data.users[userIdx].disclaimer_accepted_at = now();
+      data.users[userIdx].disclaimer_version = version;
+      saveData();
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/training/status - is AI configured?
 app.get('/api/training/status', (req, res) => {
   res.json({

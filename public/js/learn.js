@@ -19,6 +19,13 @@
   let userEmail = ''
   let userName = ''
 
+  // Bumped when the disclaimer text changes — forces existing users to
+  // re-accept after a material change (e.g. new clauses added).
+  const DISCLAIMER_VERSION = 'v1'
+  function disclaimerStorageKey() {
+    return `repro_learn_disclaimer_${DISCLAIMER_VERSION}_${userEmail || 'anon'}`
+  }
+
   function escapeHtml(s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -66,8 +73,63 @@
       console.warn('learn: /auth/me failed', e)
     }
 
+    // Show the disclaimer modal until the user accepts it. Once accepted,
+    // the localStorage flag persists (per-user, per-version) so subsequent
+    // visits skip straight to the modules.
+    if (!hasAcceptedDisclaimer()) {
+      showDisclaimer()
+      return // don't load modules yet — they'll be loaded on accept
+    }
+
     await loadModules()
     setupReaderProtection()
+  }
+
+  // ----- Disclaimer ---------------------------------------------------
+  function hasAcceptedDisclaimer() {
+    try { return !!localStorage.getItem(disclaimerStorageKey()) } catch { return false }
+  }
+
+  function recordDisclaimerAccept() {
+    try {
+      localStorage.setItem(
+        disclaimerStorageKey(),
+        JSON.stringify({ at: new Date().toISOString(), email: userEmail }),
+      )
+    } catch {}
+    // Best-effort server-side log so admins have an audit trail. The
+    // endpoint is optional — failing here doesn't block the user.
+    safeFetch('/training/disclaimer-accept', {
+      method: 'POST',
+      body: JSON.stringify({ version: DISCLAIMER_VERSION }),
+    }).catch(() => {})
+  }
+
+  function showDisclaimer() {
+    const overlay = document.getElementById('disclaimer-overlay')
+    const checkbox = document.getElementById('disclaimer-checkbox')
+    const acceptBtn = document.getElementById('disclaimer-accept')
+    const cancelBtn = document.getElementById('disclaimer-cancel')
+    if (!overlay) return
+
+    overlay.style.display = 'flex'
+
+    checkbox.addEventListener('change', () => {
+      acceptBtn.disabled = !checkbox.checked
+    })
+
+    acceptBtn.addEventListener('click', async () => {
+      if (!checkbox.checked) return
+      recordDisclaimerAccept()
+      overlay.style.display = 'none'
+      await loadModules()
+      setupReaderProtection()
+    })
+
+    cancelBtn.addEventListener('click', () => {
+      // Cancel = back to the dashboard. The user can come back any time.
+      window.location.href = 'index.html'
+    })
   }
 
   // ----- Load module list ----------------------------------------------
