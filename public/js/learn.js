@@ -129,9 +129,9 @@
   }
 
   function renderModules() {
-    const container = document.getElementById('modules-container')
+    const stack = document.getElementById('journey-stack')
     if (!modulesCache || modulesCache.length === 0) {
-      container.innerHTML = `
+      stack.innerHTML = `
         <div class="learn-empty">
           <div class="learn-empty-icon">📚</div>
           <h3>הקורסים בדרך</h3>
@@ -145,89 +145,143 @@
     const doneCount = modulesCache.filter(m => progress[m.id]?.status === 'done').length
     const total = modulesCache.length
 
-    // Update progress strip
-    const strip = document.getElementById('progress-strip')
-    if (strip) {
-      strip.style.display = total > 0 ? 'flex' : 'none'
-      const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100)
-      document.getElementById('progress-fill').style.width = pct + '%'
-      document.getElementById('progress-count').textContent = `${doneCount} / ${total}`
-    }
+    // Top progress bar
+    const pctEl = document.getElementById('journey-pct')
+    const fillEl = document.getElementById('journey-fill')
+    if (pctEl) pctEl.textContent = `${doneCount}/${total}`
+    if (fillEl) fillEl.style.width = (total ? Math.round((doneCount / total) * 100) : 0) + '%'
 
-    container.innerHTML = `
-      <div class="modules-grid">
-        ${modulesCache.map((m) => renderCard(m, progress[m.id]?.status)).join('')}
-      </div>
-    `
+    // Render cards alternating left / center / right along the path
+    const sides = ['right', 'left', 'center']
+    stack.innerHTML = modulesCache
+      .map((m, i) => renderCard(m, progress[m.id]?.status, sides[i % sides.length]))
+      .join('')
 
     // Wire up handlers
-    container.querySelectorAll('.module-card').forEach((card) => {
+    stack.querySelectorAll('.course-card').forEach((card) => {
       const id = parseInt(card.dataset.id)
 
-      card.querySelector('.module-btn-primary')?.addEventListener('click', (e) => {
+      card.querySelector('.course-btn-primary')?.addEventListener('click', (e) => {
         e.stopPropagation()
-        // Mark as in-progress on first click, unless already done
         const p = loadProgress()
         if (!p[id]) setStatus(id, 'in_progress')
         openReader(id)
       })
 
-      card.querySelector('.module-btn-done')?.addEventListener('click', (e) => {
+      card.querySelector('.course-btn-done')?.addEventListener('click', (e) => {
         e.stopPropagation()
         const cur = loadProgress()[id]?.status
         setStatus(id, cur === 'done' ? 'in_progress' : 'done')
       })
+
+      card.querySelector('.course-btn-skip')?.addEventListener('click', (e) => {
+        e.stopPropagation()
+        // "Skip" just scrolls to the next card
+        const next = card.nextElementSibling
+        if (next) next.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
     })
+
+    // Draw the curving path connecting the cards (deferred to next frame
+    // so the cards have measurable positions).
+    requestAnimationFrame(() => drawJourneyPath())
   }
 
-  function renderCard(m, status) {
-    const intro = m.intro?.length > 10 ? m.intro : 'תכנים מקצועיים בנושא זה — לחצי להתחלה'
-    const introClipped = intro.length > 280
+  function renderCard(m, status, side) {
     const isDone = status === 'done'
     const isInProgress = status === 'in_progress'
-    // Vary the icon by module index
     const icons = ['📞', '🎯', '✨', '💼', '🚀', '💡', '🤝', '📊', '🌟', '⚡']
     const icon = icons[(m.order - 1) % icons.length]
 
     return `
-      <article class="module-card" data-id="${m.id}">
-        ${isDone ? `<div class="module-status-ribbon done"><span>✓</span> סיימתי</div>` :
-          isInProgress ? `<div class="module-status-ribbon in-progress"><span>📍</span> במהלך</div>` : ''}
-        <div class="module-banner">
-          <div class="module-banner-icon">${icon}</div>
+      <article class="course-card ${side}" data-id="${m.id}">
+        ${isDone ? `<div class="course-status-ribbon done"><span>✓</span> הושלם</div>` :
+          isInProgress ? `<div class="course-status-ribbon in-progress"><span>▶</span> בתהליך</div>` : ''}
+        <div class="course-banner">
+          <div class="course-banner-icon">${icon}</div>
         </div>
-        <div class="module-body">
-          <span class="module-number-badge">קורס ${m.order}</span>
-          <h3 class="module-title">${escapeHtml(m.title)}</h3>
-          <p class="module-intro">${escapeHtml(intro)}${introClipped ? '…' : ''}</p>
-          <div class="module-meta">
-            <span class="module-meta-item">
+        <div class="course-body">
+          <div class="course-title-row">
+            <div class="course-num-badge">${m.order}</div>
+            <h3 class="course-title">${escapeHtml(m.title)}</h3>
+          </div>
+          <div class="course-meta">
+            <span class="course-meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
-              ${m.reading_minutes} דק׳
+              קורס · ${m.reading_minutes} דקות
             </span>
-            ${m.has_text ? `
-              <span class="module-meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                ${m.word_count.toLocaleString()} מילים
-              </span>` : ''}
           </div>
-          <div class="module-actions">
-            <button class="module-btn module-btn-primary">
-              ${isDone ? 'חזור על הקורס' : isInProgress ? 'המשך →' : 'התחל →'}
+          <div class="course-actions">
+            <button class="course-btn course-btn-skip" title="המשך לקורס הבא">דלג</button>
+            <button class="course-btn course-btn-done ${isDone ? 'active' : ''}" title="${isDone ? 'בטל סימון' : 'סמני כסיימתי'}">
+              ${isDone ? '✓ סיימתי' : '✓ סיימתי'}
             </button>
-            <button class="module-btn module-btn-done ${isDone ? 'active' : ''}" title="${isDone ? 'בטל סימון סיימתי' : 'סמני כסיימתי'}">
-              ${isDone ? '✓ סיימתי' : '✓'}
+            <button class="course-btn course-btn-primary">
+              ${isDone ? 'חזור →' : isInProgress ? 'המשך →' : 'התחל →'}
             </button>
           </div>
         </div>
       </article>
     `
   }
+
+  // Draw a curving SVG path connecting the cards from top to bottom.
+  // Recomputes on resize so the path stays aligned.
+  function drawJourneyPath() {
+    const wrap = document.getElementById('journey-wrap')
+    const svg = document.getElementById('journey-svg')
+    if (!wrap || !svg) return
+
+    const cards = wrap.querySelectorAll('.course-card')
+    if (cards.length < 2) { svg.innerHTML = ''; return }
+
+    const wrapRect = wrap.getBoundingClientRect()
+    svg.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`)
+    svg.setAttribute('width', wrapRect.width)
+    svg.setAttribute('height', wrapRect.height)
+
+    // Build a smooth wavy path through each card's center
+    let pathData = ''
+    const points = Array.from(cards).map((card) => {
+      const r = card.getBoundingClientRect()
+      const cx = r.left + r.width / 2 - wrapRect.left
+      const cy = r.top + r.height / 2 - wrapRect.top
+      return { cx, cy }
+    })
+
+    points.forEach((p, i) => {
+      if (i === 0) {
+        pathData += `M ${p.cx} ${p.cy}`
+      } else {
+        const prev = points[i - 1]
+        const midY = (prev.cy + p.cy) / 2
+        // S-curve via 2 control points for natural waves
+        pathData += ` C ${prev.cx} ${midY}, ${p.cx} ${midY}, ${p.cx} ${p.cy}`
+      }
+    })
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="jp-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.5"/>
+          <stop offset="50%" stop-color="#60a5fa" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#f472b6" stop-opacity="0.5"/>
+        </linearGradient>
+      </defs>
+      <path d="${pathData}" stroke="url(#jp-grad)" stroke-width="14"
+            stroke-linecap="round" fill="none"
+            stroke-dasharray="0" />
+      <path d="${pathData}" stroke="white" stroke-width="3"
+            stroke-linecap="round" fill="none"
+            stroke-dasharray="6 8" opacity="0.7"/>
+    `
+  }
+  // Redraw the path when the window resizes
+  window.addEventListener('resize', () => {
+    if (modulesCache.length > 0) requestAnimationFrame(() => drawJourneyPath())
+  })
 
   // ----- Reader -------------------------------------------------------
   async function openReader(id) {

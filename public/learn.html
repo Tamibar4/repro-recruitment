@@ -12,227 +12,246 @@
   <link rel="apple-touch-icon" href="assets/logo.png?v=2">
   <style>
     :root {
-      --learn-bg: #f8f7ff;
+      --learn-bg: #f4f3ff;
       --learn-card: #ffffff;
       --learn-border: #e8e6f7;
       --learn-text: #1a1f3a;
       --learn-text-soft: #6b6e8a;
       --learn-text-light: #a0a3b8;
-      --learn-accent: #5e5ce6;        /* RePro purple-blue */
+      --learn-accent: #5e5ce6;
       --learn-accent-soft: #ece9ff;
-      --learn-accent-deep: #4a4ad6;
       --learn-purple: #8b80c8;
       --learn-purple-soft: #efedfb;
-      --learn-green: #34d399;
-      --learn-green-soft: #d1fae5;
-      --learn-orange: #fb923c;
+      --learn-green: #16a34a;
+      --learn-green-soft: #dcfce7;
+      --learn-orange: #ea580c;
       --learn-orange-soft: #ffedd5;
       --learn-shadow: 0 1px 3px rgba(26,31,58,0.04), 0 8px 24px -8px rgba(94,92,230,0.10);
-      --learn-shadow-hover: 0 4px 8px rgba(26,31,58,0.06), 0 20px 40px -10px rgba(94,92,230,0.25);
+      --learn-shadow-lg: 0 4px 8px rgba(26,31,58,0.06), 0 24px 48px -12px rgba(94,92,230,0.25);
     }
 
     body { background: var(--learn-bg); font-family: 'Rubik', sans-serif; }
 
-    /* ===== Hero ===== */
+    /* ===== Top header bar (sticky-ish) ===== */
+    .journey-header {
+      max-width: 1100px; margin: 32px auto 0; padding: 0 24px;
+    }
+    .journey-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 14px; margin-bottom: 14px;
+    }
+    .journey-progress-pct {
+      font-size: 12px; font-weight: 700;
+      color: var(--learn-text-soft);
+      background: var(--learn-accent-soft);
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .journey-title {
+      font-size: 22px; font-weight: 800;
+      color: var(--learn-text); letter-spacing: -0.4px;
+      text-align: end;
+    }
+    .journey-progress-bar {
+      height: 4px; background: var(--learn-accent-soft);
+      border-radius: 99px; overflow: hidden;
+    }
+    .journey-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--learn-accent), #8b5cf6);
+      border-radius: 99px;
+      transition: width 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+    }
+
+    /* ===== Hero greeting ===== */
     .learn-hero {
-      padding: 56px 20px 32px;
+      max-width: 880px; margin: 32px auto 8px; padding: 0 24px;
       text-align: center;
-      max-width: 880px; margin: 0 auto;
     }
     .learn-hero h1 {
-      font-size: 36px; font-weight: 800;
+      font-size: 32px; font-weight: 800;
       letter-spacing: -0.5px;
       background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
       -webkit-background-clip: text; background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
     .learn-hero p {
-      font-size: 16px; color: var(--learn-text-soft);
-      line-height: 1.7; max-width: 560px; margin: 0 auto;
+      font-size: 14.5px; color: var(--learn-text-soft);
+      line-height: 1.7; max-width: 540px; margin: 0 auto;
     }
-    @media (max-width: 600px) { .learn-hero h1 { font-size: 28px; } .learn-hero p { font-size: 14px; } }
+    @media (max-width: 600px) { .learn-hero h1 { font-size: 26px; } }
 
-    /* ===== Progress strip ===== */
-    .progress-strip {
-      max-width: 920px; margin: 24px auto 0;
-      padding: 18px 24px;
-      background: var(--learn-card);
-      border: 1px solid var(--learn-border);
-      border-radius: 16px;
-      display: flex; align-items: center; gap: 18px;
-      box-shadow: var(--learn-shadow);
+    /* ===== The journey path ===== */
+    .journey-wrap {
+      position: relative;
+      max-width: 720px; margin: 40px auto 80px;
+      padding: 0 16px;
     }
-    .progress-emoji { font-size: 28px; }
-    .progress-text { flex: 1; min-width: 0; }
-    .progress-label { font-size: 13px; font-weight: 600; color: var(--learn-text); margin-bottom: 6px; }
-    .progress-bar-bg {
-      height: 8px; background: var(--learn-accent-soft);
-      border-radius: 99px; overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
-      border-radius: 99px;
-      transition: width 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15);
-    }
-    .progress-count {
-      font-size: 14px; font-weight: 700; color: var(--learn-accent);
-      flex-shrink: 0;
+    /* SVG connector path drawn behind the cards */
+    .journey-svg {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 0;
+      overflow: visible;
     }
 
-    /* ===== Course cards grid ===== */
-    .modules-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 22px;
-      margin: 36px auto;
-      max-width: 1100px;
-      padding: 0 20px;
-    }
-    @media (max-width: 600px) { .modules-grid { gap: 16px; padding: 0 12px; } }
-
-    .module-card {
-      background: var(--learn-card);
-      border: 1px solid var(--learn-border);
-      border-radius: 20px;
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
-      box-shadow: var(--learn-shadow);
+    .journey-stack {
+      position: relative; z-index: 1;
       display: flex; flex-direction: column;
+      gap: 60px;
+    }
+
+    /* ===== Course card ===== */
+    .course-card {
+      background: var(--learn-card);
+      border-radius: 22px;
+      box-shadow: var(--learn-shadow);
+      overflow: hidden;
+      width: min(360px, 100%);
+      transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+      border: 1px solid var(--learn-border);
       position: relative;
     }
-    .module-card:hover {
+    .course-card:hover {
       transform: translateY(-4px);
-      box-shadow: var(--learn-shadow-hover);
-      border-color: var(--learn-accent-soft);
+      box-shadow: var(--learn-shadow-lg);
+    }
+    /* Alternate card position along the path */
+    .course-card.left  { align-self: flex-start; margin-right: 8%; }
+    .course-card.right { align-self: flex-end;  margin-left:  8%; }
+    .course-card.center { align-self: center; }
+    @media (max-width: 600px) {
+      .course-card.left, .course-card.right, .course-card.center {
+        align-self: center; margin-left: 0; margin-right: 0;
+      }
+      .journey-stack { gap: 36px; }
     }
 
-    /* Status ribbon (top-left of card image) */
-    .module-status-ribbon {
-      position: absolute; top: 14px; right: 14px;
-      padding: 5px 12px; border-radius: 20px;
+    /* Card header — gradient banner with module icon */
+    .course-banner {
+      height: 130px; position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .course-banner::before, .course-banner::after {
+      content: ''; position: absolute; border-radius: 50%;
+      filter: blur(28px); opacity: 0.5;
+    }
+    .course-banner::before {
+      width: 140px; height: 140px;
+      background: rgba(255,255,255,0.5);
+      top: -50px; right: -40px;
+    }
+    .course-banner::after {
+      width: 100px; height: 100px;
+      background: rgba(236, 72, 153, 0.6);
+      bottom: -30px; left: -20px;
+    }
+    .course-banner-icon {
+      font-size: 60px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
+      z-index: 1; position: relative;
+    }
+    /* Vary banner gradients per card */
+    .course-card:nth-child(2n) .course-banner { background: linear-gradient(135deg, #f59e0b, #ef4444, #ec4899); }
+    .course-card:nth-child(3n) .course-banner { background: linear-gradient(135deg, #10b981, #06b6d4, #6366f1); }
+    .course-card:nth-child(4n) .course-banner { background: linear-gradient(135deg, #8b5cf6, #ec4899, #f43f5e); }
+    .course-card:nth-child(5n) .course-banner { background: linear-gradient(135deg, #06b6d4, #3b82f6, #8b5cf6); }
+
+    /* Status ribbon at top-right of banner */
+    .course-status-ribbon {
+      position: absolute; top: 12px; right: 12px;
+      padding: 4px 12px; border-radius: 20px;
       font-size: 11px; font-weight: 700;
       backdrop-filter: blur(8px);
       z-index: 2;
       display: inline-flex; align-items: center; gap: 4px;
     }
-    .module-status-ribbon.in-progress {
-      background: rgba(251, 146, 60, 0.95); color: white;
+    .course-status-ribbon.in-progress {
+      background: rgba(234, 88, 12, 0.95); color: white;
     }
-    .module-status-ribbon.done {
-      background: rgba(52, 211, 153, 0.95); color: white;
-    }
-
-    /* Card image area (gradient banner with module number) */
-    .module-banner {
-      height: 140px;
-      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
-      display: flex; align-items: center; justify-content: center;
-      position: relative; overflow: hidden;
-    }
-    .module-banner::before, .module-banner::after {
-      content: ''; position: absolute;
-      border-radius: 50%;
-      filter: blur(20px); opacity: 0.4;
-    }
-    .module-banner::before {
-      width: 120px; height: 120px;
-      background: rgba(255,255,255,0.4);
-      top: -40px; right: -30px;
-    }
-    .module-banner::after {
-      width: 100px; height: 100px;
-      background: rgba(139, 128, 200, 0.5);
-      bottom: -30px; left: -20px;
-    }
-    .module-banner-icon {
-      font-size: 56px;
-      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
-      z-index: 1;
-    }
-    /* Vary banner gradients by module index so they're not all identical */
-    .module-card:nth-child(2n) .module-banner {
-      background: linear-gradient(135deg, #8b80c8, #5e5ce6);
-    }
-    .module-card:nth-child(3n) .module-banner {
-      background: linear-gradient(135deg, #fb923c, #f59e0b);
-    }
-    .module-card:nth-child(4n) .module-banner {
-      background: linear-gradient(135deg, #34d399, #10b981);
-    }
-    .module-card:nth-child(5n) .module-banner {
-      background: linear-gradient(135deg, #f472b6, #db2777);
+    .course-status-ribbon.done {
+      background: rgba(22, 163, 74, 0.95); color: white;
     }
 
-    .module-body { padding: 22px 22px 18px; flex: 1; display: flex; flex-direction: column; }
-
-    .module-number-badge {
-      display: inline-flex; align-items: center;
-      gap: 6px; font-size: 11px; font-weight: 700;
-      color: var(--learn-accent);
-      background: var(--learn-accent-soft);
-      padding: 4px 10px; border-radius: 20px;
-      align-self: flex-start;
+    /* Card body */
+    .course-body { padding: 18px 20px 16px; }
+    .course-title-row {
+      display: flex; align-items: flex-start; gap: 10px;
       margin-bottom: 10px;
     }
-    .module-title {
-      font-size: 18px; font-weight: 700;
-      color: var(--learn-text); line-height: 1.4;
-      margin-bottom: 8px;
+    .course-num-badge {
+      flex-shrink: 0; width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--learn-accent);
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
     }
-    .module-intro {
-      font-size: 13px; color: var(--learn-text-soft);
-      line-height: 1.6; margin-bottom: 16px;
-      flex: 1;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; overflow: hidden;
+    .course-title {
+      flex: 1; font-size: 16px; font-weight: 700;
+      color: var(--learn-text); line-height: 1.35;
     }
-    .module-meta {
-      display: flex; align-items: center; gap: 14px;
-      font-size: 12px; color: var(--learn-text-light);
-      margin-bottom: 16px;
+    .course-meta {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 12px; color: var(--learn-text-soft);
+      margin-bottom: 14px;
     }
-    .module-meta-item { display: inline-flex; align-items: center; gap: 5px; }
-    .module-meta svg { width: 13px; height: 13px; opacity: 0.7; }
+    .course-meta-item { display: inline-flex; align-items: center; gap: 4px; }
+    .course-meta-item svg { width: 13px; height: 13px; opacity: 0.7; }
 
-    /* Action row */
-    .module-actions {
-      display: flex; gap: 8px;
+    /* Action buttons row (3 buttons like the inspiration) */
+    .course-actions {
+      display: flex; gap: 6px;
       padding-top: 14px;
       border-top: 1px solid var(--learn-border);
     }
-    .module-btn {
-      padding: 9px 14px;
-      border-radius: 10px;
-      font-family: inherit;
-      font-size: 13px; font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      border: none;
-      display: inline-flex; align-items: center; gap: 5px;
+    .course-btn {
+      padding: 8px 12px; border-radius: 10px;
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      border: 1.5px solid transparent;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
     }
-    .module-btn-primary {
-      flex: 1;
-      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
-      color: white;
-      box-shadow: 0 3px 10px rgba(94,92,230,0.3);
+    .course-btn-skip {
+      background: var(--learn-card); color: var(--learn-text-soft);
+      border-color: var(--learn-border);
+      flex: 0 0 auto;
     }
-    .module-btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 5px 14px rgba(94,92,230,0.4);
+    .course-btn-skip:hover { color: var(--learn-text); border-color: var(--learn-text-light); }
+    .course-btn-done {
+      background: var(--learn-card); color: var(--learn-green);
+      border-color: var(--learn-green);
+      flex: 0 0 auto;
     }
-    .module-btn-done {
-      background: var(--learn-card);
-      color: var(--learn-green);
-      border: 1.5px solid var(--learn-green);
-    }
-    .module-btn-done.active {
+    .course-btn-done.active {
       background: var(--learn-green-soft);
     }
-    .module-btn-done:hover { background: var(--learn-green-soft); }
+    .course-btn-done:hover { background: var(--learn-green-soft); }
+    .course-btn-primary {
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white; border: none; flex: 1;
+      box-shadow: 0 3px 8px rgba(94,92,230,0.3);
+    }
+    .course-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 12px rgba(94,92,230,0.45);
+    }
 
-    /* ===== Empty / loading states ===== */
+    /* ===== Mascot bear, decorative ===== */
+    .mascot {
+      position: absolute; z-index: 1;
+      animation: mascot-float 3s ease-in-out infinite;
+    }
+    .mascot-1 { top: 24%; left: 14%; width: 72px; height: 72px; }
+    .mascot-2 { top: 62%; right: 12%; width: 60px; height: 60px; animation-delay: -1.5s; }
+    @keyframes mascot-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @media (max-width: 600px) { .mascot { display: none; } }
+
+    /* ===== Empty / loading ===== */
     .learn-empty {
       max-width: 480px; margin: 60px auto;
       text-align: center; padding: 40px 20px;
@@ -244,22 +263,17 @@
     /* ===== Reader overlay ===== */
     .reader-overlay {
       position: fixed; inset: 0; z-index: 9990;
-      background: rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px);
       display: flex; align-items: stretch; justify-content: center;
-      padding: 0;
       animation: reader-fade 0.2s ease;
     }
     @keyframes reader-fade { from { opacity: 0; } to { opacity: 1; } }
 
     .reader {
-      background: var(--learn-bg);
-      width: 100%; max-width: 880px;
-      max-height: 100vh;
-      display: flex; flex-direction: column;
+      background: var(--learn-bg); width: 100%; max-width: 880px;
+      max-height: 100vh; display: flex; flex-direction: column;
       animation: reader-slide 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.15);
-      user-select: none; -webkit-user-select: none;
-      -webkit-touch-callout: none;
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     @keyframes reader-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -272,8 +286,7 @@
     .reader-header-num {
       width: 44px; height: 44px; border-radius: 14px;
       background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
-      color: white;
-      display: flex; align-items: center; justify-content: center;
+      color: white; display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 16px; flex-shrink: 0;
     }
     .reader-title { flex: 1; font-size: 18px; font-weight: 700; color: var(--learn-text); }
@@ -287,12 +300,9 @@
     .reader-close:hover { background: var(--learn-card); color: var(--learn-text); }
 
     .reader-body {
-      flex: 1; overflow-y: auto;
-      padding: 40px 60px 80px;
-      position: relative;
+      flex: 1; overflow-y: auto; padding: 40px 60px 80px; position: relative;
     }
     @media (max-width: 600px) { .reader-body { padding: 30px 24px 60px; } }
-
     .reader-content {
       max-width: 880px; margin: 0 auto;
       font-size: 16px; line-height: 1.85;
@@ -300,49 +310,29 @@
       white-space: pre-wrap; word-break: break-word;
     }
 
-    /* ---- PDF.js page rendering ---- */
-    .pdf-pages {
-      display: flex; flex-direction: column; gap: 24px;
-      align-items: center;
-    }
-    .pdf-page-wrap {
-      position: relative;
-      max-width: 100%;
-      animation: pdf-page-fade 0.4s ease;
-    }
-    @keyframes pdf-page-fade {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    /* PDF.js page rendering */
+    .pdf-pages { display: flex; flex-direction: column; gap: 24px; align-items: center; }
+    .pdf-page-wrap { position: relative; max-width: 100%; animation: pdf-page-fade 0.4s ease; }
+    @keyframes pdf-page-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     .pdf-page-canvas {
       display: block; max-width: 100%; height: auto;
       border-radius: 12px;
       box-shadow: 0 4px 16px rgba(26,31,58,0.12), 0 1px 3px rgba(26,31,58,0.06);
-      /* Belt-and-suspenders content protection */
-      pointer-events: none;
-      user-select: none;
-      -webkit-user-drag: none;
+      pointer-events: none; user-select: none; -webkit-user-drag: none;
     }
     .pdf-page-badge {
       position: absolute; bottom: 10px; left: 10px;
       background: rgba(15,23,42,0.7); backdrop-filter: blur(6px);
       color: white; font-size: 11px; font-weight: 600;
-      padding: 4px 10px; border-radius: 10px;
-      letter-spacing: 0.3px;
+      padding: 4px 10px; border-radius: 10px; letter-spacing: 0.3px;
     }
-    .pdf-loading {
-      text-align: center; padding: 60px 20px;
-      color: var(--learn-text-soft); font-size: 14px;
-    }
+    .pdf-loading { text-align: center; padding: 60px 20px; color: var(--learn-text-soft); font-size: 14px; }
 
-    /* Helpful empty state inside the reader (e.g. when PDF is image-only) */
     .reader-fallback {
       max-width: 540px; margin: 40px auto;
       text-align: center; padding: 40px 24px;
-      background: var(--learn-card);
-      border: 1px solid var(--learn-border);
-      border-radius: 18px;
-      box-shadow: var(--learn-shadow);
+      background: var(--learn-card); border: 1px solid var(--learn-border);
+      border-radius: 18px; box-shadow: var(--learn-shadow);
     }
     .reader-fallback-icon {
       width: 72px; height: 72px; border-radius: 22px;
@@ -352,45 +342,25 @@
     }
     .reader-fallback h3 { font-size: 18px; color: var(--learn-text); margin-bottom: 10px; }
     .reader-fallback p { font-size: 14px; color: var(--learn-text-soft); line-height: 1.7; margin-bottom: 18px; }
-    .reader-fallback .ask-btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 22px;
-      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
-      color: white; border: none; border-radius: 12px;
-      font-size: 14px; font-weight: 600; font-family: inherit;
-      cursor: pointer; transition: all 0.15s;
-      box-shadow: 0 4px 14px rgba(94,92,230,0.3);
-    }
-    .reader-fallback .ask-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(94,92,230,0.4); }
 
-    .reader-watermark {
-      position: fixed; inset: 0; pointer-events: none; z-index: 1;
-      overflow: hidden; opacity: 0.06;
-    }
+    .reader-watermark { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; opacity: 0.06; }
     .reader-watermark span {
       position: absolute; transform: rotate(-30deg);
       font-size: 18px; font-weight: 600; color: var(--learn-text);
       white-space: nowrap; letter-spacing: 2px;
     }
-
     @media print {
       body * { visibility: hidden; }
-      body::before {
-        content: 'הדפסה לא זמינה לחומרי הכשרה';
-        visibility: visible;
-        display: block; padding: 40px; text-align: center;
-        font-size: 18px;
-      }
+      body::before { content: 'הדפסה לא זמינה לחומרי הכשרה'; visibility: visible; display: block; padding: 40px; text-align: center; font-size: 18px; }
     }
-
     .reader-protected-note {
-      max-width: 660px; margin: 32px auto 0;
+      max-width: 880px; margin: 32px auto 0;
       text-align: center; font-size: 11px; color: var(--learn-text-light);
       padding-top: 20px; border-top: 1px solid var(--learn-border);
       letter-spacing: 0.3px;
     }
 
-    /* ===== Disclaimer modal ===== */
+    /* ===== Disclaimer modal styles (preserved) ===== */
     .disclaimer-overlay {
       position: fixed; inset: 0; z-index: 10000;
       background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(10px);
@@ -398,7 +368,6 @@
       animation: disclaimer-fade 0.3s ease;
     }
     @keyframes disclaimer-fade { from { opacity: 0; } to { opacity: 1; } }
-
     .disclaimer-card {
       background: var(--learn-card); border-radius: 24px;
       max-width: 720px; width: 100%; max-height: 92vh; overflow: hidden;
@@ -407,7 +376,6 @@
       animation: disclaimer-slide 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.15);
     }
     @keyframes disclaimer-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
     .disclaimer-header {
       padding: 28px 36px 22px;
       background: linear-gradient(135deg, var(--learn-accent-soft), var(--learn-purple-soft));
@@ -423,53 +391,28 @@
     .disclaimer-title { font-size: 22px; font-weight: 800; color: var(--learn-text); margin-bottom: 4px; letter-spacing: -0.3px; }
     .disclaimer-subtitle { font-size: 13.5px; color: var(--learn-text-soft); font-weight: 500; }
     .disclaimer-meta { margin-top: 12px; font-size: 11.5px; color: var(--learn-text-light); letter-spacing: 0.3px; }
-
-    .disclaimer-body {
-      flex: 1; overflow-y: auto; padding: 28px 36px 8px;
-      scroll-behavior: smooth;
-    }
+    .disclaimer-body { flex: 1; overflow-y: auto; padding: 28px 36px 8px; scroll-behavior: smooth; }
     .disclaimer-body::-webkit-scrollbar { width: 6px; }
     .disclaimer-body::-webkit-scrollbar-thumb { background: var(--learn-border); border-radius: 99px; }
-
     .disclaimer-section { margin-bottom: 22px; }
     .disclaimer-section h3 {
       font-size: 14.5px; font-weight: 700;
       color: var(--learn-text);
-      margin-bottom: 8px;
-      padding-bottom: 6px;
+      margin-bottom: 8px; padding-bottom: 6px;
       border-bottom: 1.5px solid var(--learn-accent-soft);
     }
-    .disclaimer-section p {
-      font-size: 13px; line-height: 1.75;
-      color: var(--learn-text); margin: 0 0 8px;
-    }
+    .disclaimer-section p { font-size: 13px; line-height: 1.75; color: var(--learn-text); margin: 0 0 8px; }
     .disclaimer-section p:last-child { margin-bottom: 0; }
-    .disclaimer-section ul {
-      margin: 6px 0 0; padding-right: 22px;
-      font-size: 13px; line-height: 1.75; color: var(--learn-text);
-    }
+    .disclaimer-section ul { margin: 6px 0 0; padding-right: 22px; font-size: 13px; line-height: 1.75; color: var(--learn-text); }
     .disclaimer-section ul li { margin-bottom: 4px; }
     .disclaimer-section strong { color: var(--learn-text); font-weight: 700; }
-    .disclaimer-section .law-tag {
-      display: inline-block; padding: 1px 8px;
-      background: var(--learn-accent-soft); color: var(--learn-accent);
-      border-radius: 6px; font-size: 11.5px; font-weight: 600;
-      margin: 0 2px;
-    }
-
+    .disclaimer-section .law-tag { display: inline-block; padding: 1px 8px; background: var(--learn-accent-soft); color: var(--learn-accent); border-radius: 6px; font-size: 11.5px; font-weight: 600; margin: 0 2px; }
     .disclaimer-section.critical {
       background: linear-gradient(135deg, #fef2f2, #fff7ed);
-      border: 1px solid #fecaca;
-      border-radius: 14px;
-      padding: 16px 18px;
-      margin-bottom: 22px;
+      border: 1px solid #fecaca; border-radius: 14px;
+      padding: 16px 18px; margin-bottom: 22px;
     }
-    .disclaimer-section.critical h3 {
-      color: #b91c1c;
-      border-bottom-color: #fecaca;
-    }
-
-    /* Sticky footer area below the scroll */
+    .disclaimer-section.critical h3 { color: #b91c1c; border-bottom-color: #fecaca; }
     .disclaimer-bottom {
       padding: 18px 36px 24px;
       background: var(--learn-card);
@@ -477,19 +420,15 @@
       flex-shrink: 0;
     }
     .disclaimer-checkbox-row {
-      padding: 14px 16px;
-      background: var(--learn-bg); border-radius: 12px;
+      padding: 14px 16px; background: var(--learn-bg); border-radius: 12px;
       border: 1.5px solid var(--learn-border);
       display: flex; align-items: center; gap: 12px;
-      margin-bottom: 14px;
-      transition: border-color 0.15s;
+      margin-bottom: 14px; transition: border-color 0.15s;
     }
     .disclaimer-checkbox-row:has(:checked) { border-color: var(--learn-accent); background: var(--learn-accent-soft); }
     .disclaimer-checkbox { width: 22px; height: 22px; accent-color: var(--learn-accent); cursor: pointer; flex-shrink: 0; }
     .disclaimer-checkbox-label { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--learn-text); cursor: pointer; user-select: none; }
-    .disclaimer-footer {
-      display: flex; gap: 12px; justify-content: flex-end;
-    }
+    .disclaimer-footer { display: flex; gap: 12px; justify-content: flex-end; }
     @media (max-width: 480px) { .disclaimer-footer { flex-direction: column-reverse; } .disclaimer-footer button { width: 100%; } }
     .disclaimer-btn { padding: 12px 24px; border-radius: 12px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
     .disclaimer-btn-cancel { background: var(--learn-card); color: var(--learn-text-soft); border: 1.5px solid var(--learn-border); }
@@ -542,23 +481,69 @@
 
     <main class="main">
       <div class="learn-hero">
-        <h1>ברוכים הבאים למועדון הלמידה 🎓</h1>
-        <p>קורסי ההכשרה שיהפכו אותך למגייסת מצוינת. כל קורס מסודר לפי הסדר — לחצי "התחל" וקדמי בקצב שלך.</p>
+        <h1>ברוכים הבאים למסלול ההכשרה 🎓</h1>
+        <p>קורסי ההכשרה שיהפכו אותך למגייסת מצוינת. עברי לפי הסדר — וסמני סיימתי בכל קורס שגמרת.</p>
       </div>
 
-      <div id="progress-strip" style="display:none" class="progress-strip">
-        <div class="progress-emoji">🚀</div>
-        <div class="progress-text">
-          <div class="progress-label">ההתקדמות שלך</div>
-          <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="journey-header">
+        <div class="journey-header-row">
+          <span class="journey-progress-pct" id="journey-pct">0/0</span>
+          <h2 class="journey-title">המסלול שלך: מאפס למגייסת מצטיינת</h2>
         </div>
-        <div class="progress-count" id="progress-count">0 / 0</div>
+        <div class="journey-progress-bar">
+          <div class="journey-progress-fill" id="journey-fill" style="width:0%"></div>
+        </div>
       </div>
 
-      <div id="modules-container">
-        <div class="learn-empty">
-          <div class="learn-empty-icon">📚</div>
-          <h3>טוען קורסים...</h3>
+      <div class="journey-wrap" id="journey-wrap">
+        <!-- SVG path drawn between cards once they're rendered -->
+        <svg class="journey-svg" id="journey-svg" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg>
+
+        <!-- Decorative mascot bears (SVG) -->
+        <div class="mascot mascot-1">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Ears -->
+            <circle cx="22" cy="22" r="14" fill="#7c3aed"/>
+            <circle cx="78" cy="22" r="14" fill="#7c3aed"/>
+            <circle cx="22" cy="22" r="7" fill="#5e5ce6"/>
+            <circle cx="78" cy="22" r="7" fill="#5e5ce6"/>
+            <!-- Head -->
+            <circle cx="50" cy="55" r="34" fill="#8b5cf6"/>
+            <!-- Snout -->
+            <ellipse cx="50" cy="68" rx="16" ry="12" fill="#e9d5ff"/>
+            <!-- Eyes -->
+            <circle cx="38" cy="50" r="6" fill="white"/>
+            <circle cx="62" cy="50" r="6" fill="white"/>
+            <circle cx="38" cy="51" r="3" fill="#1a1f3a"/>
+            <circle cx="62" cy="51" r="3" fill="#1a1f3a"/>
+            <!-- Nose -->
+            <ellipse cx="50" cy="64" rx="3.5" ry="2.5" fill="#1a1f3a"/>
+            <!-- Smile -->
+            <path d="M 44 72 Q 50 76 56 72" stroke="#1a1f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="mascot mascot-2">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="22" cy="22" r="14" fill="#ec4899"/>
+            <circle cx="78" cy="22" r="14" fill="#ec4899"/>
+            <circle cx="22" cy="22" r="7" fill="#db2777"/>
+            <circle cx="78" cy="22" r="7" fill="#db2777"/>
+            <circle cx="50" cy="55" r="34" fill="#f472b6"/>
+            <ellipse cx="50" cy="68" rx="16" ry="12" fill="#fce7f3"/>
+            <circle cx="38" cy="50" r="6" fill="white"/>
+            <circle cx="62" cy="50" r="6" fill="white"/>
+            <circle cx="38" cy="51" r="3" fill="#1a1f3a"/>
+            <circle cx="62" cy="51" r="3" fill="#1a1f3a"/>
+            <ellipse cx="50" cy="64" rx="3.5" ry="2.5" fill="#1a1f3a"/>
+            <path d="M 44 72 Q 50 76 56 72" stroke="#1a1f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <div class="journey-stack" id="journey-stack">
+          <div class="learn-empty">
+            <div class="learn-empty-icon">📚</div>
+            <h3>טוען קורסים...</h3>
+          </div>
         </div>
       </div>
     </main>
@@ -573,237 +558,57 @@
         <div class="disclaimer-subtitle">תנאי שירות, הגבלת אחריות והסכם משפטי · RePro</div>
         <div class="disclaimer-meta">פלטפורמת גיוס והשמה בינלאומית</div>
       </header>
-
       <div class="disclaimer-body">
-
         <div class="disclaimer-section">
           <h3>הסכם</h3>
-          <p>
-            בכניסה, רישום, או שימוש בכל חלק מהאתר, הפלטפורמה, חומרי ההכשרה, הכלים, התוכן או השירותים הקשורים (להלן: "השירותים"),
-            את/ה מאשר/ת שקראת, הבנת והסכמת להיות מחויב/ת חוקית להסכם זה במלואו.
-          </p>
-          <p>
-            אם אינך מסכים/ה לתנאים אלה, עליך להפסיק מיידית את השימוש בשירותים.
-          </p>
-          <p>
-            הסכם זה מהווה חוזה מחייב משפטית בין המשתמש/ת לבין חברת RePro בהתאם ל<span class="law-tag">חוק החוזים (חלק כללי), 1973</span>,
-            <span class="law-tag">חוק הגנת הצרכן, 1981</span> ו<span class="law-tag">חוק החוזים האחידים, 1982</span> של מדינת ישראל.
-          </p>
+          <p>בכניסה, רישום, או שימוש בכל חלק מהאתר, הפלטפורמה, חומרי ההכשרה, הכלים, התוכן או השירותים הקשורים (להלן: "השירותים"), את/ה מאשר/ת שקראת, הבנת והסכמת להיות מחויב/ת חוקית להסכם זה במלואו.</p>
+          <p>הסכם זה מהווה חוזה מחייב משפטית בין המשתמש/ת לבין חברת RePro בהתאם ל<span class="law-tag">חוק החוזים (חלק כללי), 1973</span>, <span class="law-tag">חוק הגנת הצרכן, 1981</span> ו<span class="law-tag">חוק החוזים האחידים, 1982</span> של מדינת ישראל.</p>
         </div>
-
         <div class="disclaimer-section">
           <h3>מהות מערכת היחסים</h3>
-          <p>
-            RePro מספקת פלטפורמה טכנולוגית, חינוכית והכשרתית בתחום הגיוס וההשמה הבינלאומית.
-            החברה <strong>אינה מבטיחה השמה מוצלחת</strong>, רווחים, או תוצאות גיוס מסוג כלשהו.
-          </p>
-          <p>
-            לא נוצרים יחסי שותפות, סוכנות, נאמנות, או ייעוץ משפטי בין המשתמש/ת לחברה תחת השירותים שבעמוד זה.
-            המשתמש/ת מאשר/ת במפורש שאין הסתמכות על תוכן השירותים, הכלים או חומרי ההכשרה בעת קבלת החלטות גיוס,
-            וכל ההחלטות מתקבלות באופן עצמאי על דעתו/ה הבלעדית.
-          </p>
+          <p>RePro מספקת פלטפורמה טכנולוגית, חינוכית והכשרתית בתחום הגיוס וההשמה הבינלאומית. החברה <strong>אינה מבטיחה השמה מוצלחת</strong>, רווחים, או תוצאות גיוס מסוג כלשהו.</p>
         </div>
-
-        <div class="disclaimer-section">
-          <h3>סיווג השירותים</h3>
-          <p>השירותים ניתנים אך ורק כפלטפורמת טכנולוגיה, ניתוח, חינוך והכשרה. שום דבר בשירותים אינו מהווה:</p>
-          <ul>
-            <li>ייעוץ משפטי בנושאי הגירת עבודה, ויזות או חוקי עבודה זרים</li>
-            <li>ייעוץ במס בינלאומי או רואה חשבון</li>
-            <li>שירותי הסדרת אישורי עבודה במדינות חוץ</li>
-            <li>ערבות לקבלה למשרה ספציפית או לתוצאת גיוס</li>
-          </ul>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>הצהרות ואחריות המשתמש/ת</h3>
-          <p>
-            המשתמש/ת מצהיר/ה שיש לו/לה <strong>ידע, ניסיון ויכולת מקצועיים מספיקים</strong> להבין את האתגרים
-            בתחום הגיוס הבינלאומי, את הסיכונים הכרוכים בהמלצה על מועמדים, ביחסי לקוח-מעסיק ובאחריות מקצועית.
-          </p>
-          <p>
-            המשתמש/ת מאשר/ה אחריות מלאה לכל ההחלטות, הפעולות והתוצאות הנובעות מהשימוש בשירותים, לרבות
-            בחירת מועמדים, פנייה ללקוחות, ניהול תקשורת, ועמידה בחוקי המדינות הרלוונטיות.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>אופי השירותים</h3>
-          <p>השירותים ניתנים אך ורק למטרות מידע, חינוך, ניתוח וטכנולוגיה. הם כוללים:</p>
-          <ul>
-            <li>חומרי הכשרה, מצגות, וקורסים</li>
-            <li>כלי ניהול לידים, מועמדים ומשרות</li>
-            <li>מעקב אחר השמות וסטטיסטיקות פנימיות</li>
-            <li>תקשורת עם המאמן AI (כלי עזר טכנולוגי)</li>
-          </ul>
-          <p>
-            שום פלט, ניתוח או תוכן שמופק על ידי AI אינו מהווה ערבות לתוצאה ספציפית או המלצה אישית.
-            הפלטים הם <strong>מידעיים בלבד</strong>.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>כלים, ניתוחים ובינה מלאכותית</h3>
-          <p>
-            תכונות AI, פלטים אוטומטיים או תכנים שנוצרים על ידי המודל עשויים להיות לא מדויקים, חלקיים, מאוחרים או לא עקביים.
-            הם הסתברותיים, מוגבלי הקשר ואינם דטרמיניסטיים.
-          </p>
-          <p>
-            המשתמש/ת לוקח/ת אחריות מלאה לאימות, פיקוח ושימוש בכל פלט אוטומטי. אסור להסתמך עליהם כבסיס יחיד להחלטה.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>אין אחריות לתוצאות גיוס</h3>
-          <p>
-            החברה אינה נושאת באחריות לתוצאות גיוס, השמה מוצלחת, פספוס הזדמנויות, ביצועי מועמד אצל מעסיק,
-            החלטות מעסיק, או תוצאות התנהגותיות. כל תוצאות הגיוס הן תוצאה ישירה של החלטות שמתקבלות על ידי המשתמש/ת.
-          </p>
-        </div>
-
         <div class="disclaimer-section critical">
           <h3>🔒 קניין רוחני וסודיות מלאה</h3>
-          <p>
-            כל חומרי ההכשרה, המתודולוגיות, המצגות, הסקריפטים, הטמפלייטים, רשימות הלקוחות, רשימות המעסיקים,
-            רשימות המועמדים, פרטי השמות, סטטיסטיקות החברה, וכל מידע נוסף שנחשפת אליו —
-            הם <strong>רכוש בלעדי של RePro</strong>.
-          </p>
-          <p>המשתמש/ת מקבל/ת רישיון מוגבל, ניתן לביטול, לא בלעדי ולא ניתן להעברה, לשימוש אישי בלבד. <strong>אסור</strong>:</p>
+          <p>כל חומרי ההכשרה, המתודולוגיות, המצגות, הסקריפטים, רשימות הלקוחות, המעסיקים והמועמדים — הם <strong>רכוש בלעדי של RePro</strong>.</p>
           <ul>
-            <li>להעתיק, להפיץ, לשנות, להנדס לאחור או לחלץ מתודולוגיות</li>
-            <li>ליצור עבודות נגזרות או תוכן מסחרי מבוסס</li>
-            <li>לשתף עם גורם שלישי, מתחרה או חברת גיוס אחרת</li>
-            <li>להשתמש בחומרים מחוץ למסגרת העבודה ב-RePro</li>
-            <li>להעביר את החשבון, הסיסמה או הגישה לאדם אחר</li>
+            <li>אסור להעתיק, להפיץ, לשנות, להנדס לאחור או לחלץ מתודולוגיות</li>
+            <li>אסור לשתף עם גורם שלישי, מתחרה או חברת גיוס אחרת</li>
+            <li>אסור להשתמש בחומרים מחוץ למסגרת העבודה ב-RePro</li>
+            <li>אסור להעביר את החשבון, הסיסמה או הגישה לאדם אחר</li>
           </ul>
         </div>
-
         <div class="disclaimer-section critical">
           <h3>🚫 איסור שימוש לרעה והגנה תחרותית</h3>
-          <p>המשתמש/ת מתחייב/ת:</p>
           <ul>
             <li><strong>לא לעבור למתחרה</strong> תוך שימוש בידע, מתודולוגיות או מאגרי נתונים של RePro</li>
             <li><strong>לא לפנות ישירות למעסיקים</strong> שהכיר/ה דרך RePro לתועלת אישית או של חברה אחרת</li>
             <li><strong>לא לפנות ישירות למועמדים</strong> שהיו במאגר RePro לתועלת אישית או של חברה אחרת</li>
             <li><strong>לא להעביר ידע, רשימות או נתונים</strong> שנרכשו ב-RePro לכל גורם חיצוני</li>
-            <li><strong>לא לבצע פעולות תחרותיות</strong> במקביל בעודה/ו במערך RePro</li>
           </ul>
         </div>
-
         <div class="disclaimer-section critical">
           <h3>📅 סיום ההעסקה / הקשר</h3>
-          <p>בעזיבת RePro או בסיום ההסכם:</p>
           <ul>
             <li>הזכות לעיין ולהשתמש בכל החומרים <strong>נפסקת מיידית</strong></li>
-            <li>כל המסמכים, הקבצים והרישומים שנמצאים אצל המשתמש/ת חייבים להיות <strong>מוחזרים או מושמדים</strong></li>
             <li>חובת הסודיות נמשכת <strong>ללא הגבלת זמן</strong></li>
-            <li>איסור פנייה למעסיקים, מועמדים או לקוחות שהכיר/ה ב-RePro לתקופה של <strong>24 חודשים</strong> מסיום הקשר</li>
-          </ul>
-          <p>הפרת תנאים אלה תיחשב <strong>הפרת חוזה מהותית</strong> ועלולה להוביל לתביעה משפטית עם פיצויים כספיים ניכרים.</p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>נתוני מועמדים, מעסיקים ולקוחות</h3>
-          <p>המשתמש/ת מאשר/ה אחריות מלאה ל:</p>
-          <ul>
-            <li>שמירת סודיות נתוני מועמדים בהתאם ל<span class="law-tag">חוק הגנת הפרטיות, 1981</span></li>
-            <li>אי שימוש בנתונים אלה לצרכים פרטיים או מסחריים מחוץ ל-RePro</li>
-            <li>אי העברת נתונים לגורם שלישי ללא אישור מפורש בכתב מהחברה</li>
-            <li>מחיקת נתונים בסיום הקשר או על פי דרישת החברה</li>
+            <li>איסור פנייה למעסיקים, מועמדים או לקוחות לתקופה של <strong>24 חודשים</strong> מסיום הקשר</li>
           </ul>
         </div>
-
         <div class="disclaimer-section">
           <h3>פרטיות והגנת מידע</h3>
-          <p>
-            החברה אוספת, מעבדת ושומרת נתונים אישיים בהתאם ל<span class="law-tag">חוק הגנת הפרטיות, 1981</span>.
-          </p>
-          <p>למשתמש/ת הזכות:</p>
-          <ul>
-            <li>לדעת איזה נתונים אישיים נאספים</li>
-            <li>לבקש גישה לנתונים השמורים</li>
-            <li>לבקש תיקון או מחיקה של מידע לא נכון או בלתי חוקי</li>
-          </ul>
-          <p>
-            נתונים אישיים לא יועברו לצדדים שלישיים אלא במקרים הנדרשים על פי חוק, לצורך מתן השירות
-            (כגון ספקי אחסון או אבטחה), או באישור המשתמש/ת.
-          </p>
+          <p>החברה אוספת ומעבדת נתונים אישיים בהתאם ל<span class="law-tag">חוק הגנת הפרטיות, 1981</span>. למשתמש/ת זכות לעיין, לתקן ולמחוק נתונים בכפוף לחוק.</p>
         </div>
-
         <div class="disclaimer-section">
-          <h3>תוכן משתמשים ותקשורת</h3>
-          <p>
-            החברה אינה אחראית לתוכן, הצהרות, דעות או תקשורת שנעשית על ידי משתמשים אחרים בפלטפורמה,
-            צ'אטים, פורומים או רשתות חברתיות. כל הסתמכות על תוכן זה היא על אחריותו של המשתמש/ת.
-          </p>
+          <h3>הגבלת אחריות, שיפוי, וכוח עליון</h3>
+          <p>במידה המקסימלית המותרת על פי החוק, RePro לא תהיה אחראית לנזק ישיר, עקיף, מקרי, תוצאתי או מיוחד. כל אחריות תוגבל לסכום הנמוך מבין $100 או הסכום ששילם המשתמש/ת ב-12 חודשים האחרונים.</p>
+          <p>המשתמש/ת מסכים/ה לשפות את החברה מכל תביעת צד שלישי הנובעת משימוש לרעה או הפרת הסכם זה.</p>
         </div>
-
         <div class="disclaimer-section">
-          <h3>הגבלת אחריות</h3>
-          <p>
-            במידה המקסימלית המותרת על ידי החוק, RePro לא תהיה אחראית לכל נזק ישיר, עקיף, מקרי, תוצאתי, עונשי או מיוחד —
-            לרבות הפסדים כספיים, אובדן רווחים, שיבוש עסקי, פגיעה במוניטין או אובדן נתונים.
-          </p>
-          <p>כל אחריות, אם תיקבע, תוגבל לסכום הנמוך מבין:</p>
-          <ul>
-            <li>100 USD, או</li>
-            <li>הסכום הכולל ששילם המשתמש/ת לחברה במהלך 12 החודשים שקדמו לאירוע</li>
-          </ul>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>שיפוי</h3>
-          <p>המשתמש/ת מסכים/ה לשפות את RePro ואת מנהליה, נושאי המשרה, העובדים והקבלנים שלה מכל תביעות, חבויות, נזקים, הפסדים או הוצאות הנובעים מ:</p>
-          <ul>
-            <li>שימוש או שימוש לרעה בשירותים</li>
-            <li>פעילות גיוס שגויה או הצעות שיווק כוזבות</li>
-            <li>הפרת הסכם זה או הפרת חוק</li>
-            <li>תביעות צד שלישי הנובעות מפעילות המשתמש/ת</li>
-          </ul>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>השעיה וסיום</h3>
-          <p>
-            RePro רשאית להשעות או לסיים את הגישה לשירותים בכל עת, עם או בלי הודעה, מכל סיבה שהיא, כולל הפרת הסכם זה.
-            עם סיום, כל הרישיונות מבוטלים והגישה מסתיימת.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>אבטחת מידע וכוח עליון</h3>
-          <p>
-            RePro מיישמת אמצעי אבטחה סבירים, אך אין מערכת מאובטחת לחלוטין.
-            החברה לא תהיה אחראית לאירועים מעבר לשליטתה: מתקפות סייבר, כשלי תשתית, פעולות רגולטוריות,
-            אסונות טבע, מלחמה או פעולות ממשלתיות.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>יישוב סכסוכים ודין שולט</h3>
-          <p>
-            הסכם זה כפוף ל<strong>דיני מדינת ישראל</strong>. כל מחלוקת תיושב בישראל,
-            בפני בתי המשפט המוסמכים בלבד. המשתמש/ת מוותר/ת על הזכות להשתתפות בתביעות ייצוגיות.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>הסכם שלם וראיות</h3>
-          <p>
-            הסכם זה מהווה את ההסכם השלם בין המשתמש/ת ל-RePro. רשומות אלקטרוניות, יומני מערכת, חותמות זמן,
-            יומני IP, וחתימות מים על צילומי מסך — מהווים <strong>ראיה קבילה</strong> לקבלה ושימוש בשירותים.
-          </p>
-        </div>
-
-        <div class="disclaimer-section">
-          <h3>אישור</h3>
-          <p>
-            בלחיצה על "אני מאשר/ת", המשתמש/ת מאשר/ת קבלה <strong>מודעת, מרצון ומחייבת משפטית</strong> של הסכם זה.
-            תאריך, שעה וכתובת IP יישמרו ביומן הביקורת.
-          </p>
+          <h3>דין שולט ויישוב סכסוכים</h3>
+          <p>הסכם זה כפוף ל<strong>דיני מדינת ישראל</strong>. כל מחלוקת תובא בפני בתי המשפט המוסמכים בישראל בלבד. רשומות אלקטרוניות, יומני IP וחתימות מים על צילומי מסך מהוות <strong>ראיה קבילה</strong>.</p>
         </div>
       </div>
-
       <div class="disclaimer-bottom">
         <label class="disclaimer-checkbox-row" for="disclaimer-checkbox">
           <input type="checkbox" id="disclaimer-checkbox" class="disclaimer-checkbox">
@@ -836,7 +641,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=6"></script>
+  <script src="js/learn.js?v=7"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>
