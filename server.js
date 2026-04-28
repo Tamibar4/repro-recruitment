@@ -1994,8 +1994,12 @@ const trainingUpload = multer({
   }
 });
 
-// GET /api/training/documents - list all training documents
+// GET /api/training/documents - list all training documents (admin only)
+// Restricted because the documents themselves are confidential training
+// material the admin doesn't want exposed to recruiter accounts. The AI
+// chat still works for everyone since it reads the docs server-side.
 app.get('/api/training/documents', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   try {
     const docs = (data.training_documents || []).map(d => ({
       id: d.id,
@@ -2047,8 +2051,10 @@ app.post('/api/training/documents', (req, res, next) => {
   });
 });
 
-// GET /api/training/documents/:id/file - download file
+// GET /api/training/documents/:id/file - download file (admin only)
+// Same reason as the list endpoint — confidential training material.
 app.get('/api/training/documents/:id/file', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   try {
     const id = parseInt(req.params.id);
     const doc = (data.training_documents || []).find(d => d.id === id);
