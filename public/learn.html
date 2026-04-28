@@ -81,11 +81,14 @@
     }
     @media (max-width: 600px) { .learn-hero h1 { font-size: 26px; } }
 
-    /* ===== The journey path ===== */
+    /* ===== The journey path =====
+       Wider wrap than the card column so mascots have room to live in
+       the side gutters without overlapping the cards. Cards stay 360px
+       wide in the middle ~50% of the wrap. */
     .journey-wrap {
       position: relative;
-      max-width: 720px; margin: 40px auto 80px;
-      padding: 0 16px;
+      max-width: 1000px; margin: 40px auto 80px;
+      padding: 0 32px;
     }
     /* SVG connector path drawn behind the cards */
     .journey-svg {
@@ -116,9 +119,10 @@
       transform: translateY(-4px);
       box-shadow: var(--learn-shadow-lg);
     }
-    /* Alternate card position along the path */
-    .course-card.left  { align-self: flex-start; margin-right: 8%; }
-    .course-card.right { align-self: flex-end;  margin-left:  8%; }
+    /* Alternate card position along the path. Cards sit in the middle
+       of the wider wrap so mascots have side-gutter space to live in. */
+    .course-card.left  { align-self: center; margin-right: 12%; }
+    .course-card.right { align-self: center; margin-left:  12%; }
     .course-card.center { align-self: center; }
     @media (max-width: 600px) {
       .course-card.left, .course-card.right, .course-card.center {
@@ -254,15 +258,18 @@
     }
     /* Spread along the path, alternating sides, with varied delays
        so they don't all bob in unison. Soft pastel rings per theme. */
-    .mascot-1 { top:  4%; left:  6%; background: linear-gradient(135deg,#ecfeff,#cffafe); animation-delay: 0s;     }  /* 💨 אייר דאקט */
-    .mascot-2 { top: 14%; right: 4%; background: linear-gradient(135deg,#fff5f5,#ffe2e2); animation-delay: -0.4s; }  /* 🔥 צ'ימיני */
-    .mascot-3 { top: 24%; left:  8%; background: linear-gradient(135deg,#f1f5f9,#e2e8f0); animation-delay: -0.8s; }  /* 🌀 דרייר */
-    .mascot-4 { top: 35%; right: 8%; background: linear-gradient(135deg,#fef3c7,#fde68a); animation-delay: -1.2s; }  /* 🚪 גארז' דור */
-    .mascot-5 { top: 46%; left:  4%; background: linear-gradient(135deg,#fdf4ff,#fae8ff); animation-delay: -1.6s; }  /* 💄 קוסמטיקה */
-    .mascot-6 { top: 57%; right: 6%; background: linear-gradient(135deg,#ffedd5,#fdba74); animation-delay: -2.0s; }  /* 🔨 קונסטרקשן */
-    .mascot-7 { top: 68%; left:  8%; background: linear-gradient(135deg,#dcfce7,#bbf7d0); animation-delay: -2.4s; }  /* 🏠 נדל"ן */
-    .mascot-8 { top: 79%; right: 4%; background: linear-gradient(135deg,#fae8ff,#f3e8ff); animation-delay: -2.8s; }  /* 💇‍♀ מוצרי שיער */
-    .mascot-9 { top: 90%; left:  6%; background: linear-gradient(135deg,#fef9c3,#fde68a); animation-delay: -3.2s; }  /* 🔑 לוקסמיט */
+    /* Mascots live in the side gutters. With cards centered + 12%
+       horizontal margin, the gutters are wide enough to hold the
+       56px stickers without ever overlapping a card. */
+    .mascot-1 { top:  4%; left:  2%; background: linear-gradient(135deg,#ecfeff,#cffafe); animation-delay: 0s;     }  /* 💨 אייר דאקט */
+    .mascot-2 { top: 14%; right: 2%; background: linear-gradient(135deg,#fff5f5,#ffe2e2); animation-delay: -0.4s; }  /* 🔥 צ'ימיני */
+    .mascot-3 { top: 26%; left:  3%; background: linear-gradient(135deg,#f1f5f9,#e2e8f0); animation-delay: -0.8s; }  /* 🌀 דרייר */
+    .mascot-4 { top: 38%; right: 3%; background: linear-gradient(135deg,#fef3c7,#fde68a); animation-delay: -1.2s; }  /* 🚪 גארז' דור */
+    .mascot-5 { top: 50%; left:  2%; background: linear-gradient(135deg,#fdf4ff,#fae8ff); animation-delay: -1.6s; }  /* 💄 קוסמטיקה */
+    .mascot-6 { top: 62%; right: 3%; background: linear-gradient(135deg,#ffedd5,#fdba74); animation-delay: -2.0s; }  /* 🔨 קונסטרקשן */
+    .mascot-7 { top: 74%; left:  3%; background: linear-gradient(135deg,#dcfce7,#bbf7d0); animation-delay: -2.4s; }  /* 🏠 נדל"ן */
+    .mascot-8 { top: 86%; right: 2%; background: linear-gradient(135deg,#fae8ff,#f3e8ff); animation-delay: -2.8s; }  /* 💇‍♀ מוצרי שיער */
+    .mascot-9 { top: 95%; left:  4%; background: linear-gradient(135deg,#fef9c3,#fde68a); animation-delay: -3.2s; }  /* 🔑 לוקסמיט */
     @keyframes mascot-float {
       0%, 100% { transform: translateY(0) rotate(-4deg); }
       50% { transform: translateY(-12px) rotate(4deg); }
@@ -506,8 +513,8 @@
 
       <div class="journey-header">
         <div class="journey-header-row">
-          <span class="journey-progress-pct" id="journey-pct">0/0</span>
           <h2 class="journey-title">המסלול שלך: מאפס למגייסת מצטיינת</h2>
+          <span class="journey-progress-pct" id="journey-pct">0/0</span>
         </div>
         <div class="journey-progress-bar">
           <div class="journey-progress-fill" id="journey-fill" style="width:0%"></div>
@@ -631,7 +638,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=9"></script>
+  <script src="js/learn.js?v=10"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>
