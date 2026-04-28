@@ -2008,12 +2008,22 @@ app.get('/api/training/documents', (req, res) => {
     const docs = (data.training_documents || []).map(d => ({
       id: d.id,
       original_name: d.original_name,
+      display_title: d.display_title || null,
+      display_order: d.display_order != null ? d.display_order : null,
+      hidden: !!d.hidden,
       size: d.size,
       mime_type: d.mime_type,
       uploaded_by: d.uploaded_by,
       uploaded_at: d.uploaded_at,
       description: d.description || null
     }));
+    // Sort by display_order so the admin sees them in recruiter-view order
+    docs.sort((a, b) => {
+      const ao = a.display_order != null ? a.display_order : 999999;
+      const bo = b.display_order != null ? b.display_order : 999999;
+      if (ao !== bo) return ao - bo;
+      return (a.id || 0) - (b.id || 0);
+    });
     res.json(docs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2068,6 +2078,32 @@ app.get('/api/training/documents/:id/file', (req, res) => {
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
     fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/training/documents/:id - update display title, sort order,
+// or hidden flag. Admin only — used by the admin training page to curate
+// what recruiters see and in what order.
+app.patch('/api/training/documents/:id', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  try {
+    const id = parseInt(req.params.id);
+    const idx = (data.training_documents || []).findIndex(d => d.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    const doc = data.training_documents[idx];
+    if (req.body.display_title !== undefined) {
+      doc.display_title = String(req.body.display_title || '').trim() || null;
+    }
+    if (req.body.display_order !== undefined) {
+      doc.display_order = req.body.display_order != null ? Number(req.body.display_order) : null;
+    }
+    if (req.body.hidden !== undefined) {
+      doc.hidden = !!req.body.hidden;
+    }
+    saveData();
+    res.json({ success: true, doc });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2321,10 +2357,15 @@ function prettifyDocTitle(originalName, fallbackOrder) {
 // GET /api/training/modules - list training modules visible to recruiters.
 // Returns title + intro text (first ~280 chars) for each PDF, but NEVER
 // links to the file itself. Anyone authenticated can call this.
+//
+// Filtering: documents marked hidden=true are excluded.
+// Ordering: display_order (if set) wins over insertion order.
+// Title: display_title (admin-curated) wins over the prettified filename.
 app.get('/api/training/modules', async (req, res) => {
   try {
-    const docs = (data.training_documents || [])
-      .filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''));
+    let docs = (data.training_documents || [])
+      .filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''))
+      .filter(d => !d.hidden); // recruiter-facing list excludes hidden modules
     // Back-fill extracted_text for legacy uploads.
     let backfilled = false;
     for (const doc of docs) {
@@ -2336,18 +2377,28 @@ app.get('/api/training/modules', async (req, res) => {
     }
     if (backfilled) saveData();
 
+    // Sort by display_order (nulls last), then by insertion id
+    docs.sort((a, b) => {
+      const ao = a.display_order != null ? Number(a.display_order) : 999999;
+      const bo = b.display_order != null ? Number(b.display_order) : 999999;
+      if (ao !== bo) return ao - bo;
+      return (a.id || 0) - (b.id || 0);
+    });
+
     const modules = docs.map((d, i) => {
       const text = d.extracted_text || '';
       const intro = text.replace(/\s+/g, ' ').slice(0, 280).trim();
       const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      const title = d.display_title && d.display_title.trim()
+        ? d.display_title.trim()
+        : prettifyDocTitle(d.original_name, i + 1);
       return {
         id: d.id,
         order: i + 1,
-        title: prettifyDocTitle(d.original_name, i + 1),
+        title,
         intro,
         word_count: wordCount,
         has_text: text.length > 100,
-        // Estimated reading time (Hebrew avg ~180 wpm)
         reading_minutes: Math.max(1, Math.round(wordCount / 180)),
       };
     });

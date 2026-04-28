@@ -349,21 +349,25 @@ async function loadConversation(id) {
 // ============================================================
 // Documents
 // ============================================================
+// Cached docs from the latest fetch — used by reorder helpers
+let docsCache = [];
+
 async function loadDocuments() {
   try {
-    const docs = await API.request('/training/documents');
-    document.getElementById('docs-count').textContent = docs.length;
+    docsCache = await API.request('/training/documents');
+    document.getElementById('docs-count').textContent = docsCache.length;
     const list = document.getElementById('docs-list');
-    if (!docs || docs.length === 0) {
+    if (!docsCache || docsCache.length === 0) {
       list.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--color-text-light)"><div style="font-size:48px;margin-bottom:12px">📭</div>אין חומרי הכשרה עדיין</div>';
       return;
     }
-    list.innerHTML = docs.map(d => renderDocCard(d)).join('');
+    list.innerHTML = docsCache.map((d, i) => renderDocCard(d, i, docsCache.length)).join('');
 
+    // Delete
     list.querySelectorAll('.doc-btn.danger').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        if (!confirm('למחוק את החומר?')) return;
+        if (!confirm('למחוק את החומר לצמיתות?')) return;
         try {
           await API.request('/training/documents/' + id, { method: 'DELETE' });
           showToast('נמחק');
@@ -373,25 +377,109 @@ async function loadDocuments() {
         }
       });
     });
+
+    // Hide/show toggle
+    list.querySelectorAll('.doc-btn-hide').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const doc = docsCache.find(d => d.id == id);
+        try {
+          await API.request('/training/documents/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ hidden: !doc.hidden }),
+          });
+          showToast(doc.hidden ? 'הוצג למגייסות' : 'הוסתר מהמגייסות');
+          loadDocuments();
+        } catch (err) {
+          showToast('שגיאה', 'error');
+        }
+      });
+    });
+
+    // Inline title edit
+    list.querySelectorAll('.doc-title-edit').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const doc = docsCache.find(d => d.id == id);
+        const cur = doc.display_title || doc.original_name.replace(/\.pdf$/i, '');
+        const next = prompt('שם חדש לקורס (כפי שיופיע למגייסות):', cur);
+        if (next === null) return;
+        try {
+          await API.request('/training/documents/' + id, {
+            method: 'PATCH',
+            body: JSON.stringify({ display_title: next.trim() }),
+          });
+          showToast('השם עודכן');
+          loadDocuments();
+        } catch (err) {
+          showToast('שגיאה', 'error');
+        }
+      });
+    });
+
+    // Move up / down — swap display_order with neighbour
+    list.querySelectorAll('.doc-btn-up, .doc-btn-down').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.dataset.id);
+        const dir = btn.classList.contains('doc-btn-up') ? -1 : +1;
+        const idx = docsCache.findIndex(d => d.id === id);
+        const targetIdx = idx + dir;
+        if (targetIdx < 0 || targetIdx >= docsCache.length) return;
+
+        // Build a fresh continuous order (1..N) matching current docsCache,
+        // then swap the two neighbours and PATCH both.
+        const orders = docsCache.map((d, i) => ({ id: d.id, order: i + 1 }));
+        const tmp = orders[idx].order;
+        orders[idx].order = orders[targetIdx].order;
+        orders[targetIdx].order = tmp;
+
+        try {
+          // Persist orders in parallel
+          await Promise.all(orders.map(({ id, order }) =>
+            API.request('/training/documents/' + id, {
+              method: 'PATCH',
+              body: JSON.stringify({ display_order: order }),
+            })
+          ));
+          loadDocuments();
+        } catch (err) {
+          showToast('שגיאה בסידור', 'error');
+        }
+      });
+    });
   } catch (err) {
     console.error('Failed to load documents:', err);
   }
 }
 
-function renderDocCard(d) {
+function renderDocCard(d, idx, total) {
   const ext = (d.original_name || '').split('.').pop().toLowerCase();
   const icon = ext === 'pdf' ? '📄' : (ext === 'pptx' || ext === 'ppt') ? '📊' : (ext === 'docx' || ext === 'doc') ? '📝' : '📁';
   const sizeMB = d.size ? (d.size / 1024 / 1024).toFixed(1) + ' MB' : '';
   const token = API.getToken();
   const viewUrl = '/api/training/documents/' + d.id + '/file?token=' + token;
+  const displayName = d.display_title && d.display_title.trim()
+    ? d.display_title
+    : d.original_name.replace(/\.pdf$/i, '');
+
   return `
-    <div class="doc-card">
+    <div class="doc-card" style="${d.hidden ? 'opacity:0.55;border-style:dashed' : ''}">
       <div class="doc-icon">${icon}</div>
       <div class="doc-info">
-        <div class="doc-name" title="${escapeHtml(d.original_name)}">${escapeHtml(d.original_name)}</div>
-        <div class="doc-meta">${sizeMB} · הועלה על ידי ${escapeHtml(d.uploaded_by || 'מערכת')}</div>
-        <div class="doc-actions">
-          <a href="${viewUrl}" target="_blank" class="doc-btn">👁 צפייה</a>
+        <div class="doc-name" title="${escapeHtml(d.original_name)}">
+          <span style="background:#0073ea;color:white;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px">${idx + 1}</span>
+          ${escapeHtml(displayName)}
+          ${d.hidden ? '<span style="background:#fee;color:#e2445c;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:6px">מוסתר</span>' : ''}
+        </div>
+        <div class="doc-meta">
+          ${sizeMB} · קובץ מקור: ${escapeHtml(d.original_name)}
+        </div>
+        <div class="doc-actions" style="flex-wrap:wrap;gap:4px;margin-top:8px">
+          <button class="doc-btn doc-btn-up" data-id="${d.id}" ${idx === 0 ? 'disabled style="opacity:0.4;cursor:not-allowed"' : ''} title="הזיז למעלה">↑</button>
+          <button class="doc-btn doc-btn-down" data-id="${d.id}" ${idx === total - 1 ? 'disabled style="opacity:0.4;cursor:not-allowed"' : ''} title="הזיז למטה">↓</button>
+          <button class="doc-btn doc-title-edit" data-id="${d.id}">✏ ערוך שם</button>
+          <button class="doc-btn doc-btn-hide" data-id="${d.id}">${d.hidden ? '👁 הצג' : '🙈 הסתר'}</button>
+          <a href="${viewUrl}" target="_blank" class="doc-btn">צפייה</a>
           <button class="doc-btn danger" data-id="${d.id}">🗑 מחק</button>
         </div>
       </div>
