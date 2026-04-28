@@ -2362,23 +2362,18 @@ function prettifyDocTitle(originalName, fallbackOrder) {
 // Filtering: documents marked hidden=true are excluded.
 // Ordering: display_order (if set) wins over insertion order.
 // Title: display_title (admin-curated) wins over the prettified filename.
-app.get('/api/training/modules', async (req, res) => {
+//
+// Performance: NO PDF text extraction here. The iframe viewer reads the
+// raw PDF, so we don't need extracted text for the recruiter UI. The AI
+// chat endpoint runs its own lazy extraction when needed. Skipping this
+// step keeps the modules list snappy (was timing out on 7-PDF Canva
+// libraries because pdf-parse is slow on image-only slides).
+app.get('/api/training/modules', (req, res) => {
   try {
     let docs = (data.training_documents || [])
       .filter(d => /pdf/i.test(d.mime_type || '') || /\.pdf$/i.test(d.filename || ''))
-      .filter(d => !d.hidden); // recruiter-facing list excludes hidden modules
-    // Back-fill extracted_text for legacy uploads.
-    let backfilled = false;
-    for (const doc of docs) {
-      if (!doc.extracted_text) {
-        const filePath = path.join(TRAINING_DIR, doc.filename);
-        doc.extracted_text = await extractPdfText(filePath);
-        backfilled = true;
-      }
-    }
-    if (backfilled) saveData();
+      .filter(d => !d.hidden);
 
-    // Sort by display_order (nulls last), then by insertion id
     docs.sort((a, b) => {
       const ao = a.display_order != null ? Number(a.display_order) : 999999;
       const bo = b.display_order != null ? Number(b.display_order) : 999999;

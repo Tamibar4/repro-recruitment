@@ -121,7 +121,7 @@
       document.getElementById('modules-container').innerHTML = `
         <div class="learn-empty">
           <div class="learn-empty-icon">⚠️</div>
-          <h3>לא הצלחנו לטעון את הקורסים</h3>
+          <h3>לא הצלחנו לטעון את המדריכים</h3>
           <p>נסי לרענן את העמוד</p>
         </div>
       `
@@ -134,7 +134,7 @@
       stack.innerHTML = `
         <div class="learn-empty">
           <div class="learn-empty-icon">📚</div>
-          <h3>הקורסים בדרך</h3>
+          <h3>המדריכים בדרך</h3>
           <p>טרם הועלו חומרי הכשרה. תכף נוסיף אותם — תחזרי לבדוק בקרוב.</p>
         </div>
       `
@@ -210,11 +210,11 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
-              קורס · ${m.reading_minutes} דקות
+              מדריך · ${m.reading_minutes} דקות
             </span>
           </div>
           <div class="course-actions">
-            <button class="course-btn course-btn-skip" title="המשך לקורס הבא">דלג</button>
+            <button class="course-btn course-btn-skip" title="המשך למדריך הבא">דלג</button>
             <button class="course-btn course-btn-done ${isDone ? 'active' : ''}" title="${isDone ? 'בטל סימון' : 'סמני כסיימתי'}">
               ${isDone ? '✓ סיימתי' : '✓ סיימתי'}
             </button>
@@ -317,7 +317,7 @@
       await renderPdfVisual(id, document.getElementById('pdf-pages'))
     } catch (err) {
       console.error(err)
-      contentEl.innerHTML = `<div class="reader-fallback"><div class="reader-fallback-icon">⚠️</div><h3>שגיאה</h3><p>לא הצלחנו לטעון את הקורס.</p></div>`
+      contentEl.innerHTML = `<div class="reader-fallback"><div class="reader-fallback-icon">⚠️</div><h3>שגיאה</h3><p>לא הצלחנו לטעון את המדריך.</p></div>`
     }
   }
 
