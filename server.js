@@ -2791,6 +2791,9 @@ app.post('/api/publishing/posts', (req, res) => {
     if (!account_id || !findAccount(account_id)) {
       return res.status(400).json({ error: 'Invalid account_id' });
     }
+    const title = req.body?.title != null
+      ? validateString(req.body.title, { required: false, maxLen: 200 })
+      : '';
     const text = req.body?.text != null
       ? validateString(req.body.text, { required: false, maxLen: 5000 })
       : '';
@@ -2806,6 +2809,7 @@ app.post('/api/publishing/posts', (req, res) => {
     const post = {
       id: nextId('facebook_posts'),
       account_id,
+      title,
       text,
       image_url,
       tags,
@@ -2833,6 +2837,9 @@ app.put('/api/publishing/posts/:id', (req, res) => {
       const aid = parseInt(req.body.account_id, 10);
       if (!aid || !findAccount(aid)) return res.status(400).json({ error: 'Invalid account_id' });
       post.account_id = aid;
+    }
+    if (req.body.title !== undefined) {
+      post.title = validateString(req.body.title, { required: false, maxLen: 200 }) || '';
     }
     if (req.body.text !== undefined) {
       post.text = validateString(req.body.text, { required: false, maxLen: 5000 }) || '';

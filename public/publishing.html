@@ -207,16 +207,31 @@
       flex: 1;
       display: flex; flex-direction: column; gap: 10px;
     }
-    .pub-post-text {
-      font-size: 13.5px; line-height: 1.65;
+    /* Card title — what shows on the card by default. The full body
+       text stays hidden until the user clicks the card to open the
+       preview modal, so the grid stays scannable. */
+    .pub-post-title {
+      font-size: 15px; font-weight: 700;
       color: var(--color-text);
-      white-space: pre-wrap; word-break: break-word;
-      /* No clamping — show the full text. With align-items:start on
-         the grid above, cards take their natural height so short
-         posts look short and long ones look long. */
+      line-height: 1.4;
+      /* Wrap up to 3 lines, then ellipsis. Most titles will be one line. */
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
     }
-    .pub-post-text:empty::before {
-      content: 'אין טקסט'; color: var(--color-text-light); font-style: italic;
+    .pub-post-title:empty::before {
+      content: '(ללא כותרת)';
+      color: var(--color-text-light);
+      font-weight: 500; font-style: italic;
+    }
+    /* Subtle hint that a click reveals the rest */
+    .pub-post-readmore {
+      font-size: 11.5px; font-weight: 600;
+      color: var(--color-primary);
+      opacity: 0.75;
+      margin-top: 2px;
     }
     .pub-post-tags {
       display: flex; flex-wrap: wrap; gap: 5px;
@@ -850,8 +865,13 @@
             <select id="post-account" required></select>
           </div>
           <div class="pub-form-row">
-            <label for="post-text">טקסט הפוסט</label>
-            <textarea id="post-text" maxlength="5000" placeholder="כתבי כאן את תוכן הפוסט..."></textarea>
+            <label for="post-title">כותרת הפוסט</label>
+            <input type="text" id="post-title" maxlength="200" placeholder="כותרת קצרה שתופיע בכרטיס (לדוגמה: 'מנהל מכירות לחברת ביטוח')">
+            <div class="field-hint">הכותרת היא מה שמוצג בכרטיס. הטקסט המלא יוצג רק כשתלחצי על הפוסט.</div>
+          </div>
+          <div class="pub-form-row">
+            <label for="post-text">טקסט הפוסט (התוכן המלא)</label>
+            <textarea id="post-text" maxlength="5000" placeholder="כתבי כאן את תוכן הפוסט המלא..."></textarea>
             <div class="field-hint">עד 5000 תווים. שורות חדשות יישמרו.</div>
           </div>
           <div class="pub-form-row">
@@ -937,6 +957,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=5"></script>
+  <script src="js/publishing.js?v=6"></script>
 </body>
 </html>

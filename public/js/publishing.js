@@ -30,6 +30,19 @@
   let view = 'list';              // 'list' or 'calendar'
   let calCursor = new Date();     // first day of currently displayed month
 
+  // Display title for a post: explicit title field if set, otherwise the
+  // first line of the body text (truncated to ~80 chars), otherwise an
+  // empty string (rendered as "(ללא כותרת)" by the card CSS).
+  function postTitle(post) {
+    if (post.title && post.title.trim()) return post.title.trim();
+    if (post.text && post.text.trim()) {
+      const firstLine = post.text.split(/\r?\n/)[0].trim();
+      if (firstLine.length <= 80) return firstLine;
+      return firstLine.slice(0, 77).trim() + '…';
+    }
+    return '';
+  }
+
   // Edit-state for modals
   let editingPostId = null;
   let editingAccountId = null;
@@ -257,6 +270,7 @@
   function renderPostCard(post) {
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDateShort(post.publish_date) : '';
+    const title = postTitle(post);
     return `
       <article class="pub-post" data-post-id="${post.id}">
         <div class="pub-post-image pub-post-clickable" data-action="preview">
@@ -265,8 +279,10 @@
             : `<span class="pub-post-image-empty">🖼️</span>`}
           <span class="pub-post-status ${post.status}">${statusLabel}</span>
         </div>
-        <div class="pub-post-body pub-post-clickable" data-action="preview">
-          <div class="pub-post-text">${escapeHtml(post.text || '')}</div>
+        <div class="pub-post-body pub-post-clickable" data-action="preview"
+             title="לחצי לראות את התוכן המלא">
+          <div class="pub-post-title">${escapeHtml(title)}</div>
+          ${post.text ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
           ${post.tags && post.tags.length ? `
             <div class="pub-post-tags">
               ${post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('')}
@@ -346,11 +362,14 @@
       cells.push(`
         <div class="pub-cal-cell ${isToday ? 'is-today' : ''} ${isPast ? 'is-past' : ''}" data-day="${day}">
           <div class="pub-cal-day">${day}</div>
-          ${dayPosts.slice(0, visibleCount).map(p => `
-            <div class="pub-cal-post ${p.status}" data-post-id="${p.id}" title="${escapeHtml(p.text ? p.text.slice(0, 80) : '(ללא טקסט)')}">
-              ${escapeHtml((p.text || '(ללא טקסט)').slice(0, 30))}
-            </div>
-          `).join('')}
+          ${dayPosts.slice(0, visibleCount).map(p => {
+            const t = postTitle(p) || '(ללא כותרת)';
+            return `
+              <div class="pub-cal-post ${p.status}" data-post-id="${p.id}" title="${escapeHtml(t)}">
+                ${escapeHtml(t.slice(0, 30))}
+              </div>
+            `;
+          }).join('')}
           ${moreCount > 0 ? `<div class="pub-cal-post" style="opacity:0.7">+${moreCount} עוד</div>` : ''}
           <div class="pub-cal-add">+ הוסיפי</div>
         </div>
@@ -725,6 +744,7 @@
         ${escapeHtml(a.icon || '👤')} ${escapeHtml(a.name)}
       </option>`).join('');
 
+    document.getElementById('post-title').value = post ? (post.title || '') : '';
     document.getElementById('post-text').value = post ? (post.text || '') : '';
     const status = post ? post.status : (prefill.presetStatus || 'draft');
     document.querySelector(`input[name="post-status"][value="${status}"]`).checked = true;
@@ -813,14 +833,15 @@
 
   async function savePost() {
     const account_id = parseInt(document.getElementById('post-account').value, 10);
+    const title = document.getElementById('post-title').value;
     const text = document.getElementById('post-text').value;
     const status = document.querySelector('input[name="post-status"]:checked')?.value || 'draft';
     const dateRaw = document.getElementById('post-publish-date').value;
     const publish_date = dateRaw ? new Date(dateRaw).toISOString() : null;
 
     if (!account_id) { showToast('צריך לבחור חשבון', 'error'); return; }
-    if (!text.trim() && !postImageUrl) {
-      showToast('פוסט חייב להכיל טקסט או תמונה', 'error');
+    if (!title.trim() && !text.trim() && !postImageUrl) {
+      showToast('פוסט חייב להכיל כותרת, טקסט או תמונה', 'error');
       return;
     }
     if ((status === 'scheduled' || status === 'published') && !publish_date) {
@@ -830,6 +851,7 @@
 
     const payload = {
       account_id,
+      title: title || '',
       text: text || '',
       image_url: postImageUrl,
       status,
@@ -909,10 +931,12 @@
   function openPreviewModal(post) {
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDate(post.publish_date) : '';
+    const title = post.title && post.title.trim() ? post.title.trim() : null;
 
-    document.getElementById('preview-modal-title').textContent = `פוסט · ${statusLabel}`;
+    document.getElementById('preview-modal-title').textContent = title || `פוסט · ${statusLabel}`;
     document.getElementById('preview-modal-content').innerHTML = `
       ${post.image_url ? `<img class="pub-preview-image" src="${escapeHtml(post.image_url)}" alt="">` : ''}
+      ${title ? `<h3 style="font-size:18px;font-weight:800;color:var(--color-text);margin-bottom:10px;line-height:1.4">${escapeHtml(title)}</h3>` : ''}
       <div class="pub-preview-text">${escapeHtml(post.text || '')}</div>
       <div class="pub-preview-meta">
         <span class="pub-post-status ${post.status}" style="position:static">${statusLabel}</span>
