@@ -560,28 +560,48 @@
       background: rgba(226,68,92,0.1); color: var(--color-red);
     }
 
-    /* ----- Publish-to-group dropdown on each post card ----- */
-    .pub-groups-popover {
-      position: absolute; z-index: 100;
+    /* ----- Groups bar at the top of the page (under account tabs) -----
+       A row of chips, one per Facebook group of the current account.
+       Click a chip → opens that group in a new tab. The user is expected
+       to have copied text/image first via the per-post buttons. */
+    .pub-groups-bar {
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px 0; margin-bottom: 14px;
+    }
+    .pub-groups-bar-label {
+      font-size: 12.5px; font-weight: 700;
+      color: var(--color-text-secondary);
+      margin-left: 4px;
+    }
+    .pub-group-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
       background: var(--color-white);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-      padding: 6px;
-      min-width: 220px; max-width: 320px;
-      max-height: 280px; overflow-y: auto;
+      border: 1.5px solid var(--color-border);
+      border-radius: 99px;
+      font-family: inherit;
+      font-size: 12.5px; font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .pub-groups-popover button {
-      display: block; width: 100%; text-align: start;
-      padding: 9px 12px; border-radius: 6px;
-      border: none; background: transparent;
-      font-family: inherit; font-size: 13px; font-weight: 600;
-      color: var(--color-text); cursor: pointer;
+    .pub-group-chip:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(94,92,230,0.15);
     }
-    .pub-groups-popover button:hover { background: var(--color-accent-soft); color: var(--color-primary); }
-    .pub-groups-popover-empty {
-      padding: 16px; text-align: center;
+    .pub-group-chip-icon { font-size: 14px; line-height: 1; }
+    .pub-group-chip.is-broken {
+      opacity: 0.75;
+      border-style: dashed;
+      border-color: var(--color-red);
+      color: var(--color-red);
+    }
+    .pub-groups-bar-empty {
       font-size: 12px; color: var(--color-text-light);
+      font-style: italic;
     }
 
     /* ----- Post preview modal (full-text view triggered by clicking the card) ----- */
@@ -699,6 +719,13 @@
 
       <!-- Tabs row (Facebook accounts) -->
       <div class="pub-tabs" id="pub-tabs">
+        <!-- rendered dynamically -->
+      </div>
+
+      <!-- Groups bar — quick links to the current account's Facebook groups.
+           Click a chip to open the group in a new tab. The user is expected
+           to copy the post text/image first via the per-post buttons. -->
+      <div class="pub-groups-bar" id="pub-groups-bar" style="display:none">
         <!-- rendered dynamically -->
       </div>
 
@@ -910,6 +937,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=4"></script>
+  <script src="js/publishing.js?v=5"></script>
 </body>
 </html>

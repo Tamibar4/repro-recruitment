@@ -36,7 +36,6 @@
   let postImageUrl = null;
   let postTags = [];
   let movingPostId = null;
-  let openPopover = null;         // currently-open groups popover element
 
   // ----- Init ---------------------------------------------------------
   async function init() {
@@ -102,7 +101,59 @@
   // ----- Render -------------------------------------------------------
   function render() {
     renderTabs();
+    renderGroupsBar();
     renderContent();
+  }
+
+  // Renders the row of group chips beneath the account tabs. Click a
+  // chip to open the corresponding Facebook group in a new tab. The
+  // chips are page-level "quick links" — the user copies a post's text
+  // or image first via the per-post buttons, then clicks a group chip
+  // to navigate.
+  function renderGroupsBar() {
+    const bar = document.getElementById('pub-groups-bar');
+    if (!bar) return;
+    if (!currentAccountId || accounts.length === 0) {
+      bar.style.display = 'none';
+      bar.innerHTML = '';
+      return;
+    }
+    const groups = groupsByAccount[currentAccountId] || [];
+    if (groups.length === 0) {
+      bar.style.display = 'flex';
+      bar.innerHTML = `
+        <span class="pub-groups-bar-label">📤 קבוצות:</span>
+        <span class="pub-groups-bar-empty">לא הוגדרו עדיין. ערכי את החשבון (✏️ ליד השם) והוסיפי קבוצות.</span>
+      `;
+      return;
+    }
+    bar.style.display = 'flex';
+    bar.innerHTML = `
+      <span class="pub-groups-bar-label">📤 פרסמי בקבוצה:</span>
+      ${groups.map(g => {
+        const ok = !!normalizeUrl(g.url);
+        return `
+          <button class="pub-group-chip ${ok ? '' : 'is-broken'}" data-group-id="${g.id}"
+                  title="${escapeHtml(g.url || 'אין קישור — ערכי את הקבוצה כדי להוסיף')}">
+            <span class="pub-group-chip-icon">👥</span>
+            ${escapeHtml(g.name)}
+          </button>
+        `;
+      }).join('')}
+    `;
+    bar.querySelectorAll('[data-group-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gid = parseInt(btn.dataset.groupId, 10);
+        const grp = groups.find(g => g.id === gid);
+        if (!grp) return;
+        const validUrl = normalizeUrl(grp.url);
+        if (validUrl) {
+          window.open(validUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          showToast(`לקבוצה "${grp.name}" אין קישור תקין. ערכי את החשבון להוסיף קישור.`, 'error');
+        }
+      });
+    });
   }
 
   function renderTabs() {
@@ -233,10 +284,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             העתק תמונה
           </button>
-          <button class="pub-post-btn" data-action="groups" title="פרסם בקבוצה">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            קבוצה
-          </button>
           <button class="pub-post-btn" data-action="edit" title="ערוך">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -257,7 +304,6 @@
           if (action === 'preview') openPreviewModal(post);
           else if (action === 'copy-text') await handleCopyText(post, el);
           else if (action === 'copy-image') await handleCopyImage(post, el);
-          else if (action === 'groups') openGroupsPopover(post, el);
           else if (action === 'edit') openPostModal(post);
         });
       });
@@ -452,61 +498,6 @@
     return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   }
 
-  // ----- Groups popover (publish-to-group dropdown on each post) ------
-  function closeOpenPopover() {
-    if (openPopover) {
-      openPopover.remove();
-      openPopover = null;
-    }
-  }
-
-  function openGroupsPopover(post, anchorBtn) {
-    closeOpenPopover();
-    const groups = groupsByAccount[post.account_id] || [];
-    const pop = document.createElement('div');
-    pop.className = 'pub-groups-popover';
-    if (groups.length === 0) {
-      pop.innerHTML = `
-        <div class="pub-groups-popover-empty">
-          עדיין לא הגדרת קבוצות לחשבון הזה.<br>
-          ערכי את החשבון והוסיפי קבוצות.
-        </div>`;
-    } else {
-      pop.innerHTML = groups.map(g => `
-        <button data-group-id="${g.id}" title="${escapeHtml(g.url || '')}">
-          📤 ${escapeHtml(g.name)}
-        </button>
-      `).join('');
-      pop.querySelectorAll('button').forEach(b => {
-        b.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const gid = parseInt(b.dataset.groupId, 10);
-          const grp = groups.find(x => x.id === gid);
-          await publishToGroup(post, grp);
-          closeOpenPopover();
-        });
-      });
-    }
-    // Position it
-    const rect = anchorBtn.getBoundingClientRect();
-    pop.style.position = 'fixed';
-    pop.style.top  = (rect.bottom + 6) + 'px';
-    pop.style.right = (window.innerWidth - rect.right) + 'px';
-    document.body.appendChild(pop);
-    openPopover = pop;
-
-    // Click-outside-to-close
-    setTimeout(() => {
-      const closer = (e) => {
-        if (!pop.contains(e.target)) {
-          closeOpenPopover();
-          document.removeEventListener('click', closer);
-        }
-      };
-      document.addEventListener('click', closer);
-    }, 0);
-  }
-
   // Take whatever the user typed into the URL field and try to make it
   // into a real https URL. Returns null if it's clearly not a URL (Hebrew
   // text, gibberish, etc.) so callers can refuse to navigate to it.
@@ -516,7 +507,6 @@
     if (!s) return null;
     // Already has a protocol
     if (/^https?:\/\//i.test(s)) {
-      // Validate
       try { new URL(s); return s; } catch { return null; }
     }
     // No protocol — try prepending https:// if it looks like a domain.
@@ -527,32 +517,6 @@
       try { new URL('https://' + s); return 'https://' + s; } catch { return null; }
     }
     return null;
-  }
-
-  async function publishToGroup(post, group) {
-    if (!group) return;
-    // Always copy the text to clipboard — that's the main thing the
-    // user wants to do. Opening the group URL is a nice-to-have that
-    // only works if the URL was entered correctly.
-    if (post.text) {
-      try { await navigator.clipboard.writeText(post.text); } catch {}
-    }
-    const validUrl = normalizeUrl(group.url);
-    if (validUrl) {
-      // Best case: copy text + open the actual group page
-      window.open(validUrl, '_blank', 'noopener,noreferrer');
-      showToast(post.text
-        ? `הטקסט הועתק. הקבוצה "${group.name}" נפתחה — הדביקי שם (Ctrl+V) ופרסמי`
-        : `הקבוצה "${group.name}" נפתחה`);
-    } else {
-      // No (valid) URL — copy text anyway and tell the user to navigate
-      // manually. Don't block her workflow just because the URL is bad.
-      if (post.text) {
-        showToast(`הטקסט הועתק! עברי לקבוצה "${group.name}" בפייסבוק והדביקי (Ctrl+V). 💡 אפשר להוסיף קישור לקבוצה ע"י עריכת החשבון — אז זה ייפתח אוטומטית.`);
-      } else {
-        showToast(`אין טקסט בפוסט הזה. הוסיפי טקסט קודם, או הוסיפי קישור לקבוצה ע"י עריכת החשבון.`, 'error');
-      }
-    }
   }
 
   // ----- Account modal ------------------------------------------------
@@ -939,12 +903,11 @@
   // ----- Preview modal ------------------------------------------------
   // Click on a post's body or image opens this. Shows the FULL text
   // (no clipping) and ALL actions inline — including the secondary
-  // ones (duplicate, move, delete, publish-to-group) that don't fit
-  // on the card itself.
+  // ones (duplicate, move, delete) that don't fit on the card itself.
+  // Note: publish-to-group is no longer here. Groups live in the
+  // top-of-page bar so the user picks a destination AFTER copying.
   function openPreviewModal(post) {
-    closeOpenPopover();
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
-    const groups = groupsByAccount[post.account_id] || [];
     const dateStr = post.publish_date ? formatDate(post.publish_date) : '';
 
     document.getElementById('preview-modal-title').textContent = `פוסט · ${statusLabel}`;
@@ -959,12 +922,6 @@
       <div class="pub-preview-actions">
         <button class="btn btn-primary" data-prev-action="copy-text">📄 העתק טקסט</button>
         <button class="btn btn-secondary" data-prev-action="copy-image" ${post.image_url ? '' : 'disabled'}>🖼️ העתק תמונה</button>
-        ${groups.length > 0 ? `
-          <select id="prev-group-select" style="padding:8px 12px;border:1px solid var(--color-border);border-radius:var(--radius);font-family:inherit;font-size:13px">
-            <option value="">📤 פרסמי בקבוצה...</option>
-            ${groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
-          </select>
-        ` : ''}
         <button class="btn btn-secondary" data-prev-action="edit">✏️ ערוך</button>
         <button class="btn btn-secondary" data-prev-action="duplicate">📋 שכפל</button>
         <button class="btn btn-secondary" data-prev-action="move">🔀 העבר</button>
@@ -989,16 +946,6 @@
         }
       });
     });
-    const groupSel = content.querySelector('#prev-group-select');
-    if (groupSel) {
-      groupSel.addEventListener('change', async () => {
-        const gid = parseInt(groupSel.value, 10);
-        if (!gid) return;
-        const grp = groups.find(x => x.id === gid);
-        await publishToGroup(post, grp);
-        groupSel.value = '';
-      });
-    }
 
     openModal('preview-modal');
   }
@@ -1074,8 +1021,6 @@
       });
     });
 
-    // Close popover on Esc / outside-click
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOpenPopover(); });
   }
 
   function debounce(fn, ms) {
