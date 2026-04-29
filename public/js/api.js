@@ -166,6 +166,21 @@ const API = {
       });
     },
 
+    // Groups (per-account Facebook groups)
+    listGroups(accountId) {
+      const qs = accountId ? '?account_id=' + accountId : '';
+      return API.request('/publishing/groups' + qs);
+    },
+    createGroup(data) {
+      return API.request('/publishing/groups', { method: 'POST', body: JSON.stringify(data) });
+    },
+    updateGroup(id, data) {
+      return API.request('/publishing/groups/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    },
+    deleteGroup(id) {
+      return API.request('/publishing/groups/' + id, { method: 'DELETE' });
+    },
+
     // Tags + image upload
     listTags() {
       return API.request('/publishing/tags');

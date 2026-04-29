@@ -507,14 +507,16 @@ const defaultData = {
   training_documents: [],
   training_conversations: [],
   // Tami's personal Facebook publishing manager. `facebook_accounts`
-  // are the Facebook profiles/pages she posts on; `facebook_posts` are
-  // the post drafts/scheduled/published items belonging to each account.
+  // are the Facebook profiles she posts from; `facebook_groups` are FB
+  // groups she's a member of (each tied to one account); `facebook_posts`
+  // are draft/scheduled/published items belonging to each account.
   facebook_accounts: [],
+  facebook_groups: [],
   facebook_posts: [],
   counters: {
     jobs: 0, candidates: 0, stage_history: 0,
     training_documents: 0, training_conversations: 0,
-    facebook_accounts: 0, facebook_posts: 0
+    facebook_accounts: 0, facebook_groups: 0, facebook_posts: 0
   }
 };
 
@@ -548,8 +550,10 @@ function loadData() {
       // Initialize Facebook publishing collections if missing (migration
       // for existing databases that predate this feature)
       if (!Array.isArray(data.facebook_accounts)) { data.facebook_accounts = []; saveData(); }
+      if (!Array.isArray(data.facebook_groups))   { data.facebook_groups = [];   saveData(); }
       if (!Array.isArray(data.facebook_posts))    { data.facebook_posts = [];    saveData(); }
       if (!data.counters.facebook_accounts)       { data.counters.facebook_accounts = 0; saveData(); }
+      if (!data.counters.facebook_groups)         { data.counters.facebook_groups = 0;   saveData(); }
       if (!data.counters.facebook_posts)          { data.counters.facebook_posts = 0;    saveData(); }
       // Add default users if missing (migration for existing databases)
       if (!data.users || data.users.length === 0) {
@@ -2742,11 +2746,13 @@ app.delete('/api/publishing/accounts/:id', (req, res) => {
       try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) { console.warn('Could not delete', fpath, e.message); }
     }
   }
+  const groupsDeleted = (data.facebook_groups || []).filter(g => g.account_id === acc.id).length;
+  data.facebook_groups = data.facebook_groups.filter(g => g.account_id !== acc.id);
   data.facebook_posts = data.facebook_posts.filter(p => p.account_id !== acc.id);
   data.facebook_accounts = data.facebook_accounts.filter(a => a.id !== acc.id);
   saveData();
-  auditLog('publishing_account_delete', { id: acc.id, name: acc.name, posts_deleted: postsToDelete.length, by: req.user.username });
-  res.json({ success: true, posts_deleted: postsToDelete.length });
+  auditLog('publishing_account_delete', { id: acc.id, name: acc.name, posts_deleted: postsToDelete.length, groups_deleted: groupsDeleted, by: req.user.username });
+  res.json({ success: true, posts_deleted: postsToDelete.length, groups_deleted: groupsDeleted });
 });
 
 // --- Posts CRUD ------------------------------------------------------
@@ -2917,6 +2923,90 @@ app.patch('/api/publishing/posts/:id/move', (req, res) => {
   post.updated_at = new Date().toISOString();
   saveData();
   res.json(post);
+});
+
+// --- Groups CRUD (Facebook groups belonging to an account) ---------
+
+function findGroup(id) {
+  const numId = parseInt(id, 10);
+  return data.facebook_groups.find(g => g.id === numId);
+}
+
+// GET /api/publishing/groups?account_id=X — list groups (filter by account)
+app.get('/api/publishing/groups', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  let groups = (data.facebook_groups || []).slice();
+  if (req.query.account_id) {
+    const aid = parseInt(req.query.account_id, 10);
+    groups = groups.filter(g => g.account_id === aid);
+  }
+  groups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.id - b.id));
+  res.json(groups);
+});
+
+// POST /api/publishing/groups — create a new group under an account
+app.post('/api/publishing/groups', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const account_id = parseInt(req.body?.account_id, 10);
+    if (!account_id || !findAccount(account_id)) {
+      return res.status(400).json({ error: 'Invalid account_id' });
+    }
+    const name = validateString(req.body?.name, { required: true, maxLen: 100, minLen: 1 });
+    const url = req.body?.url ? validateString(req.body.url, { required: false, maxLen: 500 }) : null;
+
+    const group = {
+      id: nextId('facebook_groups'),
+      account_id,
+      name,
+      url,
+      sort_order: data.facebook_groups.filter(g => g.account_id === account_id).length,
+      created_at: new Date().toISOString(),
+      created_by: req.user.username
+    };
+    data.facebook_groups.push(group);
+    saveData();
+    res.status(201).json(group);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/publishing/groups/:id — update a group
+app.put('/api/publishing/groups/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const grp = findGroup(req.params.id);
+  if (!grp) return res.status(404).json({ error: 'Group not found' });
+  try {
+    if (req.body.name !== undefined) {
+      grp.name = validateString(req.body.name, { required: true, maxLen: 100, minLen: 1 });
+    }
+    if (req.body.url !== undefined) {
+      grp.url = req.body.url ? validateString(req.body.url, { required: false, maxLen: 500 }) : null;
+    }
+    if (req.body.account_id !== undefined) {
+      const aid = parseInt(req.body.account_id, 10);
+      if (!aid || !findAccount(aid)) return res.status(400).json({ error: 'Invalid account_id' });
+      grp.account_id = aid;
+    }
+    if (req.body.sort_order !== undefined) {
+      grp.sort_order = parseInt(req.body.sort_order, 10) || 0;
+    }
+    saveData();
+    res.json(grp);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/publishing/groups/:id — delete a group
+app.delete('/api/publishing/groups/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const idx = data.facebook_groups.findIndex(g => g.id === parseInt(req.params.id, 10));
+  if (idx === -1) return res.status(404).json({ error: 'Group not found' });
+  data.facebook_groups.splice(idx, 1);
+  saveData();
+  res.json({ success: true });
 });
 
 // GET /api/publishing/tags — return all unique tags across all posts
