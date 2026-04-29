@@ -344,12 +344,13 @@
        One PDF page at a time, framed in the center, with smooth slide
        animations between pages.
 
-       Approach: native browser PDF rendering inside iframes (only thing
-       that handles Hebrew RTL correctly), with the iframe sized to the
-       EXACT page aspect ratio so a single page fills it perfectly with
-       no leftover space. `pointer-events: none` on the iframe blocks
-       any internal scrolling — the only way to change pages is via our
-       prev/next buttons. */
+       Approach: PDF.js renders each page to a <canvas>. This gives us
+       complete control over layout — no browser PDF chrome, no scrollbars,
+       no chrome bars cropping the page. The canvas has explicit pixel
+       dimensions for crisp high-DPI rendering, scaled visually via CSS
+       width/height: 100% to fill the aspect-ratio-matched .pdf-slide-wrap.
+       Hebrew renders correctly because we configure PDF.js with cMap
+       support (see learn.js). */
     .pdf-stage {
       position: relative; width: 100%;
       height: calc(100vh - 200px); min-height: 580px;
@@ -364,29 +365,29 @@
       min-height: 0; /* allow flex child to shrink */
     }
     /* Inner aspect-ratio frame — sized by JS to match PDF page dimensions
-       exactly. Both iframes overlap inside this frame and cross-fade. */
+       exactly. Both canvases overlap inside this frame and cross-fade. */
     .pdf-slide-wrap {
       position: relative;
       /* JS sets width/height in px based on actual page dimensions */
-      width: 100%; height: 100%;
       max-width: 100%; max-height: 100%;
     }
     .pdf-slide {
       position: absolute; inset: 0;
-      width: 100%; height: 100%;
+      width: 100% !important;
+      height: 100% !important;
       border: none;
       border-radius: 12px;
       box-shadow: 0 16px 50px rgba(94,92,230,0.30), 0 2px 6px rgba(26,31,58,0.08);
       background: white;
-      /* Block ALL interaction with the iframe — no scrolling, no clicking
-         inside the PDF viewer. User navigates only via our prev/next
-         buttons or arrow keys. This is what stops the "scrolling" view
-         the user complained about. */
-      pointer-events: none;
       transition: transform 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.15),
                   opacity 0.4s ease;
       will-change: transform, opacity;
       opacity: 0;
+      /* Don't let the user select / drag the canvas image — combined
+         with the watermark this is part of the screenshot deterrent. */
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-user-drag: none;
     }
     .pdf-slide.is-active   { transform: translateX(0)     scale(1);   opacity: 1; z-index: 2; }
     .pdf-slide.exit-right  { transform: translateX(-110%) scale(0.85);opacity: 0; z-index: 1; }
@@ -763,7 +764,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=16"></script>
+  <script src="js/learn.js?v=17"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>

@@ -355,22 +355,11 @@
     const url = '/api/training/modules/' + moduleId
       + '/view?token=' + encodeURIComponent(token)
 
-    // Heavy URL fragment to force "single page, fit page, no chrome".
-    // Different browsers respect different subsets of these params, so
-    // we throw a few in. `zoom=page-fit` is the Chromium one, `view=Fit`
-    // is the Adobe Open Parameters spec, `pagemode=none` hides side panels.
-    const buildSlideUrl = (page) =>
-      url
-      + '#page=' + page
-      + '&zoom=page-fit'
-      + '&view=Fit'
-      + '&pagemode=none'
-      + '&toolbar=0'
-      + '&navpanes=0'
-      + '&statusbar=0'
-      + '&messages=0'
-      + '&scrollbar=0'
-
+    // PDF.js canvas rendering — gives us full control over layout (no
+    // browser PDF chrome, no scrollbars, exact aspect ratio). cMap and
+    // standardFontDataUrl are CRITICAL for Hebrew: without them PDF.js
+    // can't map Canva's CID-keyed Hebrew fonts to the right glyphs and
+    // the text comes out mangled.
     container.innerHTML = `
       <div class="pdf-stage">
         <div class="pdf-loading" id="pdf-loading">
@@ -381,11 +370,8 @@
         <div class="pdf-page-counter" id="pdf-counter">— / —</div>
         <div class="pdf-slide-area" id="pdf-slide-area">
           <div class="pdf-slide-wrap" id="pdf-slide-wrap">
-            <iframe class="pdf-slide is-active" id="pdf-slide-a" title="דף נוכחי"
-                    scrolling="no" frameborder="0"
-                    src="${buildSlideUrl(1)}"></iframe>
-            <iframe class="pdf-slide" id="pdf-slide-b" title="דף הבא"
-                    scrolling="no" frameborder="0"></iframe>
+            <canvas class="pdf-slide is-active" id="pdf-slide-a" aria-label="דף נוכחי"></canvas>
+            <canvas class="pdf-slide" id="pdf-slide-b" aria-label="דף הבא"></canvas>
           </div>
         </div>
         <div class="pdf-nav">
@@ -403,58 +389,99 @@
     const prevBtn = container.querySelector('#pdf-prev')
     const nextBtn = container.querySelector('#pdf-next')
     const loading = container.querySelector('#pdf-loading')
-    let frontIframe = container.querySelector('#pdf-slide-a')
-    let backIframe = container.querySelector('#pdf-slide-b')
+    let frontCanvas = container.querySelector('#pdf-slide-a')
+    let backCanvas = container.querySelector('#pdf-slide-b')
 
     try {
-      // Get page count via PDF.js metadata only (cheap)
       const pdfjsLib = await loadPdfJsLib()
-      const pdf = await pdfjsLib.getDocument({ url }).promise
+      const PDFJS_VER = '3.11.174'
+      const CDN_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VER
+      const pdf = await pdfjsLib.getDocument({
+        url,
+        cMapUrl: CDN_BASE + '/cmaps/',
+        cMapPacked: true,
+        // standardFontDataUrl tells PDF.js where to fetch the 14 standard
+        // PDF fonts when a document references them but doesn't embed
+        // them. Most Canva exports DO embed fonts, but having this set
+        // prevents fallbacks to Times New Roman that mangle Hebrew.
+        standardFontDataUrl: CDN_BASE + '/standard_fonts/',
+      }).promise
       const totalPages = pdf.numPages
 
-      // Read page 1 dimensions so we can size the slide-wrap to match the
-      // PDF page's aspect ratio EXACTLY. With no leftover space inside the
-      // iframe, the browser PDF viewer has nothing to scroll to — combined
-      // with `pointer-events: none` on the iframes, this gives us a true
-      // "one page per slide" presentation.
-      let pageRatio = 16 / 9 // safe default for Canva landscape
-      try {
-        const page1 = await pdf.getPage(1)
-        const vp = page1.getViewport({ scale: 1 })
-        if (vp.width > 0 && vp.height > 0) {
-          pageRatio = vp.width / vp.height
-        }
-      } catch (e) {
-        console.warn('learn: could not read page dimensions, using default ratio', e)
+      // Read page 1 to compute aspect ratio for the slide frame
+      const page1 = await pdf.getPage(1)
+      const baseVp = page1.getViewport({ scale: 1 })
+      const pageRatio = baseVp.width / baseVp.height || (16 / 9)
+
+      // Cache pages so re-rendering on resize / re-visiting is cheap
+      const pageCache = new Map([[1, page1]])
+      async function getPage(n) {
+        if (!pageCache.has(n)) pageCache.set(n, await pdf.getPage(n))
+        return pageCache.get(n)
       }
 
-      // Resize slideWrap to fit the PDF aspect ratio inside slideArea.
-      // We pick the larger of the two dimensions then clip to fit.
+      // Size slideWrap to fit page aspect ratio inside slideArea
       const fitWrap = () => {
-        if (!slideArea || !slideWrap) return
         const aw = slideArea.clientWidth
         const ah = slideArea.clientHeight
         if (aw === 0 || ah === 0) return
-        // Try filling width; if that overflows height, fill height instead.
-        let w = aw
-        let h = aw / pageRatio
+        let w = aw, h = aw / pageRatio
         if (h > ah) { h = ah; w = ah * pageRatio }
-        // Tiny inset so the box-shadow has room to breathe
-        slideWrap.style.width  = Math.floor(w * 0.98) + 'px'
-        slideWrap.style.height = Math.floor(h * 0.98) + 'px'
+        slideWrap.style.width  = Math.floor(w * 0.97) + 'px'
+        slideWrap.style.height = Math.floor(h * 0.97) + 'px'
       }
       fitWrap()
-      // Resize whenever the slide-area changes size (window resize,
-      // device-rotation, sidebar collapse, etc.)
-      let ro = null
-      try {
-        ro = new ResizeObserver(fitWrap)
-        ro.observe(slideArea)
-      } catch {}
-      window.addEventListener('resize', fitWrap)
+
+      // Render a specific PDF page into the given canvas at high-DPI
+      async function renderToCanvas(pageNum, canvas) {
+        const page = await getPage(pageNum)
+        const baseViewport = page.getViewport({ scale: 1 })
+        const cssW = slideWrap.clientWidth
+        if (cssW === 0) return
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        // Scale so the rendered canvas matches CSS width (in CSS px)
+        // multiplied by DPR for crisp rendering on retina displays.
+        const renderScale = (cssW / baseViewport.width) * dpr
+        const viewport = page.getViewport({ scale: renderScale })
+        canvas.width  = Math.floor(viewport.width)
+        canvas.height = Math.floor(viewport.height)
+        const ctx = canvas.getContext('2d', { alpha: false })
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        // Cancel any in-flight render on this canvas before starting new
+        if (canvas._renderTask) {
+          try { canvas._renderTask.cancel() } catch {}
+        }
+        const task = page.render({ canvasContext: ctx, viewport })
+        canvas._renderTask = task
+        try {
+          await task.promise
+        } catch (e) {
+          if (e?.name !== 'RenderingCancelledException') throw e
+        }
+        canvas._renderTask = null
+      }
+
+      // Render initial page
+      await renderToCanvas(1, frontCanvas)
+      if (loading) {
+        loading.classList.add('fade-out')
+        setTimeout(() => loading.remove(), 400)
+      }
 
       let currentPage = 1
       let animating = false
+
+      // Re-render current page when the window resizes (debounced)
+      let resizeTimer = null
+      const onResize = () => {
+        clearTimeout(resizeTimer)
+        resizeTimer = setTimeout(() => {
+          fitWrap()
+          renderToCanvas(currentPage, frontCanvas)
+        }, 200)
+      }
+      window.addEventListener('resize', onResize)
 
       const renderDots = () => {
         dotsEl.innerHTML = ''
@@ -477,96 +504,91 @@
         })
       }
 
-      // Animated transition: load the new page into the BACK iframe,
-      // wait for it to be ready, then crossfade/slide between the two.
-      // RTL convention: 'next' (forward in reading) means new slide
-      // enters from the LEFT (since the reading flow is right-to-left,
-      // turning the page reveals the next one to the left).
-      const goTo = (newPage, dir = null) => {
+      // Navigate to a page with slide animation. Renders the new page
+      // into the back canvas, then crossfades/slides between the two.
+      // RTL convention: 'next' enters from the left (because reading
+      // direction is right-to-left, the next page lives on the left).
+      async function goTo(newPage) {
         if (animating) return
         if (newPage < 1 || newPage > totalPages) return
         if (newPage === currentPage) return
-        const direction = dir || (newPage > currentPage ? 'next' : 'prev')
+        const direction = newPage > currentPage ? 'next' : 'prev'
         animating = true
+        updateUi()
 
-        // Pre-load new page into back iframe
-        backIframe.src = buildSlideUrl(newPage)
-
-        const onReady = () => {
-          backIframe.removeEventListener('load', onReady)
-
-          // Set up initial states
-          frontIframe.classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
-          backIframe.classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
-
-          // Back enters from one side; front exits to the other
-          backIframe.classList.add(direction === 'next' ? 'enter-left' : 'enter-right')
-          // Reflow so the initial transform is registered
-          // eslint-disable-next-line no-unused-expressions
-          backIframe.offsetWidth
-
-          // Trigger animations
-          requestAnimationFrame(() => {
-            frontIframe.classList.add(direction === 'next' ? 'exit-right' : 'exit-left')
-            backIframe.classList.remove('enter-left', 'enter-right')
-            backIframe.classList.add('is-active')
-          })
-
-          // After the transition: swap roles, leave the new front clean
-          setTimeout(() => {
-            // Old front is now the back; clear its src to free memory
-            const oldFront = frontIframe
-            frontIframe = backIframe
-            backIframe = oldFront
-            backIframe.classList.remove('is-active', 'exit-right', 'exit-left')
-            // Don't blank the src — keep it cached in case user navigates back
-            currentPage = newPage
-            animating = false
-            updateUi()
-          }, 600)
+        // Render the new page into the back canvas BEFORE animating
+        try {
+          await renderToCanvas(newPage, backCanvas)
+        } catch (e) {
+          console.error('Page render failed:', e)
+          animating = false
+          updateUi()
+          return
         }
-        // Iframes don't always fire 'load' for pure hash changes; fall
-        // back to a short timeout so the animation never gets stuck.
-        backIframe.addEventListener('load', onReady)
-        setTimeout(() => { if (animating) onReady() }, 500)
+
+        // Reset all classes
+        frontCanvas.classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
+        backCanvas .classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
+
+        // Park back canvas off-screen on the entry side
+        backCanvas.classList.add(direction === 'next' ? 'enter-left' : 'enter-right')
+        // Force reflow so the initial position is registered
+        // eslint-disable-next-line no-unused-expressions
+        void backCanvas.offsetWidth
+
+        // Trigger transitions
+        requestAnimationFrame(() => {
+          frontCanvas.classList.add(direction === 'next' ? 'exit-right' : 'exit-left')
+          backCanvas.classList.remove('enter-left', 'enter-right')
+          backCanvas.classList.add('is-active')
+        })
+
+        setTimeout(() => {
+          // Swap roles
+          const oldFront = frontCanvas
+          frontCanvas = backCanvas
+          backCanvas = oldFront
+          backCanvas.classList.remove('is-active', 'exit-right', 'exit-left')
+          currentPage = newPage
+          animating = false
+          updateUi()
+        }, 600)
       }
 
       renderDots()
       updateUi()
 
-      // Hide loading spinner once first iframe is ready
-      const onFirstLoad = () => {
-        if (loading) {
-          loading.classList.add('fade-out')
-          setTimeout(() => loading.remove(), 400)
-        }
-        frontIframe.removeEventListener('load', onFirstLoad)
-      }
-      frontIframe.addEventListener('load', onFirstLoad)
-      // Safety: hide spinner after 4s regardless
-      setTimeout(onFirstLoad, 4000)
-
       // Wire up navigation
-      prevBtn.addEventListener('click', () => goTo(currentPage - 1, 'prev'))
-      nextBtn.addEventListener('click', () => goTo(currentPage + 1, 'next'))
+      prevBtn.addEventListener('click', () => goTo(currentPage - 1))
+      nextBtn.addEventListener('click', () => goTo(currentPage + 1))
 
       // Keyboard: arrows. In RTL, left arrow = next, right arrow = prev
       const keyHandler = (e) => {
         if (document.getElementById('reader-overlay').style.display === 'none') return
-        if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(currentPage + 1, 'next') }
-        if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage - 1, 'prev') }
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(currentPage + 1) }
+        if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage - 1) }
       }
       document.addEventListener('keydown', keyHandler)
 
-      // Swipe (touch devices)
+      // Swipe (touch devices). RTL: swipe right -> previous, left -> next
       let touchStartX = 0
       slideArea.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX })
       slideArea.addEventListener('touchend', (e) => {
         const dx = e.changedTouches[0].screenX - touchStartX
         if (Math.abs(dx) < 50) return
-        if (dx > 0) goTo(currentPage - 1, 'prev')
-        else        goTo(currentPage + 1, 'next')
+        if (dx > 0) goTo(currentPage - 1)
+        else        goTo(currentPage + 1)
       })
+
+      // Pre-render adjacent pages in the background so navigation feels
+      // instant. We don't wait for these — they hydrate the page cache.
+      // Done in two stages: first the immediate neighbors, then the rest.
+      ;(async () => {
+        try {
+          if (totalPages > 1) await getPage(2)
+          for (let i = 3; i <= totalPages; i++) await getPage(i)
+        } catch {}
+      })()
     } catch (err) {
       console.error('PDF render error:', err)
       container.innerHTML = `
