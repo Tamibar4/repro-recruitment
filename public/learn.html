@@ -359,14 +359,15 @@
     }
     .pdf-slide {
       position: absolute;
-      max-width: 96%; max-height: 100%;
+      width: 96%; height: 100%;
+      border: none;
       border-radius: 12px;
       box-shadow: 0 16px 50px rgba(94,92,230,0.30), 0 2px 6px rgba(26,31,58,0.08);
       background: white;
       transition: transform 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.15),
                   opacity 0.4s ease;
       will-change: transform, opacity;
-      pointer-events: none; user-select: none; -webkit-user-drag: none;
+      opacity: 0;
     }
     .pdf-slide.is-active   { transform: translateX(0)     scale(1);   opacity: 1; z-index: 2; }
     .pdf-slide.exit-right  { transform: translateX(-110%) scale(0.85);opacity: 0; z-index: 1; }
@@ -743,7 +744,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=14"></script>
+  <script src="js/learn.js?v=15"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>

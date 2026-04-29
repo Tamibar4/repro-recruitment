@@ -325,11 +325,17 @@
     }
   }
 
-  // ----- Slide-deck renderer (PDF.js + custom UI) ---------------------
-  // Each page is rendered to a <canvas> via PDF.js. We build a slide
-  // viewer that shows ONE page at a time, with smooth slide-in/out
-  // animations and prev/next/keyboard/swipe navigation. Big visual win
-  // over the continuous-scroll iframe — feels like a real presentation.
+  // ----- Slide-deck renderer (iframe-based) ---------------------------
+  // We use the BROWSER'S NATIVE PDF viewer inside iframes — it's the
+  // only renderer that handles Hebrew RTL shaping correctly for Canva
+  // exports. PDF.js's canvas renderer mangles Hebrew letters into
+  // disconnected glyphs ("בח פ ם הבא ם" instead of "ברוכים הבאים").
+  //
+  // To get a slide-deck feel out of an iframe-per-page setup, we keep
+  // TWO iframes layered on top of each other. The 'incoming' iframe
+  // pre-loads the next page off-screen, then we animate the swap.
+  // PDF.js is loaded only to get the page count (lightweight metadata
+  // call) — never to render visuals.
   async function loadPdfJsLib() {
     if (window.pdfjsLib) return window.pdfjsLib
     await new Promise((resolve, reject) => {
@@ -349,6 +355,9 @@
     const url = '/api/training/modules/' + moduleId
       + '/view?token=' + encodeURIComponent(token)
 
+    const buildSlideUrl = (page) =>
+      url + '#page=' + page + '&view=Fit&toolbar=0&navpanes=0&scrollbar=0'
+
     container.innerHTML = `
       <div class="pdf-stage">
         <div class="pdf-loading" id="pdf-loading">
@@ -357,7 +366,11 @@
           <div class="pdf-loading-hint">בטעינה ראשונה זה לוקח מספר שניות. בכניסות הבאות זה יהיה מיידי ⚡</div>
         </div>
         <div class="pdf-page-counter" id="pdf-counter">— / —</div>
-        <div class="pdf-slide-area" id="pdf-slide-area"></div>
+        <div class="pdf-slide-area" id="pdf-slide-area">
+          <iframe class="pdf-slide is-active" id="pdf-slide-a" title="דף נוכחי"
+                  src="${buildSlideUrl(1)}"></iframe>
+          <iframe class="pdf-slide" id="pdf-slide-b" title="דף הבא"></iframe>
+        </div>
         <div class="pdf-nav">
           <button class="pdf-nav-btn" id="pdf-prev" title="הקודם" disabled>›</button>
           <div class="pdf-nav-dots" id="pdf-dots"></div>
@@ -372,44 +385,18 @@
     const prevBtn = container.querySelector('#pdf-prev')
     const nextBtn = container.querySelector('#pdf-next')
     const loading = container.querySelector('#pdf-loading')
+    let frontIframe = container.querySelector('#pdf-slide-a')
+    let backIframe = container.querySelector('#pdf-slide-b')
 
     try {
+      // Get page count via PDF.js metadata only (cheap)
       const pdfjsLib = await loadPdfJsLib()
       const pdf = await pdfjsLib.getDocument({ url }).promise
-
       const totalPages = pdf.numPages
+
       let currentPage = 1
-      const slides = new Map() // pageNum → canvas element
+      let animating = false
 
-      // Render a single page to a canvas (cached). Returns the canvas.
-      const renderPage = async (pageNum) => {
-        if (slides.has(pageNum)) return slides.get(pageNum)
-        const page = await pdf.getPage(pageNum)
-        const baseViewport = page.getViewport({ scale: 1 })
-        // Fit-to-area: take 95% of slide area, keep aspect ratio
-        const areaW = slideArea.clientWidth * 0.96
-        const areaH = slideArea.clientHeight
-        const scaleW = areaW / baseViewport.width
-        const scaleH = areaH / baseViewport.height
-        const fitScale = Math.min(scaleW, scaleH)
-        const dpr = Math.min(window.devicePixelRatio || 1, 2)
-        const viewport = page.getViewport({ scale: fitScale * dpr })
-
-        const canvas = document.createElement('canvas')
-        canvas.className = 'pdf-slide'
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        canvas.style.width = (viewport.width / dpr) + 'px'
-        canvas.style.height = (viewport.height / dpr) + 'px'
-        canvas.dataset.page = pageNum
-        slideArea.appendChild(canvas)
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-        slides.set(pageNum, canvas)
-        return canvas
-      }
-
-      // Render dots indicator (one per page, max 30 visible — beyond that
-      // we let it scroll horizontally)
       const renderDots = () => {
         dotsEl.innerHTML = ''
         for (let i = 1; i <= totalPages; i++) {
@@ -424,90 +411,100 @@
 
       const updateUi = () => {
         counterEl.textContent = `${currentPage} / ${totalPages}`
-        prevBtn.disabled = currentPage === 1
-        nextBtn.disabled = currentPage === totalPages
+        prevBtn.disabled = currentPage === 1 || animating
+        nextBtn.disabled = currentPage === totalPages || animating
         dotsEl.querySelectorAll('.pdf-nav-dot').forEach((d) => {
           d.classList.toggle('active', parseInt(d.dataset.page) === currentPage)
         })
       }
 
-      // Animated transition between pages — RTL: 'next' slides FROM the
-      // left side and current page exits to the right.
-      const goTo = async (newPage, dir = null) => {
+      // Animated transition: load the new page into the BACK iframe,
+      // wait for it to be ready, then crossfade/slide between the two.
+      // RTL convention: 'next' (forward in reading) means new slide
+      // enters from the LEFT (since the reading flow is right-to-left,
+      // turning the page reveals the next one to the left).
+      const goTo = (newPage, dir = null) => {
+        if (animating) return
         if (newPage < 1 || newPage > totalPages) return
         if (newPage === currentPage) return
         const direction = dir || (newPage > currentPage ? 'next' : 'prev')
+        animating = true
 
-        const incomingCanvas = await renderPage(newPage)
-        const outgoingCanvas = slides.get(currentPage)
+        // Pre-load new page into back iframe
+        backIframe.src = buildSlideUrl(newPage)
 
-        // Reset all classes first
-        slides.forEach((c) => { c.className = 'pdf-slide' })
+        const onReady = () => {
+          backIframe.removeEventListener('load', onReady)
 
-        // Set initial state for incoming
-        incomingCanvas.classList.add(direction === 'next' ? 'enter-left' : 'enter-right')
-        // Force a reflow so the browser registers the initial transform
-        // before we transition to the active state.
-        // eslint-disable-next-line no-unused-expressions
-        incomingCanvas.offsetWidth
+          // Set up initial states
+          frontIframe.classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
+          backIframe.classList.remove('is-active', 'enter-left', 'enter-right', 'exit-left', 'exit-right')
 
-        // Outgoing exits in the opposite direction
-        if (outgoingCanvas) {
-          outgoingCanvas.classList.add(direction === 'next' ? 'exit-right' : 'exit-left')
+          // Back enters from one side; front exits to the other
+          backIframe.classList.add(direction === 'next' ? 'enter-left' : 'enter-right')
+          // Reflow so the initial transform is registered
+          // eslint-disable-next-line no-unused-expressions
+          backIframe.offsetWidth
+
+          // Trigger animations
+          requestAnimationFrame(() => {
+            frontIframe.classList.add(direction === 'next' ? 'exit-right' : 'exit-left')
+            backIframe.classList.remove('enter-left', 'enter-right')
+            backIframe.classList.add('is-active')
+          })
+
+          // After the transition: swap roles, leave the new front clean
+          setTimeout(() => {
+            // Old front is now the back; clear its src to free memory
+            const oldFront = frontIframe
+            frontIframe = backIframe
+            backIframe = oldFront
+            backIframe.classList.remove('is-active', 'exit-right', 'exit-left')
+            // Don't blank the src — keep it cached in case user navigates back
+            currentPage = newPage
+            animating = false
+            updateUi()
+          }, 600)
         }
-
-        // Trigger animation: switch incoming to active
-        requestAnimationFrame(() => {
-          incomingCanvas.classList.remove('enter-left', 'enter-right')
-          incomingCanvas.classList.add('is-active')
-        })
-
-        currentPage = newPage
-        updateUi()
-
-        // Pre-load the NEXT page in the background so the next click
-        // is instant
-        if (currentPage + 1 <= totalPages) renderPage(currentPage + 1).catch(() => {})
-        if (currentPage - 1 >= 1)         renderPage(currentPage - 1).catch(() => {})
+        // Iframes don't always fire 'load' for pure hash changes; fall
+        // back to a short timeout so the animation never gets stuck.
+        backIframe.addEventListener('load', onReady)
+        setTimeout(() => { if (animating) onReady() }, 500)
       }
 
-      // Initial render: page 1 active
       renderDots()
-      const firstCanvas = await renderPage(1)
-      firstCanvas.classList.add('is-active')
-      // Pre-load page 2 in background
-      if (totalPages > 1) renderPage(2).catch(() => {})
-
       updateUi()
-      // Hide loading spinner
-      if (loading) {
-        loading.classList.add('fade-out')
-        setTimeout(() => loading.remove(), 400)
+
+      // Hide loading spinner once first iframe is ready
+      const onFirstLoad = () => {
+        if (loading) {
+          loading.classList.add('fade-out')
+          setTimeout(() => loading.remove(), 400)
+        }
+        frontIframe.removeEventListener('load', onFirstLoad)
       }
+      frontIframe.addEventListener('load', onFirstLoad)
+      // Safety: hide spinner after 4s regardless
+      setTimeout(onFirstLoad, 4000)
 
       // Wire up navigation
-      // RTL: prev button is on the right (has the '›' arrow), next on left ('‹')
       prevBtn.addEventListener('click', () => goTo(currentPage - 1, 'prev'))
       nextBtn.addEventListener('click', () => goTo(currentPage + 1, 'next'))
 
-      // Keyboard navigation — arrow keys
+      // Keyboard: arrows. In RTL, left arrow = next, right arrow = prev
       const keyHandler = (e) => {
         if (document.getElementById('reader-overlay').style.display === 'none') return
-        // RTL: left arrow = next, right arrow = prev
         if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(currentPage + 1, 'next') }
         if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage - 1, 'prev') }
       }
       document.addEventListener('keydown', keyHandler)
 
-      // Swipe support for touch devices
+      // Swipe (touch devices)
       let touchStartX = 0
-      slideArea.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX
-      })
+      slideArea.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX })
       slideArea.addEventListener('touchend', (e) => {
         const dx = e.changedTouches[0].screenX - touchStartX
         if (Math.abs(dx) < 50) return
-        // RTL: swipe right = previous, swipe left = next
         if (dx > 0) goTo(currentPage - 1, 'prev')
         else        goTo(currentPage + 1, 'next')
       })
@@ -585,6 +582,12 @@
       c.style.display = 'flex'
     }
 
+    // ONLY trigger on direct screenshot keypresses (PrintScreen, Ctrl+P,
+    // etc.). The previous version triggered on window blur / mouse leave /
+    // visibilitychange — which broke normal reading because every tab
+    // switch or cursor wander made the cover pop up. Watermark + legal
+    // disclaimer carry most of the deterrent weight; the cover is just a
+    // 'caught you' for the obvious shortcut presses.
     document.addEventListener('keydown', (e) => {
       if (overlay.style.display === 'none') return
       if ((e.ctrlKey || e.metaKey) && ['p', 's', 'a', 'P', 'S', 'A'].includes(e.key)) {
@@ -598,37 +601,7 @@
         try { navigator.clipboard?.writeText('') } catch {}
         return
       }
-      // Win+Shift+S key combo (some browsers DO fire this, depending on
-      // OS-level interception order)
-      if (e.shiftKey && (e.metaKey || e.key === 'Meta') && (e.key === 'S' || e.key === 's')) {
-        e.preventDefault()
-        showCover()
-        return
-      }
       if (e.key === 'Escape') closeReader()
-    })
-
-    // Window losing focus — Win+Shift+S, Alt+Tab, switching apps, etc.
-    // This is the most reliable signal for Win+Shift+S because the
-    // snipping tool steals focus the moment it opens.
-    window.addEventListener('blur', () => {
-      showCover()
-    })
-
-    // Document visibility — switching tabs, minimizing, etc.
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) showCover()
-    })
-
-    // Mouse leaving the window towards browser chrome (likely going to
-    // grab the snipping tool from the taskbar or start menu)
-    document.addEventListener('mouseleave', (e) => {
-      // mouseleave from <html> means cursor left the document area
-      if (overlay.style.display === 'none') return
-      if (e.clientY <= 0 || e.clientX <= 0 ||
-          e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
-        showCover()
-      }
     })
 
     reader?.addEventListener('dragstart', (e) => e.preventDefault())
