@@ -531,19 +531,28 @@
 
   async function publishToGroup(post, group) {
     if (!group) return;
-    const validUrl = normalizeUrl(group.url);
-    if (!validUrl) {
-      showToast(`לקבוצה "${group.name}" אין קישור תקין. ערכי את החשבון והוסיפי קישור כמו https://facebook.com/groups/...`, 'error');
-      return;
-    }
-    // Copy text to clipboard so the user can paste in the group's composer
+    // Always copy the text to clipboard — that's the main thing the
+    // user wants to do. Opening the group URL is a nice-to-have that
+    // only works if the URL was entered correctly.
     if (post.text) {
       try { await navigator.clipboard.writeText(post.text); } catch {}
     }
-    window.open(validUrl, '_blank', 'noopener,noreferrer');
-    showToast(post.text
-      ? `הטקסט הועתק. הקבוצה "${group.name}" נפתחה — הדביקי שם (Ctrl+V) ופרסמי`
-      : `הקבוצה "${group.name}" נפתחה`);
+    const validUrl = normalizeUrl(group.url);
+    if (validUrl) {
+      // Best case: copy text + open the actual group page
+      window.open(validUrl, '_blank', 'noopener,noreferrer');
+      showToast(post.text
+        ? `הטקסט הועתק. הקבוצה "${group.name}" נפתחה — הדביקי שם (Ctrl+V) ופרסמי`
+        : `הקבוצה "${group.name}" נפתחה`);
+    } else {
+      // No (valid) URL — copy text anyway and tell the user to navigate
+      // manually. Don't block her workflow just because the URL is bad.
+      if (post.text) {
+        showToast(`הטקסט הועתק! עברי לקבוצה "${group.name}" בפייסבוק והדביקי (Ctrl+V). 💡 אפשר להוסיף קישור לקבוצה ע"י עריכת החשבון — אז זה ייפתח אוטומטית.`);
+      } else {
+        showToast(`אין טקסט בפוסט הזה. הוסיפי טקסט קודם, או הוסיפי קישור לקבוצה ע"י עריכת החשבון.`, 'error');
+      }
+    }
   }
 
   // ----- Account modal ------------------------------------------------
