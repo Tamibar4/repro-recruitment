@@ -2819,11 +2819,24 @@ app.get('/api/publishing/posts', (req, res) => {
   }
   if (req.query.q) {
     const q = String(req.query.q).toLowerCase();
-    posts = posts.filter(p => (p.text || '').toLowerCase().includes(q));
+    posts = posts.filter(p => {
+      if ((p.text || '').toLowerCase().includes(q)) return true;
+      if (Array.isArray(p.texts) && p.texts.some(t => String(t).toLowerCase().includes(q))) return true;
+      return false;
+    });
   }
 
   // Sort: most recently updated first
   posts.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+
+  // Backfill: posts created before the multi-text schema have only `text`.
+  // Synthesize `texts` so the frontend can rely on it being present.
+  posts = posts.map(p => {
+    if (!Array.isArray(p.texts) || p.texts.length === 0) {
+      return { ...p, texts: p.text ? [p.text] : [] };
+    }
+    return p;
+  });
   res.json(posts);
 });
 
@@ -2841,6 +2854,18 @@ app.post('/api/publishing/posts', (req, res) => {
     const text = req.body?.text != null
       ? validateString(req.body.text, { required: false, maxLen: 5000 })
       : '';
+    // Multiple text variations (cubes in the preview modal). If the
+    // client only sent the legacy `text` field, treat that as a single-
+    // entry array.
+    let texts;
+    if (Array.isArray(req.body?.texts)) {
+      texts = req.body.texts
+        .map(t => String(t || '').slice(0, 5000))
+        .filter(t => t.trim().length > 0)
+        .slice(0, 10);
+    } else {
+      texts = text && text.trim() ? [text] : [];
+    }
     let status = req.body?.status || 'draft';
     if (!PUB_VALID_STATUSES.includes(status)) status = 'draft';
     const images = Array.isArray(req.body?.images)
@@ -2869,7 +2894,8 @@ app.post('/api/publishing/posts', (req, res) => {
       id: nextId('facebook_posts'),
       account_id,
       title,
-      text,
+      text,            // primary/first variant — kept for backward compat
+      texts,           // ordered list of all variants
       image_url,
       images,
       reference_url,
@@ -2902,8 +2928,26 @@ app.put('/api/publishing/posts/:id', (req, res) => {
     if (req.body.title !== undefined) {
       post.title = validateString(req.body.title, { required: false, maxLen: 200 }) || '';
     }
-    if (req.body.text !== undefined) {
+    if (req.body.texts !== undefined) {
+      const list = Array.isArray(req.body.texts)
+        ? req.body.texts
+            .map(t => String(t || '').slice(0, 5000))
+            .filter(t => t.trim().length > 0)
+            .slice(0, 10)
+        : [];
+      post.texts = list;
+      // Keep `text` (the legacy single field) in sync with the first
+      // variant so older code paths keep working.
+      post.text = list[0] || '';
+    } else if (req.body.text !== undefined) {
       post.text = validateString(req.body.text, { required: false, maxLen: 5000 }) || '';
+      // If we have a `texts` array, mirror the first entry; otherwise
+      // create a one-entry list so the new schema is populated.
+      if (Array.isArray(post.texts) && post.texts.length > 0) {
+        post.texts[0] = post.text;
+      } else {
+        post.texts = post.text ? [post.text] : [];
+      }
     }
     if (req.body.images !== undefined) {
       const newList = Array.isArray(req.body.images)
@@ -3005,6 +3049,7 @@ app.post('/api/publishing/posts/:id/duplicate', (req, res) => {
     account_id: req.body?.account_id ? parseInt(req.body.account_id, 10) : orig.account_id,
     title: orig.title || '',
     text: orig.text,
+    texts: Array.isArray(orig.texts) ? orig.texts.slice() : (orig.text ? [orig.text] : []),
     image_url: orig.image_url,
     images: Array.isArray(orig.images) ? orig.images.slice() : (orig.image_url ? [orig.image_url] : []),
     reference_url: orig.reference_url || null,

@@ -41,6 +41,7 @@
   let editingAccountId = null;
   let postImages = [];          // all images attached to the post being edited
   let postSelectedImage = null; // currently-selected (primary) image URL
+  let postTexts = [''];         // text variations being edited (always at least 1)
   let postTags = [];
   let movingPostId = null;
 
@@ -400,32 +401,77 @@
   }
 
   // Modal that shows the full post content + every action when the user
-  // clicks the body of a card. The user explicitly asked for a window
-  // (modal) instead of inline expansion.
+  // clicks the body of a card. Two interactive sections:
+  //
+  //  1. Image carousel — navigate with prev/next, dot indicators show
+  //     position. A "📋 העתק תמונה" button on the carousel copies the
+  //     CURRENTLY-VISIBLE image (so the user can flip + copy any image).
+  //
+  //  2. Text cubes — one cube per text variation (post.texts). Each
+  //     cube shows a 2-line preview; click to expand inline → reveals
+  //     the full text + a per-cube copy button. Click again to collapse.
+  //
+  // Plus: title, reference link, status badge, tags, plus the standard
+  // post-level actions (edit, duplicate, move, delete).
   function openPreviewModal(post) {
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDate(post.publish_date) : '';
     const title = postTitle(post);
-    const imgSrc = imageUrl(post.image_url);
+    const images = Array.isArray(post.images) && post.images.length > 0
+      ? post.images
+      : (post.image_url ? [post.image_url] : []);
+    const texts = Array.isArray(post.texts) && post.texts.length > 0
+      ? post.texts
+      : (post.text ? [post.text] : []);
 
     document.getElementById('preview-modal-title').textContent = title || `פוסט · ${statusLabel}`;
     document.getElementById('preview-modal-content').innerHTML = `
-      ${imgSrc ? `<img class="pub-preview-image" src="${escapeHtml(imgSrc)}" alt=""
-                       onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;background:rgba(226,68,92,0.1);color:var(--color-red);border-radius:8px;margin-bottom:14px;text-align:center\\'>⚠️ התמונה לא נטענה. נסי להעלות שוב.</div>');">` : ''}
+      ${images.length > 0 ? `
+        <div class="pub-carousel" data-current="0">
+          <div class="pub-carousel-stage" id="carousel-stage">
+            <img src="${escapeHtml(imageUrl(images[0]))}" alt=""
+                 onerror="this.outerHTML='<div style=&quot;padding:24px;color:var(--color-red);text-align:center&quot;>⚠️ התמונה לא נטענה. נסי להעלות שוב.</div>';">
+          </div>
+          ${images.length > 1 ? `
+            <button class="pub-carousel-nav prev" id="carousel-prev" title="הקודם" disabled>›</button>
+            <button class="pub-carousel-nav next" id="carousel-next" title="הבא">‹</button>
+            <div class="pub-carousel-counter" id="carousel-counter">1 / ${images.length}</div>
+          ` : ''}
+          <button class="pub-carousel-copy" id="carousel-copy" title="העתק את התמונה הזו">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            העתק תמונה
+          </button>
+          ${images.length > 1 ? `
+            <div class="pub-carousel-dots" id="carousel-dots">
+              ${images.map((_, i) => `<button class="${i === 0 ? 'active' : ''}" data-idx="${i}" title="תמונה ${i + 1}"></button>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
       ${title ? `<div class="pub-preview-title">${escapeHtml(title)}</div>` : ''}
-      <div class="pub-preview-text">${escapeHtml(post.text || '')}</div>
+      ${texts.length > 0 ? `
+        <div class="pub-text-cubes" id="text-cubes">
+          ${texts.map((t, i) => `
+            <div class="pub-text-cube" data-idx="${i}">
+              ${texts.length > 1 ? `<span class="pub-text-cube-num">וריאציה ${i + 1}</span>` : ''}
+              <div class="pub-text-cube-preview">${escapeHtml(t)}</div>
+              <div class="pub-text-cube-hint">לחצי לפתיחה ולהעתקה</div>
+              <div class="pub-text-cube-actions">
+                <button class="copy-btn" data-cube-action="copy" data-idx="${i}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;display:inline;vertical-align:-2px;margin-left:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  העתק טקסט
+                </button>
+                <button class="close-btn" data-cube-action="close" data-idx="${i}">סגרי</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
       ${post.reference_url ? `
         <div style="margin-bottom:14px">
           <a class="pub-post-reflink" href="${escapeHtml(post.reference_url)}" target="_blank" rel="noopener noreferrer">
             קישור לפוסט מקורי / לדוגמה
           </a>
-        </div>` : ''}
-      ${post.images && post.images.length > 1 ? `
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-          <span style="font-size:12px;color:var(--color-text-secondary);font-weight:600;margin-left:4px;align-self:center">תמונות נוספות:</span>
-          ${post.images.filter(u => u !== post.image_url).map(u => `
-            <img src="${escapeHtml(imageUrl(u))}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--color-border)">
-          `).join('')}
         </div>` : ''}
       <div class="pub-preview-meta">
         <span class="pub-post-status ${post.status}" style="position:static">${statusLabel}</span>
@@ -433,8 +479,6 @@
         ${post.tags && post.tags.length ? post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('') : ''}
       </div>
       <div class="pub-preview-actions">
-        <button class="btn btn-primary"   data-prev-action="copy-text">📄 העתק טקסט</button>
-        <button class="btn btn-secondary" data-prev-action="copy-image" ${post.image_url ? '' : 'disabled'}>🖼️ העתק תמונה</button>
         <button class="btn btn-secondary" data-prev-action="edit">✏️ ערוך</button>
         <button class="btn btn-secondary" data-prev-action="duplicate">📋 שכפלי</button>
         <button class="btn btn-secondary" data-prev-action="move">🔀 העבירי</button>
@@ -443,12 +487,68 @@
     `;
 
     const content = document.getElementById('preview-modal-content');
+
+    // ---- Carousel wiring ----
+    if (images.length > 0) {
+      const stage    = content.querySelector('#carousel-stage');
+      const counter  = content.querySelector('#carousel-counter');
+      const dotsWrap = content.querySelector('#carousel-dots');
+      const prevBtn  = content.querySelector('#carousel-prev');
+      const nextBtn  = content.querySelector('#carousel-next');
+      const copyBtn  = content.querySelector('#carousel-copy');
+      let currentImageIdx = 0;
+
+      const showImage = (idx) => {
+        if (idx < 0 || idx >= images.length) return;
+        currentImageIdx = idx;
+        stage.innerHTML = `<img src="${escapeHtml(imageUrl(images[idx]))}" alt=""
+          onerror="this.outerHTML='<div style=&quot;padding:24px;color:var(--color-red);text-align:center&quot;>⚠️ התמונה לא נטענה</div>';">`;
+        if (counter) counter.textContent = `${idx + 1} / ${images.length}`;
+        if (dotsWrap) {
+          dotsWrap.querySelectorAll('button').forEach((d, i) => d.classList.toggle('active', i === idx));
+        }
+        if (prevBtn) prevBtn.disabled = idx === 0;
+        if (nextBtn) nextBtn.disabled = idx === images.length - 1;
+      };
+
+      prevBtn?.addEventListener('click', () => showImage(currentImageIdx - 1));
+      nextBtn?.addEventListener('click', () => showImage(currentImageIdx + 1));
+      dotsWrap?.querySelectorAll('button').forEach((d) => {
+        d.addEventListener('click', () => showImage(parseInt(d.dataset.idx, 10)));
+      });
+      copyBtn?.addEventListener('click', async () => {
+        await handleCopyImage(post, copyBtn, images[currentImageIdx]);
+      });
+
+      if (nextBtn) nextBtn.disabled = images.length <= 1;
+    }
+
+    // ---- Text cubes wiring ----
+    content.querySelectorAll('.pub-text-cube').forEach(cube => {
+      const idx = parseInt(cube.dataset.idx, 10);
+      // Click on the cube itself (but not on action buttons) toggles
+      cube.addEventListener('click', (e) => {
+        if (e.target.closest('[data-cube-action]')) return;
+        cube.classList.toggle('is-expanded');
+      });
+      cube.querySelectorAll('[data-cube-action]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.cubeAction;
+          if (action === 'copy') {
+            await handleCopyText(post, btn, texts[idx]);
+          } else if (action === 'close') {
+            cube.classList.remove('is-expanded');
+          }
+        });
+      });
+    });
+
+    // ---- Post-level actions ----
     content.querySelectorAll('[data-prev-action]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const a = btn.dataset.prevAction;
-        if (a === 'copy-text')      await handleCopyText(post, btn);
-        else if (a === 'copy-image') await handleCopyImage(post, btn);
-        else if (a === 'edit')      { closeModal('preview-modal'); openPostModal(post); }
+        if (a === 'edit')           { closeModal('preview-modal'); openPostModal(post); }
         else if (a === 'duplicate') { closeModal('preview-modal'); await handleDuplicate(post); }
         else if (a === 'move')      { closeModal('preview-modal'); openMoveModal(post); }
         else if (a === 'delete')    {
@@ -505,23 +605,27 @@
   // clipboard, pasting the image drops the text and vice-versa. So
   // Tami picks: copy text first, paste; then copy image, paste.
 
-  async function handleCopyText(post, btn) {
-    if (!post.text) {
+  async function handleCopyText(post, btn, explicitText) {
+    // If an explicit text is passed (from a cube/variation), use that.
+    // Otherwise fall back to the post's primary/first text.
+    const txt = explicitText != null
+      ? explicitText
+      : (post.text || (Array.isArray(post.texts) ? post.texts[0] : '') || '');
+    if (!txt) {
       showToast('הפוסט ללא טקסט', 'error');
       return;
     }
     const original = btn.innerHTML;
     btn.disabled = true;
     try {
-      await navigator.clipboard.writeText(post.text);
+      await navigator.clipboard.writeText(txt);
       btn.classList.add('copied');
       btn.innerHTML = '✓ הועתק';
       showToast('הטקסט הועתק ללוח. הדביקי בפייסבוק (Ctrl+V)');
     } catch (e) {
       console.warn('writeText failed:', e);
-      // Fallback: textarea select+copy
       const ta = document.createElement('textarea');
-      ta.value = post.text;
+      ta.value = txt;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
@@ -533,8 +637,9 @@
     setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; btn.disabled = false; }, 1800);
   }
 
-  async function handleCopyImage(post, btn) {
-    if (!post.image_url) {
+  async function handleCopyImage(post, btn, explicitUrl) {
+    const rawUrl = explicitUrl || post.image_url;
+    if (!rawUrl) {
       showToast('אין תמונה לפוסט הזה', 'error');
       return;
     }
@@ -546,7 +651,7 @@
       }
       // Use the same authenticated URL the <img> tag uses, so this works
       // even if direct static serving is blocked.
-      const fetchUrl = imageUrl(post.image_url);
+      const fetchUrl = imageUrl(rawUrl);
       const res = await fetch(fetchUrl);
       if (!res.ok) throw new Error('Failed to fetch image');
       const blob = await res.blob();
@@ -558,8 +663,8 @@
     } catch (e) {
       console.warn('image copy failed, falling back to download:', e);
       const a = document.createElement('a');
-      a.href = post.image_url;
-      a.download = post.image_url.split('/').pop() || 'post-image';
+      a.href = imageUrl(rawUrl);
+      a.download = rawUrl.split('/').pop() || 'post-image';
       document.body.appendChild(a); a.click(); a.remove();
       btn.classList.add('copied');
       btn.innerHTML = '✓ ירדה';
@@ -810,8 +915,16 @@
       </option>`).join('');
 
     document.getElementById('post-title').value = post ? (post.title || '') : '';
-    document.getElementById('post-text').value = post ? (post.text || '') : '';
     document.getElementById('post-reference-url').value = post ? (post.reference_url || '') : '';
+    // Load text variations: prefer post.texts, fall back to single post.text
+    if (post && Array.isArray(post.texts) && post.texts.length > 0) {
+      postTexts = post.texts.slice();
+    } else if (post && post.text) {
+      postTexts = [post.text];
+    } else {
+      postTexts = [''];
+    }
+    renderTextsArea();
     const status = post ? post.status : (prefill.presetStatus || 'draft');
     document.querySelector(`input[name="post-status"][value="${status}"]`).checked = true;
     togglePublishDateRow(status);
@@ -848,6 +961,56 @@
   function togglePublishDateRow(status) {
     document.getElementById('post-publish-date-row').style.display =
       (status === 'scheduled' || status === 'published') ? '' : 'none';
+  }
+
+  // Renders the multi-text editor inside the post modal. Each variation
+  // is a textarea; one row gets a delete button (when there's more than
+  // one); a "+ הוסיפי וריאציה" button appends another. We only re-render
+  // on add/delete so typing doesn't fight focus with the React-style
+  // re-render loop.
+  function renderTextsArea() {
+    const area = document.getElementById('post-texts-area');
+    if (!area) return;
+    if (!Array.isArray(postTexts) || postTexts.length === 0) postTexts = [''];
+    area.innerHTML = postTexts.map((t, i) => `
+      <div class="pub-text-edit-row" data-idx="${i}">
+        <span class="pub-text-edit-label">${postTexts.length > 1 ? `וריאציה ${i + 1}` : 'טקסט'}</span>
+        <textarea data-text-idx="${i}" maxlength="5000" placeholder="${i === 0 ? 'כתבי כאן את תוכן הפוסט...' : 'גרסה נוספת...'}">${escapeHtml(t || '')}</textarea>
+        ${postTexts.length > 1
+          ? `<button type="button" class="pub-text-edit-delete" data-del-idx="${i}" title="מחקי וריאציה">🗑️</button>`
+          : ''}
+      </div>
+    `).join('') + `
+      <button type="button" class="pub-text-add-btn" id="add-text-variation">+ הוסיפי וריאציה</button>
+    `;
+    // Wire up: keep state in sync as user types
+    area.querySelectorAll('textarea[data-text-idx]').forEach(ta => {
+      ta.addEventListener('input', () => {
+        const idx = parseInt(ta.dataset.textIdx, 10);
+        postTexts[idx] = ta.value;
+      });
+    });
+    area.querySelectorAll('.pub-text-edit-delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.delIdx, 10);
+        postTexts.splice(idx, 1);
+        if (postTexts.length === 0) postTexts = [''];
+        renderTextsArea();
+      });
+    });
+    document.getElementById('add-text-variation')?.addEventListener('click', () => {
+      if (postTexts.length >= 10) {
+        showToast('הגעת למקסימום של 10 וריאציות', 'error');
+        return;
+      }
+      postTexts.push('');
+      renderTextsArea();
+      // Focus the new textarea
+      setTimeout(() => {
+        const lastTa = area.querySelector(`textarea[data-text-idx="${postTexts.length - 1}"]`);
+        if (lastTa) lastTa.focus();
+      }, 30);
+    });
   }
 
   // Renders the multi-image gallery inside the post modal. The user can
@@ -945,14 +1108,16 @@
   async function savePost() {
     const account_id = parseInt(document.getElementById('post-account').value, 10);
     const title = document.getElementById('post-title').value;
-    const text = document.getElementById('post-text').value;
     const reference_url = document.getElementById('post-reference-url').value.trim() || null;
     const status = document.querySelector('input[name="post-status"]:checked')?.value || 'draft';
     const dateRaw = document.getElementById('post-publish-date').value;
     const publish_date = dateRaw ? new Date(dateRaw).toISOString() : null;
 
+    // Collect texts from postTexts state, drop empties
+    const cleanTexts = (postTexts || []).map(t => t.trim()).filter(Boolean);
+
     if (!account_id) { showToast('צריך לבחור חשבון', 'error'); return; }
-    if (!title.trim() && !text.trim() && postImages.length === 0) {
+    if (!title.trim() && cleanTexts.length === 0 && postImages.length === 0) {
       showToast('פוסט חייב להכיל כותרת, טקסט או תמונה', 'error');
       return;
     }
@@ -964,7 +1129,8 @@
     const payload = {
       account_id,
       title: title || '',
-      text: text || '',
+      texts: cleanTexts,
+      text: cleanTexts[0] || '',  // legacy field kept in sync with first variant
       images: postImages,
       image_url: postSelectedImage,
       reference_url,
