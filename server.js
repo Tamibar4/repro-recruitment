@@ -2843,7 +2843,22 @@ app.post('/api/publishing/posts', (req, res) => {
       : '';
     let status = req.body?.status || 'draft';
     if (!PUB_VALID_STATUSES.includes(status)) status = 'draft';
-    const image_url = req.body?.image_url ? String(req.body.image_url).slice(0, 500) : null;
+    const images = Array.isArray(req.body?.images)
+      ? req.body.images.map(u => String(u).slice(0, 500)).filter(Boolean).slice(0, 10)
+      : [];
+    // image_url = the currently-selected image (for cards/copy). Defaults
+    // to the first one in the list. If body sends image_url separately,
+    // we accept it as long as it's in `images` (or null to clear).
+    let image_url = req.body?.image_url ? String(req.body.image_url).slice(0, 500) : null;
+    if (image_url && images.length > 0 && !images.includes(image_url)) {
+      // Selected image wasn't in the list — assume it should be added
+      images.push(image_url);
+    } else if (!image_url && images.length > 0) {
+      image_url = images[0];
+    }
+    const reference_url = req.body?.reference_url
+      ? String(req.body.reference_url).slice(0, 500)
+      : null;
     const tags = Array.isArray(req.body?.tags)
       ? req.body.tags.map(t => String(t).trim().slice(0, 32)).filter(Boolean).slice(0, 20)
       : [];
@@ -2856,6 +2871,8 @@ app.post('/api/publishing/posts', (req, res) => {
       title,
       text,
       image_url,
+      images,
+      reference_url,
       tags,
       status,
       publish_date,
@@ -2888,15 +2905,51 @@ app.put('/api/publishing/posts/:id', (req, res) => {
     if (req.body.text !== undefined) {
       post.text = validateString(req.body.text, { required: false, maxLen: 5000 }) || '';
     }
-    if (req.body.image_url !== undefined) {
-      // Old image to potentially clean up if replaced
-      const oldImg = post.image_url;
-      post.image_url = req.body.image_url ? String(req.body.image_url).slice(0, 500) : null;
-      if (oldImg && oldImg !== post.image_url && oldImg.startsWith('/uploads/posts/')) {
-        const fname = oldImg.replace(/^\/uploads\/posts\//, '');
-        const fpath = path.join(PUBLISHING_DIR, fname);
-        try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+    if (req.body.images !== undefined) {
+      const newList = Array.isArray(req.body.images)
+        ? req.body.images.map(u => String(u).slice(0, 500)).filter(Boolean).slice(0, 10)
+        : [];
+      // Delete files that were dropped from the list (cleanup orphan uploads)
+      const oldList = post.images || (post.image_url ? [post.image_url] : []);
+      const removed = oldList.filter(u => !newList.includes(u));
+      for (const url of removed) {
+        if (url.startsWith('/uploads/posts/')) {
+          const fname = url.replace(/^\/uploads\/posts\//, '');
+          const fpath = path.join(PUBLISHING_DIR, fname);
+          try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+        }
       }
+      post.images = newList;
+    }
+    if (req.body.image_url !== undefined) {
+      const requested = req.body.image_url ? String(req.body.image_url).slice(0, 500) : null;
+      // If requested URL exists in our images list (or is null), accept.
+      // Otherwise default to the first image (or null).
+      const list = post.images || [];
+      if (!requested) {
+        post.image_url = null;
+      } else if (list.includes(requested)) {
+        post.image_url = requested;
+      } else if (list.length > 0) {
+        post.image_url = list[0];
+      } else {
+        // Backward-compat path: no images list yet, so just store as-is
+        post.image_url = requested;
+      }
+    } else if (req.body.images !== undefined) {
+      // images changed but image_url didn't — auto-pick first if current
+      // selection no longer exists, else keep
+      const list = post.images || [];
+      if (post.image_url && !list.includes(post.image_url)) {
+        post.image_url = list[0] || null;
+      } else if (!post.image_url && list.length > 0) {
+        post.image_url = list[0];
+      }
+    }
+    if (req.body.reference_url !== undefined) {
+      post.reference_url = req.body.reference_url
+        ? String(req.body.reference_url).slice(0, 500)
+        : null;
     }
     if (req.body.tags !== undefined) {
       post.tags = Array.isArray(req.body.tags)
@@ -2917,16 +2970,20 @@ app.put('/api/publishing/posts/:id', (req, res) => {
   }
 });
 
-// DELETE /api/publishing/posts/:id — delete a post (and its image, if any)
+// DELETE /api/publishing/posts/:id — delete a post (and its images, if any)
 app.delete('/api/publishing/posts/:id', (req, res) => {
   if (!requireAdmin(req, res)) return;
   const idx = data.facebook_posts.findIndex(p => p.id === parseInt(req.params.id, 10));
   if (idx === -1) return res.status(404).json({ error: 'Post not found' });
   const post = data.facebook_posts[idx];
-  if (post.image_url && post.image_url.startsWith('/uploads/posts/')) {
-    const fname = post.image_url.replace(/^\/uploads\/posts\//, '');
-    const fpath = path.join(PUBLISHING_DIR, fname);
-    try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+  // Clean up every image attached to this post (the gallery as a whole)
+  const allImages = new Set([...(post.images || []), post.image_url].filter(Boolean));
+  for (const url of allImages) {
+    if (url.startsWith('/uploads/posts/')) {
+      const fname = url.replace(/^\/uploads\/posts\//, '');
+      const fpath = path.join(PUBLISHING_DIR, fname);
+      try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+    }
   }
   data.facebook_posts.splice(idx, 1);
   saveData();
@@ -2946,8 +3003,11 @@ app.post('/api/publishing/posts/:id/duplicate', (req, res) => {
   const dup = {
     id: nextId('facebook_posts'),
     account_id: req.body?.account_id ? parseInt(req.body.account_id, 10) : orig.account_id,
+    title: orig.title || '',
     text: orig.text,
     image_url: orig.image_url,
+    images: Array.isArray(orig.images) ? orig.images.slice() : (orig.image_url ? [orig.image_url] : []),
+    reference_url: orig.reference_url || null,
     tags: Array.isArray(orig.tags) ? orig.tags.slice() : [],
     status: 'draft',         // always start as draft
     publish_date: null,

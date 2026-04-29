@@ -39,7 +39,8 @@
   // Edit-state for modals
   let editingPostId = null;
   let editingAccountId = null;
-  let postImageUrl = null;
+  let postImages = [];          // all images attached to the post being edited
+  let postSelectedImage = null; // currently-selected (primary) image URL
   let postTags = [];
   let movingPostId = null;
 
@@ -349,6 +350,11 @@
              title="לחצי לראות את התוכן המלא">
           <div class="pub-post-title">${escapeHtml(title)}</div>
           ${post.text ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
+          ${post.reference_url ? `
+            <a class="pub-post-reflink" href="${escapeHtml(post.reference_url)}" target="_blank" rel="noopener noreferrer"
+               onclick="event.stopPropagation()">
+              קישור לפוסט מקורי
+            </a>` : ''}
           ${post.tags && post.tags.length ? `
             <div class="pub-post-tags">
               ${post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('')}
@@ -408,6 +414,19 @@
                        onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;background:rgba(226,68,92,0.1);color:var(--color-red);border-radius:8px;margin-bottom:14px;text-align:center\\'>⚠️ התמונה לא נטענה. נסי להעלות שוב.</div>');">` : ''}
       ${title ? `<div class="pub-preview-title">${escapeHtml(title)}</div>` : ''}
       <div class="pub-preview-text">${escapeHtml(post.text || '')}</div>
+      ${post.reference_url ? `
+        <div style="margin-bottom:14px">
+          <a class="pub-post-reflink" href="${escapeHtml(post.reference_url)}" target="_blank" rel="noopener noreferrer">
+            קישור לפוסט מקורי / לדוגמה
+          </a>
+        </div>` : ''}
+      ${post.images && post.images.length > 1 ? `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+          <span style="font-size:12px;color:var(--color-text-secondary);font-weight:600;margin-left:4px;align-self:center">תמונות נוספות:</span>
+          ${post.images.filter(u => u !== post.image_url).map(u => `
+            <img src="${escapeHtml(imageUrl(u))}" alt="" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--color-border)">
+          `).join('')}
+        </div>` : ''}
       <div class="pub-preview-meta">
         <span class="pub-post-status ${post.status}" style="position:static">${statusLabel}</span>
         ${dateStr ? `<span>📅 ${escapeHtml(dateStr)}</span>` : ''}
@@ -461,7 +480,14 @@
       try {
         showToast('מעלה תמונה...');
         const result = await API.publishing.uploadImage(file);
-        await API.publishing.updatePost(post.id, { image_url: result.url });
+        const existingImages = Array.isArray(post.images) && post.images.length > 0
+          ? post.images
+          : (post.image_url ? [post.image_url] : []);
+        const newImages = [...existingImages, result.url];
+        await API.publishing.updatePost(post.id, {
+          images: newImages,
+          image_url: post.image_url || result.url, // keep current selection or pick this one
+        });
         await reload();
         showToast('התמונה נוספה');
       } catch (err) {
@@ -785,6 +811,7 @@
 
     document.getElementById('post-title').value = post ? (post.title || '') : '';
     document.getElementById('post-text').value = post ? (post.text || '') : '';
+    document.getElementById('post-reference-url').value = post ? (post.reference_url || '') : '';
     const status = post ? post.status : (prefill.presetStatus || 'draft');
     document.querySelector(`input[name="post-status"][value="${status}"]`).checked = true;
     togglePublishDateRow(status);
@@ -798,7 +825,17 @@
       dateInput.value = '';
     }
 
-    postImageUrl = post ? (post.image_url || null) : null;
+    // Image gallery state — load existing images, fall back to image_url
+    // alone for posts that predate the multi-image schema.
+    if (post) {
+      postImages = Array.isArray(post.images) && post.images.length > 0
+        ? post.images.slice()
+        : (post.image_url ? [post.image_url] : []);
+      postSelectedImage = post.image_url || (postImages[0] || null);
+    } else {
+      postImages = [];
+      postSelectedImage = null;
+    }
     renderImageArea();
 
     postTags = post && Array.isArray(post.tags) ? post.tags.slice() : [];
@@ -813,27 +850,62 @@
       (status === 'scheduled' || status === 'published') ? '' : 'none';
   }
 
+  // Renders the multi-image gallery inside the post modal. The user can
+  // upload many images, click a thumbnail to mark it as the "primary"
+  // (the one that appears on the card / gets copied), or delete any
+  // image. The selected one gets a colored border + "ראשית" badge.
   function renderImageArea() {
     const area = document.getElementById('post-image-area');
-    if (postImageUrl) {
-      area.innerHTML = `
-        <div class="pub-image-preview">
-          <img src="${escapeHtml(postImageUrl)}" alt="">
-          <button type="button" class="pub-image-preview-remove" id="image-remove-btn" title="הסר תמונה">✕</button>
-        </div>`;
-      area.querySelector('#image-remove-btn').addEventListener('click', () => {
-        postImageUrl = null;
+    if (!area) return;
+    const thumbs = postImages.map((url, i) => {
+      const isSel = url === postSelectedImage;
+      return `
+        <div class="pub-image-thumb ${isSel ? 'is-selected' : ''}" data-img-url="${escapeHtml(url)}" data-idx="${i}">
+          <img src="${escapeHtml(imageUrl(url))}" alt="" loading="lazy"
+               onerror="this.parentElement.innerHTML='<div style=&quot;color:#e2445c;font-size:10px;padding:6px;text-align:center&quot;>⚠️ תמונה לא נטענה</div>';">
+          <button type="button" class="pub-image-thumb-delete" data-del-idx="${i}" title="מחקי תמונה">✕</button>
+        </div>
+      `;
+    }).join('');
+    area.innerHTML = `
+      <div class="pub-image-gallery">
+        ${thumbs}
+        <label class="pub-image-add-thumb" title="העלי תמונה נוספת">
+          <input type="file" id="post-image-file" accept="image/*">
+          <span class="icon">+</span>
+          <span class="label">${postImages.length === 0 ? 'הוסיפי תמונה' : 'תמונה נוספת'}</span>
+        </label>
+      </div>
+    `;
+    // Click thumbnail → mark as selected (primary)
+    area.querySelectorAll('.pub-image-thumb').forEach(thumb => {
+      thumb.addEventListener('click', (e) => {
+        if (e.target.closest('.pub-image-thumb-delete')) return;
+        const url = thumb.dataset.imgUrl;
+        if (url && url !== postSelectedImage) {
+          postSelectedImage = url;
+          renderImageArea();
+        }
+      });
+    });
+    // Delete button → remove from list
+    area.querySelectorAll('.pub-image-thumb-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.delIdx, 10);
+        const removed = postImages[idx];
+        postImages.splice(idx, 1);
+        // If we removed the selected one, fall back to first remaining
+        if (removed === postSelectedImage) {
+          postSelectedImage = postImages[0] || null;
+        }
         renderImageArea();
       });
-    } else {
-      area.innerHTML = `
-        <div class="pub-image-upload">
-          <input type="file" id="post-image-file" accept="image/*">
-          <div class="pub-image-upload-icon">🖼️</div>
-          <div class="pub-image-upload-text">גררי תמונה לכאן או לחצי לבחירה</div>
-          <div class="pub-image-upload-hint">JPG / PNG / WEBP / GIF · עד 10MB</div>
-        </div>`;
-      area.querySelector('#post-image-file').addEventListener('change', async (e) => {
+    });
+    // Upload another image → push to gallery
+    const fileInput = area.querySelector('#post-image-file');
+    if (fileInput) {
+      fileInput.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) {
@@ -841,13 +913,13 @@
           return;
         }
         try {
-          area.innerHTML = `<div class="pub-image-upload"><div class="pub-image-upload-text">⏳ מעלה...</div></div>`;
           const result = await API.publishing.uploadImage(file);
-          postImageUrl = result.url;
+          postImages.push(result.url);
+          // First-uploaded image becomes the primary by default
+          if (!postSelectedImage) postSelectedImage = result.url;
           renderImageArea();
         } catch (err) {
           showToast(err.message || 'העלאת התמונה נכשלה', 'error');
-          renderImageArea();
         }
       });
     }
@@ -874,12 +946,13 @@
     const account_id = parseInt(document.getElementById('post-account').value, 10);
     const title = document.getElementById('post-title').value;
     const text = document.getElementById('post-text').value;
+    const reference_url = document.getElementById('post-reference-url').value.trim() || null;
     const status = document.querySelector('input[name="post-status"]:checked')?.value || 'draft';
     const dateRaw = document.getElementById('post-publish-date').value;
     const publish_date = dateRaw ? new Date(dateRaw).toISOString() : null;
 
     if (!account_id) { showToast('צריך לבחור חשבון', 'error'); return; }
-    if (!title.trim() && !text.trim() && !postImageUrl) {
+    if (!title.trim() && !text.trim() && postImages.length === 0) {
       showToast('פוסט חייב להכיל כותרת, טקסט או תמונה', 'error');
       return;
     }
@@ -892,7 +965,9 @@
       account_id,
       title: title || '',
       text: text || '',
-      image_url: postImageUrl,
+      images: postImages,
+      image_url: postSelectedImage,
+      reference_url,
       status,
       publish_date,
       tags: postTags

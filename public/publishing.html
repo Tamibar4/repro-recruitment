@@ -536,6 +536,117 @@
       font-style: italic;
     }
 
+    /* ----- Floating action button for "new post" -----
+       Sits in the bottom-left of the viewport (RTL layout). Two variants:
+       extended (icon + label) on wide screens, compact (icon only) on
+       mobile. Always-visible primary CTA. */
+    .pub-fab {
+      position: fixed;
+      bottom: 28px; left: 28px;
+      z-index: 50;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 22px;
+      border: none; border-radius: 99px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-purple, #8b5cf6));
+      color: white;
+      font-family: inherit; font-size: 15px; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(94,92,230,0.4), 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.18s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+    }
+    .pub-fab:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 14px 30px rgba(94,92,230,0.5), 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .pub-fab:active { transform: translateY(0) scale(1); }
+    .pub-fab svg { width: 22px; height: 22px; }
+    @media (max-width: 600px) {
+      .pub-fab { bottom: 20px; left: 20px; padding: 14px; }
+      .pub-fab span { display: none; }
+      .pub-fab svg { width: 24px; height: 24px; }
+    }
+
+    /* ----- Multi-image gallery in the post modal ----- */
+    .pub-image-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 8px;
+    }
+    .pub-image-thumb {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--color-bg);
+    }
+    .pub-image-thumb img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .pub-image-thumb:hover { transform: translateY(-2px); }
+    .pub-image-thumb.is-selected {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(94,92,230,0.3);
+    }
+    .pub-image-thumb.is-selected::before {
+      content: '✓ ראשית';
+      position: absolute; bottom: 4px; left: 4px;
+      padding: 2px 8px; border-radius: 99px;
+      background: var(--color-primary); color: white;
+      font-size: 10px; font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .pub-image-thumb-delete {
+      position: absolute; top: 4px; right: 4px;
+      width: 22px; height: 22px; border-radius: 50%;
+      border: none; background: rgba(0,0,0,0.6); color: white;
+      font-size: 12px; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .pub-image-thumb:hover .pub-image-thumb-delete { opacity: 1; }
+    .pub-image-thumb-delete:hover { background: var(--color-red); }
+    .pub-image-add-thumb {
+      aspect-ratio: 1 / 1;
+      border-radius: var(--radius);
+      border: 2px dashed var(--color-border);
+      background: var(--color-white);
+      color: var(--color-primary);
+      cursor: pointer; transition: all 0.15s;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 4px;
+      font-family: inherit;
+      position: relative;
+    }
+    .pub-image-add-thumb input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .pub-image-add-thumb:hover {
+      border-color: var(--color-primary);
+      background: var(--color-accent-soft);
+      border-style: solid;
+    }
+    .pub-image-add-thumb .icon  { font-size: 26px; }
+    .pub-image-add-thumb .label { font-size: 11.5px; font-weight: 700; }
+
+    /* Reference-link badge on cards */
+    .pub-post-reflink {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: 99px;
+      background: var(--color-accent-soft);
+      color: var(--color-primary);
+      font-size: 11.5px; font-weight: 600;
+      text-decoration: none;
+      margin-top: 4px;
+      transition: all 0.15s;
+    }
+    .pub-post-reflink:hover {
+      background: var(--color-primary); color: white;
+    }
+    .pub-post-reflink::before { content: '🔗'; font-size: 11px; }
+
     /* ----- Preview modal (full-text view triggered by clicking the card) ----- */
     .pub-preview-image {
       width: 100%; max-height: 360px; object-fit: contain;
@@ -645,10 +756,6 @@
           <h1 class="page-title">📱 מדיה</h1>
           <div class="page-subtitle">ניהול תוכן וטיוטות לכל חשבון — העתקה בלחיצת כפתור ישירות לפייסבוק</div>
         </div>
-        <button class="btn btn-primary" id="btn-new-post">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          <span>פוסט חדש</span>
-        </button>
       </div>
 
       <!-- Tabs row (Facebook accounts) -->
@@ -686,6 +793,13 @@
       </div>
     </main>
   </div>
+
+  <!-- Floating action button — primary "new post" CTA. Stays visible
+       regardless of scroll position so it's always one click away. -->
+  <button class="pub-fab" id="btn-new-post" type="button" title="פוסט חדש">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    <span>פוסט חדש</span>
+  </button>
 
   <!-- ============================================================
        Modal: Create / edit Facebook account
@@ -784,10 +898,16 @@
             <div class="field-hint">עד 5000 תווים. שורות חדשות יישמרו.</div>
           </div>
           <div class="pub-form-row">
-            <label>תמונה (אופציונלי)</label>
+            <label>תמונות (אופציונלי)</label>
+            <div class="field-hint" style="margin-bottom:8px">העלי כמה תמונות שתרצי. לחצי על תמונה כדי לסמן אותה כתמונה הראשית (זאת שתופיע בכרטיס ובהעתקה).</div>
             <div id="post-image-area">
-              <!-- JS toggles between upload area and preview -->
+              <!-- JS renders the gallery -->
             </div>
+          </div>
+          <div class="pub-form-row">
+            <label for="post-reference-url">קישור לפוסט לדוגמה (אופציונלי)</label>
+            <input type="url" id="post-reference-url" maxlength="500" placeholder="https://facebook.com/..." dir="ltr">
+            <div class="field-hint">קישור לפוסט מקורי / לדוגמה / למקור התוכן. יופיע על הכרטיס.</div>
           </div>
           <div class="pub-form-row">
             <label>סטטוס</label>
@@ -865,6 +985,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=10"></script>
+  <script src="js/publishing.js?v=11"></script>
 </body>
 </html>
