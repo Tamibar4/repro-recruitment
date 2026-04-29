@@ -314,20 +314,69 @@
     wirePostCardHandlers();
   }
 
-  // Build the actual <img src> URL we use for post images. We always
-  // route through the authenticated /api/publishing/image endpoint
-  // because it's been more reliable across environments than direct
-  // static serving (Railway volumes etc). The token is included in
-  // the query string because <img> tags can't set Authorization headers.
+  // Build the actual <img src> URL we use for post images.
+  //   - data:... URLs (the new format) pass through unchanged.
+  //   - /uploads/posts/... URLs (legacy disk-stored) get routed through
+  //     the authenticated endpoint so they work even if direct static
+  //     serving is blocked.
+  //   - Anything else (full URL, etc.) passes through.
   function imageUrl(rawUrl) {
     if (!rawUrl) return null;
+    if (rawUrl.startsWith('data:')) return rawUrl;
     if (rawUrl.startsWith('/uploads/posts/')) {
       const filename = rawUrl.replace(/^\/uploads\/posts\//, '');
       const token = API.getToken();
       return '/api/publishing/image/' + encodeURIComponent(filename) +
              (token ? '?token=' + encodeURIComponent(token) : '');
     }
-    return rawUrl; // already a full URL or data: URL
+    return rawUrl;
+  }
+
+  // Resize+compress an image File before upload so it fits comfortably
+  // in the JSON DB once base64-encoded. Skip GIFs (they'd lose animation)
+  // and very small files. Returns a Blob (or the original File on
+  // failure) that can be appended to FormData.
+  async function resizeImage(file, maxDim = 1600, quality = 0.82) {
+    try {
+      if (!file || !file.type || !file.type.startsWith('image/')) return file;
+      if (file.type === 'image/gif') return file;
+      if (file.size < 350 * 1024) return file; // already small enough
+
+      const img = await createImageBitmap(file);
+      let { width, height } = img;
+      const scale = Math.min(maxDim / width, maxDim / height, 1);
+      if (scale >= 1 && file.size < 800 * 1024) return file;
+      const newW = Math.round(width * scale);
+      const newH = Math.round(height * scale);
+
+      let canvas, ctx;
+      if (typeof OffscreenCanvas !== 'undefined') {
+        canvas = new OffscreenCanvas(newW, newH);
+        ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, newW, newH);
+        return await canvas.convertToBlob({ type: 'image/jpeg', quality });
+      } else {
+        canvas = document.createElement('canvas');
+        canvas.width = newW; canvas.height = newH;
+        ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, newW, newH);
+        return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+      }
+    } catch (e) {
+      console.warn('resizeImage failed, sending original:', e);
+      return file;
+    }
+  }
+
+  // Drop-in replacement for API.publishing.uploadImage that resizes
+  // first. Use this everywhere we upload images.
+  async function uploadResized(file) {
+    const blob = await resizeImage(file);
+    // Wrap blob in a File so the server sees a filename + mimetype
+    const wrapped = blob instanceof File
+      ? blob
+      : new File([blob], (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg', { type: blob.type || 'image/jpeg' });
+    return API.publishing.uploadImage(wrapped);
   }
 
   function renderPostCard(post) {
@@ -337,10 +386,9 @@
     const imgSrc = imageUrl(post.image_url);
     return `
       <article class="pub-post" data-post-id="${post.id}">
-        <div class="pub-post-image">
+        <div class="pub-post-image" data-post-id-img="${post.id}">
           ${imgSrc
-            ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy"
-                    onerror="this.parentElement.innerHTML='<span class=&quot;pub-post-image-empty&quot; style=&quot;color:#e2445c&quot;>⚠️ תמונה לא נטענה</span><span class=&quot;pub-post-status ${post.status}&quot;>${escapeHtml(statusLabel)}</span>';">`
+            ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" data-broken-watcher="1">`
             : `<button type="button" class="pub-post-add-image-btn" data-action="add-image" title="הוסיפי תמונה">
                  <span class="icon">📷</span>
                  <span class="label">הוסיפי תמונה</span>
@@ -395,9 +443,70 @@
           else if (action === 'copy-image') await handleCopyImage(post, el);
           else if (action === 'edit')       openPostModal(post);
           else if (action === 'add-image')  triggerImageUploadForPost(post);
+          else if (action === 'replace-broken') replaceBrokenImage(post);
         });
       });
+      // Watch the card's <img> for load failures. When the file backing
+      // the URL is gone (legacy disk-stored images that didn't survive
+      // a redeploy), replace the broken <img> with a clear "החליפי תמונה"
+      // affordance so the user can fix it without diving into the modal.
+      const img = card.querySelector('img[data-broken-watcher]');
+      if (img) {
+        img.addEventListener('error', () => {
+          const wrap = img.parentElement;
+          if (!wrap) return;
+          const status = wrap.querySelector('.pub-post-status');
+          wrap.innerHTML = `
+            <button type="button" class="pub-post-add-image-btn" data-action="replace-broken" title="התמונה לא נטענה — לחצי להחלפה">
+              <span class="icon">⚠️</span>
+              <span class="label">תמונה לא נטענה</span>
+              <span class="label" style="font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-top:4px">לחצי להעלות חדשה</span>
+            </button>
+          `;
+          if (status) wrap.appendChild(status);
+          // Re-wire the button we just inserted
+          wrap.querySelector('[data-action="replace-broken"]').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const post = posts.find(p => p.id === id);
+            if (post) replaceBrokenImage(post);
+          });
+        });
+      }
     });
+  }
+
+  // The post has an image_url that failed to load (file gone from disk).
+  // Open a file picker, upload the chosen file, and REPLACE the broken
+  // URL in the post's images list so the user is back to a working state.
+  function replaceBrokenImage(post) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        showToast('מעלה תמונה...');
+        const result = await uploadResized(file);
+        const broken = post.image_url;
+        const oldList = Array.isArray(post.images) ? post.images : (post.image_url ? [post.image_url] : []);
+        // Replace the broken URL with the new one (if it was in the list);
+        // otherwise just append the new one.
+        const newList = oldList.includes(broken)
+          ? oldList.map(u => (u === broken ? result.url : u))
+          : [...oldList, result.url];
+        await API.publishing.updatePost(post.id, {
+          images: newList,
+          image_url: result.url
+        });
+        await reload();
+        showToast('התמונה הוחלפה');
+      } catch (err) {
+        showToast(err.message || 'העלאה נכשלה', 'error');
+      }
+    });
+    document.body.appendChild(input);
+    input.click();
+    setTimeout(() => input.remove(), 5000);
   }
 
   // Modal that shows the full post content + every action when the user
@@ -597,7 +706,7 @@
       }
       try {
         showToast('מעלה תמונה...');
-        const result = await API.publishing.uploadImage(file);
+        const result = await uploadResized(file);
         const existingImages = Array.isArray(post.images) && post.images.length > 0
           ? post.images
           : (post.image_url ? [post.image_url] : []);
@@ -1089,12 +1198,13 @@
       fileInput.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 10 * 1024 * 1024) {
-          showToast('התמונה גדולה מדי (מעל 10MB)', 'error');
+        if (file.size > 20 * 1024 * 1024) {
+          showToast('התמונה גדולה מדי (מעל 20MB) — נסי קובץ קטן יותר', 'error');
           return;
         }
         try {
-          const result = await API.publishing.uploadImage(file);
+          showToast('מעלה תמונה...');
+          const result = await uploadResized(file);
           postImages.push(result.url);
           // First-uploaded image becomes the primary by default
           if (!postSelectedImage) postSelectedImage = result.url;

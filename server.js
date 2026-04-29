@@ -2606,29 +2606,18 @@ app.get('/api/training/status', (req, res) => {
 // status (draft / scheduled / published), tags, and a publish date.
 // All endpoints are admin-gated; recruiters never see this data.
 
-// Multer config for post images. 10MB cap, common image formats only.
-// Re-creates the destination directory on every upload in case the volume
-// was re-mounted or the dir was deleted between requests.
-const publishingStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    try {
-      if (!fs.existsSync(PUBLISHING_DIR)) {
-        fs.mkdirSync(PUBLISHING_DIR, { recursive: true });
-      }
-      cb(null, PUBLISHING_DIR);
-    } catch (e) {
-      console.error('Could not create PUBLISHING_DIR:', e.message);
-      cb(e);
-    }
-  },
-  filename: (req, file, cb) => {
-    const ext = (path.extname(file.originalname || '') || '').toLowerCase();
-    cb(null, 'p_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex') + ext);
-  }
-});
+// Multer config for post images. We use memoryStorage so that the upload
+// endpoint can convert the bytes directly to a base64 data URL stored
+// inline in the JSON DB — no filesystem dependency. This is the only
+// storage strategy that survives Railway redeploys regardless of volume
+// mount state.
+//
+// 4 MB cap is generous: the client-side resize (see resizeImage in
+// publishing.js) shrinks anything bigger to ~1600px JPEG quality 80,
+// which lands well under 500KB for any reasonable photo.
 const publishingUpload = multer({
-  storage: publishingStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB — plenty for FB images
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (allowed.includes(file.mimetype) || /\.(jpe?g|png|webp|gif)$/i.test(file.originalname || '')) {
@@ -2781,13 +2770,17 @@ app.delete('/api/publishing/accounts/:id', (req, res) => {
   const acc = findAccount(req.params.id);
   if (!acc) return res.status(404).json({ error: 'Account not found' });
 
-  // Cascade-delete posts; also unlink any uploaded images from disk
+  // Cascade-delete posts; also unlink any legacy disk-based images.
+  // (New images are base64 data URLs stored inline — nothing to clean up.)
   const postsToDelete = data.facebook_posts.filter(p => p.account_id === acc.id);
   for (const post of postsToDelete) {
-    if (post.image_url && post.image_url.startsWith('/uploads/posts/')) {
-      const fname = post.image_url.replace(/^\/uploads\/posts\//, '');
-      const fpath = path.join(PUBLISHING_DIR, fname);
-      try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) { console.warn('Could not delete', fpath, e.message); }
+    const imgs = [post.image_url, ...(post.images || [])].filter(Boolean);
+    for (const url of imgs) {
+      if (typeof url === 'string' && url.startsWith('/uploads/posts/')) {
+        const fname = url.replace(/^\/uploads\/posts\//, '');
+        const fpath = path.join(PUBLISHING_DIR, fname);
+        try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) { console.warn('Could not delete', fpath, e.message); }
+      }
     }
   }
   const groupsDeleted = (data.facebook_groups || []).filter(g => g.account_id === acc.id).length;
@@ -2957,7 +2950,7 @@ app.put('/api/publishing/posts/:id', (req, res) => {
       const oldList = post.images || (post.image_url ? [post.image_url] : []);
       const removed = oldList.filter(u => !newList.includes(u));
       for (const url of removed) {
-        if (url.startsWith('/uploads/posts/')) {
+        if (typeof url === 'string' && url.startsWith('/uploads/posts/')) {
           const fname = url.replace(/^\/uploads\/posts\//, '');
           const fpath = path.join(PUBLISHING_DIR, fname);
           try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
@@ -3176,30 +3169,31 @@ app.get('/api/publishing/tags', (req, res) => {
   res.json(tags);
 });
 
-// POST /api/publishing/upload-image — upload an image, return its URL
+// POST /api/publishing/upload-image — upload an image, return it as a
+// data URL. The bytes are stored inline in the JSON DB (in `images[]`
+// on the post), so the image survives any Railway redeploy or volume
+// mounting issue. No disk dependency at all.
 app.post('/api/publishing/upload-image', (req, res) => {
   if (!requireAdmin(req, res)) return;
   publishingUpload.single('image')(req, res, (err) => {
     if (err) {
       console.error('Upload-image multer error:', err);
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'התמונה גדולה מדי (מקסימום 10MB)' });
+        return res.status(413).json({ error: 'התמונה גדולה מדי (מקסימום 4MB אחרי קומפרסיה)' });
       }
       return res.status(400).json({ error: err.message });
     }
-    if (!req.file) return res.status(400).json({ error: 'לא הועלתה תמונה' });
-    // Verify the file actually landed on disk (Railway volumes can fail
-    // silently if not mounted; this catches that case).
-    const fpath = path.join(PUBLISHING_DIR, req.file.filename);
-    if (!fs.existsSync(fpath)) {
-      console.error('Upload claimed success but file not on disk:', fpath);
-      return res.status(500).json({ error: 'התמונה לא נשמרה לדיסק. בדקי שיש Volume מחובר ב-Railway.' });
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'לא הועלתה תמונה' });
     }
-    console.log('Image uploaded:', req.file.filename, '(' + req.file.size + ' bytes) to ' + fpath);
+    const mime = req.file.mimetype || 'image/jpeg';
+    const b64 = req.file.buffer.toString('base64');
+    const dataUrl = 'data:' + mime + ';base64,' + b64;
+    console.log('Image uploaded (in-DB base64):', mime, req.file.size + ' bytes →', dataUrl.length + ' chars');
     res.status(201).json({
-      url: '/uploads/posts/' + req.file.filename,
+      url: dataUrl,
       size: req.file.size,
-      mimetype: req.file.mimetype
+      mimetype: mime
     });
   });
 });
