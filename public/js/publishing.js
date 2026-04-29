@@ -450,21 +450,26 @@
       ` : ''}
       ${title ? `<div class="pub-preview-title">${escapeHtml(title)}</div>` : ''}
       ${texts.length > 0 ? `
-        <div class="pub-text-cubes" id="text-cubes">
-          ${texts.map((t, i) => `
-            <div class="pub-text-cube" data-idx="${i}">
-              ${texts.length > 1 ? `<span class="pub-text-cube-num">וריאציה ${i + 1}</span>` : ''}
-              <div class="pub-text-cube-preview">${escapeHtml(t)}</div>
-              <div class="pub-text-cube-hint">לחצי לפתיחה ולהעתקה</div>
-              <div class="pub-text-cube-actions">
-                <button class="copy-btn" data-cube-action="copy" data-idx="${i}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;display:inline;vertical-align:-2px;margin-left:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  העתק טקסט
-                </button>
-                <button class="close-btn" data-cube-action="close" data-idx="${i}">סגרי</button>
-              </div>
+        <div class="pub-text-carousel" data-current="0">
+          <div class="pub-text-carousel-stage">
+            ${texts.length > 1 ? `<span class="pub-text-carousel-num" id="text-carousel-num">וריאציה 1 / ${texts.length}</span>` : ''}
+            <div class="pub-text-carousel-text" id="text-carousel-text">${escapeHtml(texts[0])}</div>
+            ${texts.length > 1 ? `
+              <button class="pub-text-carousel-nav prev" id="text-carousel-prev" title="הקודם" disabled>›</button>
+              <button class="pub-text-carousel-nav next" id="text-carousel-next" title="הבא">‹</button>
+            ` : ''}
+          </div>
+          <div class="pub-text-carousel-actions">
+            <button class="pub-text-carousel-copy" id="text-carousel-copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              העתק טקסט
+            </button>
+          </div>
+          ${texts.length > 1 ? `
+            <div class="pub-text-carousel-dots" id="text-carousel-dots">
+              ${texts.map((_, i) => `<button class="${i === 0 ? 'active' : ''}" data-idx="${i}" title="וריאציה ${i + 1}"></button>`).join('')}
             </div>
-          `).join('')}
+          ` : ''}
         </div>
       ` : ''}
       ${post.reference_url ? `
@@ -523,26 +528,39 @@
       if (nextBtn) nextBtn.disabled = images.length <= 1;
     }
 
-    // ---- Text cubes wiring ----
-    content.querySelectorAll('.pub-text-cube').forEach(cube => {
-      const idx = parseInt(cube.dataset.idx, 10);
-      // Click on the cube itself (but not on action buttons) toggles
-      cube.addEventListener('click', (e) => {
-        if (e.target.closest('[data-cube-action]')) return;
-        cube.classList.toggle('is-expanded');
+    // ---- Text carousel wiring ----
+    if (texts.length > 0) {
+      const textStage = content.querySelector('#text-carousel-text');
+      const textNum   = content.querySelector('#text-carousel-num');
+      const textPrev  = content.querySelector('#text-carousel-prev');
+      const textNext  = content.querySelector('#text-carousel-next');
+      const textCopy  = content.querySelector('#text-carousel-copy');
+      const textDots  = content.querySelector('#text-carousel-dots');
+      let currentTextIdx = 0;
+
+      const showText = (idx) => {
+        if (idx < 0 || idx >= texts.length) return;
+        currentTextIdx = idx;
+        textStage.textContent = texts[idx];
+        if (textNum)  textNum.textContent = `וריאציה ${idx + 1} / ${texts.length}`;
+        if (textPrev) textPrev.disabled = idx === 0;
+        if (textNext) textNext.disabled = idx === texts.length - 1;
+        if (textDots) {
+          textDots.querySelectorAll('button').forEach((d, i) => d.classList.toggle('active', i === idx));
+        }
+      };
+
+      textPrev?.addEventListener('click', () => showText(currentTextIdx - 1));
+      textNext?.addEventListener('click', () => showText(currentTextIdx + 1));
+      textDots?.querySelectorAll('button').forEach(d => {
+        d.addEventListener('click', () => showText(parseInt(d.dataset.idx, 10)));
       });
-      cube.querySelectorAll('[data-cube-action]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const action = btn.dataset.cubeAction;
-          if (action === 'copy') {
-            await handleCopyText(post, btn, texts[idx]);
-          } else if (action === 'close') {
-            cube.classList.remove('is-expanded');
-          }
-        });
+      textCopy?.addEventListener('click', async () => {
+        await handleCopyText(post, textCopy, texts[currentTextIdx]);
       });
-    });
+
+      if (textNext) textNext.disabled = texts.length <= 1;
+    }
 
     // ---- Post-level actions ----
     content.querySelectorAll('[data-prev-action]').forEach(btn => {
