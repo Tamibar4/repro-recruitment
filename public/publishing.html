@@ -161,6 +161,9 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 18px;
       padding-bottom: 60px;
+      /* Don't stretch cards to match the tallest in their row — let
+         each card take its natural height so short posts look short. */
+      align-items: start;
     }
     .pub-post {
       background: var(--color-white);
@@ -208,9 +211,9 @@
       font-size: 13.5px; line-height: 1.65;
       color: var(--color-text);
       white-space: pre-wrap; word-break: break-word;
-      max-height: 7.5em; overflow: hidden;
-      position: relative;
-      display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+      /* No clamping — show the full text. With align-items:start on
+         the grid above, cards take their natural height so short
+         posts look short and long ones look long. */
     }
     .pub-post-text:empty::before {
       content: 'אין טקסט'; color: var(--color-text-light); font-style: italic;
@@ -907,6 +910,6 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=2"></script>
+  <script src="js/publishing.js?v=3"></script>
 </body>
 </html>

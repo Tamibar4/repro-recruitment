@@ -227,11 +227,11 @@
         <div class="pub-post-actions">
           <button class="pub-post-btn primary" data-action="copy-text" title="העתק טקסט בלבד">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            טקסט
+            העתק טקסט
           </button>
           <button class="pub-post-btn" data-action="copy-image" title="העתק תמונה בלבד" ${post.image_url ? '' : 'disabled style="opacity:0.4"'}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            תמונה
+            העתק תמונה
           </button>
           <button class="pub-post-btn" data-action="groups" title="פרסם בקבוצה">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -507,16 +507,40 @@
     }, 0);
   }
 
+  // Take whatever the user typed into the URL field and try to make it
+  // into a real https URL. Returns null if it's clearly not a URL (Hebrew
+  // text, gibberish, etc.) so callers can refuse to navigate to it.
+  function normalizeUrl(raw) {
+    if (!raw) return null;
+    let s = String(raw).trim();
+    if (!s) return null;
+    // Already has a protocol
+    if (/^https?:\/\//i.test(s)) {
+      // Validate
+      try { new URL(s); return s; } catch { return null; }
+    }
+    // No protocol — try prepending https:// if it looks like a domain.
+    // A domain has at least one dot followed by a TLD-like part. Hebrew
+    // text or words without dots are NOT URLs and we refuse to coerce
+    // them into "https://<hebrew-text>" which the browser would reject.
+    if (/^[a-z0-9][a-z0-9.\-_/?#=&%]*\.[a-z]{2,}/i.test(s)) {
+      try { new URL('https://' + s); return 'https://' + s; } catch { return null; }
+    }
+    return null;
+  }
+
   async function publishToGroup(post, group) {
     if (!group) return;
+    const validUrl = normalizeUrl(group.url);
+    if (!validUrl) {
+      showToast(`לקבוצה "${group.name}" אין קישור תקין. ערכי את החשבון והוסיפי קישור כמו https://facebook.com/groups/...`, 'error');
+      return;
+    }
     // Copy text to clipboard so the user can paste in the group's composer
     if (post.text) {
       try { await navigator.clipboard.writeText(post.text); } catch {}
     }
-    // Open the group URL in a new tab so she can immediately paste
-    if (group.url) {
-      window.open(group.url, '_blank', 'noopener,noreferrer');
-    }
+    window.open(validUrl, '_blank', 'noopener,noreferrer');
     showToast(post.text
       ? `הטקסט הועתק. הקבוצה "${group.name}" נפתחה — הדביקי שם (Ctrl+V) ופרסמי`
       : `הקבוצה "${group.name}" נפתחה`);
@@ -559,13 +583,24 @@
         list.innerHTML = '<div style="font-size:12px;color:var(--color-text-light);padding:6px 0">עדיין אין קבוצות. הוסיפי בשורה למטה.</div>';
         return;
       }
-      list.innerHTML = groups.map(g => `
-        <div class="pub-group-row" data-group-id="${g.id}">
-          <span class="pub-group-name">${escapeHtml(g.name)}</span>
-          <span class="pub-group-url">${escapeHtml(g.url || '')}</span>
-          <button data-action="del-group" data-group-id="${g.id}" title="מחק">🗑️</button>
-        </div>
-      `).join('');
+      list.innerHTML = groups.map(g => {
+        const urlOk = !!normalizeUrl(g.url);
+        return `
+          <div class="pub-group-row" data-group-id="${g.id}">
+            <span class="pub-group-name">${escapeHtml(g.name)}</span>
+            <span class="pub-group-url" title="${escapeHtml(g.url || '')}">
+              ${g.url
+                ? (urlOk
+                    ? escapeHtml(g.url)
+                    : `<span style="color:var(--color-red)">⚠️ קישור לא תקין: ${escapeHtml(g.url)}</span>`)
+                : '<span style="color:var(--color-text-light)">ללא קישור</span>'}
+            </span>
+            <button data-action="edit-group" data-group-id="${g.id}" title="ערוך"
+                    style="color:var(--color-primary)">✏️</button>
+            <button data-action="del-group" data-group-id="${g.id}" title="מחק">🗑️</button>
+          </div>
+        `;
+      }).join('');
       list.querySelectorAll('[data-action="del-group"]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const gid = parseInt(btn.dataset.groupId, 10);
@@ -575,6 +610,35 @@
             renderGroupsList(accountId);
           } catch (err) {
             showToast(err.message || 'מחיקה נכשלה', 'error');
+          }
+        });
+      });
+      list.querySelectorAll('[data-action="edit-group"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const gid = parseInt(btn.dataset.groupId, 10);
+          const grp = groups.find(g => g.id === gid);
+          if (!grp) return;
+          // Use prompt() for inline editing — simple but effective
+          const newName = prompt('שם הקבוצה:', grp.name);
+          if (newName === null) return;
+          if (!newName.trim()) { showToast('השם לא יכול להיות ריק', 'error'); return; }
+          const newUrlRaw = prompt('קישור הקבוצה (https://facebook.com/groups/...):', grp.url || '');
+          if (newUrlRaw === null) return;
+          // Validate the URL — if it doesn't look like a URL, warn and abort
+          const newUrl = newUrlRaw.trim();
+          if (newUrl && !normalizeUrl(newUrl)) {
+            if (!confirm('הקישור שהזנת לא נראה תקין. לשמור בכל זאת?\nכדאי שיהיה כמו: https://facebook.com/groups/...')) return;
+          }
+          try {
+            await API.publishing.updateGroup(gid, {
+              name: newName.trim(),
+              url: newUrl ? (normalizeUrl(newUrl) || newUrl) : null
+            });
+            renderGroupsList(accountId);
+            // Invalidate group cache so popovers show fresh data
+            delete groupsByAccount[accountId];
+          } catch (err) {
+            showToast(err.message || 'עדכון נכשל', 'error');
           }
         });
       });
@@ -588,16 +652,33 @@
     const nameEl = document.getElementById('new-group-name');
     const urlEl  = document.getElementById('new-group-url');
     const name = nameEl.value.trim();
-    const url  = urlEl.value.trim();
+    const urlRaw = urlEl.value.trim();
     if (!name) { showToast('שם הקבוצה נדרש', 'error'); return; }
+    // Validate URL — if user typed something that doesn't look like a
+    // URL (e.g. they pasted Hebrew text into the URL field), warn them.
+    // If they DID type a URL but forgot the https://, we auto-prepend.
+    let urlToSave = null;
+    if (urlRaw) {
+      const normalized = normalizeUrl(urlRaw);
+      if (!normalized) {
+        if (!confirm('הקישור שהזנת לא נראה כמו URL תקין. \nכדאי שיהיה כמו: https://facebook.com/groups/...\n\nלשמור בכל זאת? (לא נוכל לפתוח את הקבוצה אוטומטית)')) {
+          return;
+        }
+        urlToSave = urlRaw; // save as-is so user can fix later
+      } else {
+        urlToSave = normalized;
+      }
+    }
     try {
       await API.publishing.createGroup({
         account_id: editingAccountId,
         name,
-        url: url || null
+        url: urlToSave
       });
       nameEl.value = '';
       urlEl.value = '';
+      // Invalidate cache so the post-card popover sees the new group
+      delete groupsByAccount[editingAccountId];
       renderGroupsList(editingAccountId);
     } catch (err) {
       showToast(err.message || 'הוספה נכשלה', 'error');
