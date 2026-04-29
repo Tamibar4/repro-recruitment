@@ -340,21 +340,95 @@
       white-space: pre-wrap; word-break: break-word;
     }
 
-    /* PDF iframe rendering — uses the browser's native PDF viewer so
-       Hebrew renders correctly. The toolbar is hidden via URL fragment. */
+    /* ===== Slide-deck viewer =====
+       One PDF page at a time, beautifully framed in the center, with
+       smooth slide animations between pages. Built on PDF.js (each page
+       rendered to a <canvas>) — gives us full control over presentation,
+       transitions, and protection. */
     .pdf-stage {
       position: relative; width: 100%;
-      height: calc(100vh - 200px); min-height: 600px;
-      border-radius: 12px; overflow: hidden;
-      box-shadow: 0 4px 16px rgba(26,31,58,0.12), 0 1px 3px rgba(26,31,58,0.06);
+      height: calc(100vh - 200px); min-height: 580px;
+      display: flex; flex-direction: column;
+      gap: 14px;
+    }
+    .pdf-slide-area {
+      position: relative; flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      perspective: 1400px;
+    }
+    .pdf-slide {
+      position: absolute;
+      max-width: 96%; max-height: 100%;
+      border-radius: 12px;
+      box-shadow: 0 16px 50px rgba(94,92,230,0.30), 0 2px 6px rgba(26,31,58,0.08);
       background: white;
+      transition: transform 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.15),
+                  opacity 0.4s ease;
+      will-change: transform, opacity;
+      pointer-events: none; user-select: none; -webkit-user-drag: none;
     }
-    .pdf-iframe {
-      display: block; width: 100%; height: 100%;
-      border: none; background: white;
-      opacity: 0; transition: opacity 0.4s ease;
+    .pdf-slide.is-active   { transform: translateX(0)     scale(1);   opacity: 1; z-index: 2; }
+    .pdf-slide.exit-right  { transform: translateX(-110%) scale(0.85);opacity: 0; z-index: 1; }
+    .pdf-slide.exit-left   { transform: translateX(110%)  scale(0.85);opacity: 0; z-index: 1; }
+    .pdf-slide.enter-right { transform: translateX(110%)  scale(0.85);opacity: 0; z-index: 1; }
+    .pdf-slide.enter-left  { transform: translateX(-110%) scale(0.85);opacity: 0; z-index: 1; }
+
+    /* Bottom navigation row: prev / dots / next */
+    .pdf-nav {
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; padding: 8px 0;
     }
-    .pdf-iframe.ready { opacity: 1; }
+    .pdf-nav-btn {
+      width: 48px; height: 48px;
+      border-radius: 50%; border: none;
+      background: linear-gradient(135deg, var(--learn-accent), var(--learn-purple));
+      color: white; font-size: 20px;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(94,92,230,0.35);
+      font-family: inherit;
+    }
+    .pdf-nav-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(94,92,230,0.5);
+    }
+    .pdf-nav-btn:disabled {
+      opacity: 0.35; cursor: not-allowed;
+      box-shadow: none;
+    }
+    .pdf-nav-dots {
+      display: flex; gap: 6px; align-items: center;
+      max-width: 60%; overflow-x: auto;
+      padding: 4px 8px;
+      scrollbar-width: none;
+    }
+    .pdf-nav-dots::-webkit-scrollbar { display: none; }
+    .pdf-nav-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--learn-border);
+      cursor: pointer; transition: all 0.15s;
+      flex-shrink: 0; border: none; padding: 0;
+    }
+    .pdf-nav-dot.active {
+      width: 28px; border-radius: 99px;
+      background: linear-gradient(90deg, var(--learn-accent), var(--learn-purple));
+    }
+    .pdf-nav-dot:hover:not(.active) {
+      background: var(--learn-text-light);
+      transform: scale(1.3);
+    }
+    .pdf-page-counter {
+      position: absolute; top: 14px; right: 14px;
+      background: rgba(15,23,42,0.7); backdrop-filter: blur(10px);
+      color: white; font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border-radius: 99px;
+      letter-spacing: 0.4px; z-index: 5;
+    }
+    @media (max-width: 600px) {
+      .pdf-nav-btn { width: 40px; height: 40px; font-size: 17px; }
+      .pdf-page-counter { font-size: 11px; padding: 5px 10px; }
+    }
 
     /* Full-overlay loading state — sits over the iframe area */
     .pdf-loading {
@@ -669,7 +743,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=13"></script>
+  <script src="js/learn.js?v=14"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>

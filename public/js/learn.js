@@ -325,27 +325,29 @@
     }
   }
 
-  // ----- PDF renderer (iframe) ----------------------------------------
-  // Use the browser's native PDF viewer via <iframe>. This is the only
-  // approach that handles Hebrew text correctly — PDF.js mangles RTL
-  // shaping with Canva-exported PDFs (letters appear individually
-  // separated). The native viewer uses the OS font stack and gets
-  // shaping right.
-  //
-  // URL fragment '#toolbar=0&navpanes=0&scrollbar=0' hides the Chrome
-  // toolbar (download/print buttons). Combined with the watermark
-  // overlay + sandbox attribute, this stays as protected as we can
-  // make a browser-rendered PDF.
-  //
-  // Loading UX: spinner overlay sits ON TOP of the (initially invisible)
-  // iframe and fades out once the iframe fires its 'load' event. The
-  // server sends Cache-Control: private + ETag so a second view of the
-  // same guide is instant.
-  function renderPdfVisual(moduleId, container) {
+  // ----- Slide-deck renderer (PDF.js + custom UI) ---------------------
+  // Each page is rendered to a <canvas> via PDF.js. We build a slide
+  // viewer that shows ONE page at a time, with smooth slide-in/out
+  // animations and prev/next/keyboard/swipe navigation. Big visual win
+  // over the continuous-scroll iframe — feels like a real presentation.
+  async function loadPdfJsLib() {
+    if (window.pdfjsLib) return window.pdfjsLib
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+      s.onload = resolve
+      s.onerror = () => reject(new Error('PDF.js failed to load'))
+      document.head.appendChild(s)
+    })
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    return window.pdfjsLib
+  }
+
+  async function renderPdfVisual(moduleId, container) {
     const token = localStorage.getItem('auth_token')
     const url = '/api/training/modules/' + moduleId
       + '/view?token=' + encodeURIComponent(token)
-      + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'
 
     container.innerHTML = `
       <div class="pdf-stage">
@@ -354,25 +356,163 @@
           <div class="pdf-loading-text">טוען את המדריך...</div>
           <div class="pdf-loading-hint">בטעינה ראשונה זה לוקח מספר שניות. בכניסות הבאות זה יהיה מיידי ⚡</div>
         </div>
-        <iframe id="pdf-frame" class="pdf-iframe" title="מצגת המדריך" src="${url}"></iframe>
+        <div class="pdf-page-counter" id="pdf-counter">— / —</div>
+        <div class="pdf-slide-area" id="pdf-slide-area"></div>
+        <div class="pdf-nav">
+          <button class="pdf-nav-btn" id="pdf-prev" title="הקודם" disabled>›</button>
+          <div class="pdf-nav-dots" id="pdf-dots"></div>
+          <button class="pdf-nav-btn" id="pdf-next" title="הבא" disabled>‹</button>
+        </div>
       </div>
     `
 
-    const iframe = container.querySelector('#pdf-frame')
+    const slideArea = container.querySelector('#pdf-slide-area')
+    const counterEl = container.querySelector('#pdf-counter')
+    const dotsEl = container.querySelector('#pdf-dots')
+    const prevBtn = container.querySelector('#pdf-prev')
+    const nextBtn = container.querySelector('#pdf-next')
     const loading = container.querySelector('#pdf-loading')
-    let done = false
-    const finish = () => {
-      if (done) return
-      done = true
-      iframe.classList.add('ready')
+
+    try {
+      const pdfjsLib = await loadPdfJsLib()
+      const pdf = await pdfjsLib.getDocument({ url }).promise
+
+      const totalPages = pdf.numPages
+      let currentPage = 1
+      const slides = new Map() // pageNum → canvas element
+
+      // Render a single page to a canvas (cached). Returns the canvas.
+      const renderPage = async (pageNum) => {
+        if (slides.has(pageNum)) return slides.get(pageNum)
+        const page = await pdf.getPage(pageNum)
+        const baseViewport = page.getViewport({ scale: 1 })
+        // Fit-to-area: take 95% of slide area, keep aspect ratio
+        const areaW = slideArea.clientWidth * 0.96
+        const areaH = slideArea.clientHeight
+        const scaleW = areaW / baseViewport.width
+        const scaleH = areaH / baseViewport.height
+        const fitScale = Math.min(scaleW, scaleH)
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        const viewport = page.getViewport({ scale: fitScale * dpr })
+
+        const canvas = document.createElement('canvas')
+        canvas.className = 'pdf-slide'
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        canvas.style.width = (viewport.width / dpr) + 'px'
+        canvas.style.height = (viewport.height / dpr) + 'px'
+        canvas.dataset.page = pageNum
+        slideArea.appendChild(canvas)
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+        slides.set(pageNum, canvas)
+        return canvas
+      }
+
+      // Render dots indicator (one per page, max 30 visible — beyond that
+      // we let it scroll horizontally)
+      const renderDots = () => {
+        dotsEl.innerHTML = ''
+        for (let i = 1; i <= totalPages; i++) {
+          const dot = document.createElement('button')
+          dot.className = 'pdf-nav-dot' + (i === currentPage ? ' active' : '')
+          dot.dataset.page = i
+          dot.title = 'דף ' + i
+          dot.addEventListener('click', () => goTo(i))
+          dotsEl.appendChild(dot)
+        }
+      }
+
+      const updateUi = () => {
+        counterEl.textContent = `${currentPage} / ${totalPages}`
+        prevBtn.disabled = currentPage === 1
+        nextBtn.disabled = currentPage === totalPages
+        dotsEl.querySelectorAll('.pdf-nav-dot').forEach((d) => {
+          d.classList.toggle('active', parseInt(d.dataset.page) === currentPage)
+        })
+      }
+
+      // Animated transition between pages — RTL: 'next' slides FROM the
+      // left side and current page exits to the right.
+      const goTo = async (newPage, dir = null) => {
+        if (newPage < 1 || newPage > totalPages) return
+        if (newPage === currentPage) return
+        const direction = dir || (newPage > currentPage ? 'next' : 'prev')
+
+        const incomingCanvas = await renderPage(newPage)
+        const outgoingCanvas = slides.get(currentPage)
+
+        // Reset all classes first
+        slides.forEach((c) => { c.className = 'pdf-slide' })
+
+        // Set initial state for incoming
+        incomingCanvas.classList.add(direction === 'next' ? 'enter-left' : 'enter-right')
+        // Force a reflow so the browser registers the initial transform
+        // before we transition to the active state.
+        // eslint-disable-next-line no-unused-expressions
+        incomingCanvas.offsetWidth
+
+        // Outgoing exits in the opposite direction
+        if (outgoingCanvas) {
+          outgoingCanvas.classList.add(direction === 'next' ? 'exit-right' : 'exit-left')
+        }
+
+        // Trigger animation: switch incoming to active
+        requestAnimationFrame(() => {
+          incomingCanvas.classList.remove('enter-left', 'enter-right')
+          incomingCanvas.classList.add('is-active')
+        })
+
+        currentPage = newPage
+        updateUi()
+
+        // Pre-load the NEXT page in the background so the next click
+        // is instant
+        if (currentPage + 1 <= totalPages) renderPage(currentPage + 1).catch(() => {})
+        if (currentPage - 1 >= 1)         renderPage(currentPage - 1).catch(() => {})
+      }
+
+      // Initial render: page 1 active
+      renderDots()
+      const firstCanvas = await renderPage(1)
+      firstCanvas.classList.add('is-active')
+      // Pre-load page 2 in background
+      if (totalPages > 1) renderPage(2).catch(() => {})
+
+      updateUi()
+      // Hide loading spinner
       if (loading) {
         loading.classList.add('fade-out')
-        // Remove from DOM after the fade transition so it doesn't block clicks
         setTimeout(() => loading.remove(), 400)
       }
-    }
-    iframe.addEventListener('load', finish)
-    iframe.addEventListener('error', () => {
+
+      // Wire up navigation
+      // RTL: prev button is on the right (has the '›' arrow), next on left ('‹')
+      prevBtn.addEventListener('click', () => goTo(currentPage - 1, 'prev'))
+      nextBtn.addEventListener('click', () => goTo(currentPage + 1, 'next'))
+
+      // Keyboard navigation — arrow keys
+      const keyHandler = (e) => {
+        if (document.getElementById('reader-overlay').style.display === 'none') return
+        // RTL: left arrow = next, right arrow = prev
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(currentPage + 1, 'next') }
+        if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage - 1, 'prev') }
+      }
+      document.addEventListener('keydown', keyHandler)
+
+      // Swipe support for touch devices
+      let touchStartX = 0
+      slideArea.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX
+      })
+      slideArea.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].screenX - touchStartX
+        if (Math.abs(dx) < 50) return
+        // RTL: swipe right = previous, swipe left = next
+        if (dx > 0) goTo(currentPage - 1, 'prev')
+        else        goTo(currentPage + 1, 'next')
+      })
+    } catch (err) {
+      console.error('PDF render error:', err)
       container.innerHTML = `
         <div class="reader-fallback">
           <div class="reader-fallback-icon">⚠️</div>
@@ -380,10 +520,7 @@
           <p>נסי לרענן את העמוד.</p>
         </div>
       `
-    })
-    // Safety net — some browsers don't fire 'load' for plugins.
-    // After 8s, force-show the iframe regardless.
-    setTimeout(finish, 8000)
+    }
   }
 
   function closeReader() { document.getElementById('reader-overlay').style.display = 'none' }
