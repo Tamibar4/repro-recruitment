@@ -27,20 +27,14 @@
   let currentAccountId = null;
   let allTags = [];
   let filters = { status: 'all', q: '' };
-  let view = 'list';              // 'list' or 'calendar'
-  let calCursor = new Date();     // first day of currently displayed month
+  let expandedPostIds = new Set();  // posts currently expanded inline
+  let draggingAccountId = null;   // tab being dragged (account id)
 
-  // Display title for a post: explicit title field if set, otherwise the
-  // first line of the body text (truncated to ~80 chars), otherwise an
-  // empty string (rendered as "(ללא כותרת)" by the card CSS).
+  // Display title for a post: ONLY the explicit title field. No fallback
+  // to the body text — if the user didn't enter a title, the card shows
+  // "(ללא כותרת)" via CSS so it's obvious she should add one.
   function postTitle(post) {
-    if (post.title && post.title.trim()) return post.title.trim();
-    if (post.text && post.text.trim()) {
-      const firstLine = post.text.split(/\r?\n/)[0].trim();
-      if (firstLine.length <= 80) return firstLine;
-      return firstLine.slice(0, 77).trim() + '…';
-    }
-    return '';
+    return (post.title || '').trim();
   }
 
   // Edit-state for modals
@@ -95,8 +89,8 @@
     if (!currentAccountId) { posts = []; return; }
     posts = await API.publishing.listPosts({
       account_id: currentAccountId,
-      status: view === 'calendar' ? undefined : (filters.status === 'all' ? undefined : filters.status),
-      q: view === 'calendar' ? undefined : (filters.q || undefined)
+      status: filters.status === 'all' ? undefined : filters.status,
+      q: filters.q || undefined
     });
   }
 
@@ -186,7 +180,8 @@
         : '';
       const c = acc.counts || { draft: 0, scheduled: 0, published: 0 };
       return `
-        <button class="pub-tab ${isActive ? 'is-active' : ''}" data-account-id="${acc.id}" style="${style}">
+        <button class="pub-tab ${isActive ? 'is-active' : ''}" data-account-id="${acc.id}" style="${style}"
+                draggable="true" title="גררי להזזה">
           <span class="pub-tab-icon">${escapeHtml(acc.icon || '👤')}</span>
           <span>${escapeHtml(acc.name)}</span>
           <span class="pub-tab-counts">
@@ -213,6 +208,39 @@
           Promise.all([loadPosts(), loadGroupsForCurrentAccount()]).then(render);
         }
       });
+      // Drag-and-drop: drag a tab to reorder accounts
+      tab.addEventListener('dragstart', (e) => {
+        draggingAccountId = parseInt(tab.dataset.accountId, 10);
+        tab.classList.add('is-dragging');
+        try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+        // Some browsers require setData() to be called for drag to work
+        try { e.dataTransfer.setData('text/plain', String(draggingAccountId)); } catch {}
+      });
+      tab.addEventListener('dragend', () => {
+        tab.classList.remove('is-dragging');
+        tabsEl.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
+        draggingAccountId = null;
+      });
+      tab.addEventListener('dragover', (e) => {
+        if (draggingAccountId == null) return;
+        const overId = parseInt(tab.dataset.accountId, 10);
+        if (overId === draggingAccountId) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch {}
+        tabsEl.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
+        tab.classList.add('is-drop-target');
+      });
+      tab.addEventListener('dragleave', () => {
+        tab.classList.remove('is-drop-target');
+      });
+      tab.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        tab.classList.remove('is-drop-target');
+        if (draggingAccountId == null) return;
+        const targetId = parseInt(tab.dataset.accountId, 10);
+        if (targetId === draggingAccountId) return;
+        await reorderAccounts(draggingAccountId, targetId);
+      });
     });
     tabsEl.querySelectorAll('.pub-tab-edit').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -223,6 +251,31 @@
       });
     });
     tabsEl.querySelector('#add-account-btn').addEventListener('click', () => openAccountModal());
+  }
+
+  // Move the dragged account so it sits right before the drop-target,
+  // then renumber sort_order across all accounts (so the order is stable
+  // across reloads) and persist via PUT /accounts/:id.
+  async function reorderAccounts(fromId, toId) {
+    const fromIdx = accounts.findIndex(a => a.id === fromId);
+    const toIdx   = accounts.findIndex(a => a.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = accounts.splice(fromIdx, 1);
+    accounts.splice(toIdx, 0, moved);
+    // Renumber locally and re-render right away (optimistic)
+    accounts.forEach((acc, i) => { acc.sort_order = i; });
+    renderTabs();
+    // Persist in the background. If any one save fails we don't roll back —
+    // worst case the order on next reload is what the server has, which is
+    // close enough.
+    try {
+      await Promise.all(accounts.map((acc, i) =>
+        API.publishing.updateAccount(acc.id, { sort_order: i })
+      ));
+    } catch (err) {
+      console.warn('Reorder save failed:', err);
+      showToast('סדר עודכן מקומית, אבל היתה בעיה בשמירה לשרת', 'error');
+    }
   }
 
   function renderContent() {
@@ -244,13 +297,6 @@
     }
 
     filtersEl.style.display = '';
-    syncViewToggleUi();
-
-    if (view === 'calendar') {
-      contentEl.innerHTML = renderCalendar();
-      wireCalendarHandlers();
-      return;
-    }
 
     if (posts.length === 0) {
       contentEl.innerHTML = `
@@ -271,24 +317,36 @@
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDateShort(post.publish_date) : '';
     const title = postTitle(post);
+    const isExpanded = expandedPostIds.has(post.id);
     return `
-      <article class="pub-post" data-post-id="${post.id}">
-        <div class="pub-post-image pub-post-clickable" data-action="preview">
+      <article class="pub-post ${isExpanded ? 'is-expanded' : ''}" data-post-id="${post.id}">
+        <div class="pub-post-image">
           ${post.image_url
             ? `<img src="${escapeHtml(post.image_url)}" alt="" loading="lazy">`
-            : `<span class="pub-post-image-empty">🖼️</span>`}
+            : `<button type="button" class="pub-post-add-image-btn" data-action="add-image" title="הוסיפי תמונה">
+                 <span class="icon">📷</span>
+                 <span class="label">הוסיפי תמונה</span>
+               </button>`}
           <span class="pub-post-status ${post.status}">${statusLabel}</span>
         </div>
-        <div class="pub-post-body pub-post-clickable" data-action="preview"
-             title="לחצי לראות את התוכן המלא">
+        <div class="pub-post-body pub-post-clickable" data-action="toggle"
+             title="${isExpanded ? 'לחצי לסגור' : 'לחצי לראות את הפוסט המלא'}">
           <div class="pub-post-title">${escapeHtml(title)}</div>
-          ${post.text ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
+          ${post.text && !isExpanded ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
           ${post.tags && post.tags.length ? `
             <div class="pub-post-tags">
               ${post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('')}
             </div>` : ''}
           <div class="pub-post-meta">
             ${dateStr ? `📅 ${escapeHtml(dateStr)}` : `נערך ${escapeHtml(formatDateShort(post.updated_at || post.created_at))}`}
+          </div>
+        </div>
+        <div class="pub-post-expanded">
+          ${post.text ? `<div class="pub-post-fulltext">${escapeHtml(post.text)}</div>` : ''}
+          <div class="pub-post-secondary-actions">
+            <button data-action="duplicate">📋 שכפלי</button>
+            <button data-action="move">🔀 העבירי</button>
+            <button class="danger" data-action="delete">🗑️ מחקי</button>
           </div>
         </div>
         <div class="pub-post-actions">
@@ -317,124 +375,60 @@
           const action = el.dataset.action;
           const post = posts.find(p => p.id === id);
           if (!post) return;
-          if (action === 'preview') openPreviewModal(post);
-          else if (action === 'copy-text') await handleCopyText(post, el);
+          if (action === 'toggle') togglePostExpansion(post);
+          else if (action === 'copy-text')  await handleCopyText(post, el);
           else if (action === 'copy-image') await handleCopyImage(post, el);
-          else if (action === 'edit') openPostModal(post);
+          else if (action === 'edit')       openPostModal(post);
+          else if (action === 'add-image')  triggerImageUploadForPost(post);
+          else if (action === 'duplicate')  await handleDuplicate(post);
+          else if (action === 'move')       openMoveModal(post);
+          else if (action === 'delete')     await handleDelete(post);
         });
       });
     });
   }
 
-  // ----- Calendar view ------------------------------------------------
-  // Renders a 7-column month grid with scheduled+published posts placed
-  // on their publish_date. Lets Tami plan a week (or a month) at a glance.
-  function renderCalendar() {
-    const cur = new Date(calCursor);
-    cur.setDate(1);
-    const monthName = cur.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-    // Sunday-first columns (Hebrew week starts on Sunday)
-    const dayHeads = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
-    const firstDow = cur.getDay();
-    const lastDay = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
-    const today = new Date(); today.setHours(0,0,0,0);
-
-    // Bucket posts (with publish_date) by YYYY-MM-DD
-    const byDate = {};
-    for (const p of posts) {
-      if (!p.publish_date) continue;
-      const d = new Date(p.publish_date);
-      if (isNaN(d)) continue;
-      if (d.getFullYear() !== cur.getFullYear() || d.getMonth() !== cur.getMonth()) continue;
-      const key = d.getDate();
-      (byDate[key] = byDate[key] || []).push(p);
-    }
-
-    const cells = [];
-    for (let i = 0; i < firstDow; i++) cells.push('<div class="pub-cal-cell is-empty"></div>');
-    for (let day = 1; day <= lastDay; day++) {
-      const cellDate = new Date(cur.getFullYear(), cur.getMonth(), day);
-      const isToday = cellDate.getTime() === today.getTime();
-      const isPast = cellDate < today && !isToday;
-      const dayPosts = byDate[day] || [];
-      const visibleCount = dayPosts.length > 3 ? 3 : dayPosts.length;
-      const moreCount = dayPosts.length - visibleCount;
-      cells.push(`
-        <div class="pub-cal-cell ${isToday ? 'is-today' : ''} ${isPast ? 'is-past' : ''}" data-day="${day}">
-          <div class="pub-cal-day">${day}</div>
-          ${dayPosts.slice(0, visibleCount).map(p => {
-            const t = postTitle(p) || '(ללא כותרת)';
-            return `
-              <div class="pub-cal-post ${p.status}" data-post-id="${p.id}" title="${escapeHtml(t)}">
-                ${escapeHtml(t.slice(0, 30))}
-              </div>
-            `;
-          }).join('')}
-          ${moreCount > 0 ? `<div class="pub-cal-post" style="opacity:0.7">+${moreCount} עוד</div>` : ''}
-          <div class="pub-cal-add">+ הוסיפי</div>
-        </div>
-      `);
-    }
-
-    return `
-      <div class="pub-calendar">
-        <div class="pub-cal-header">
-          <div class="pub-cal-title">${escapeHtml(monthName)}</div>
-          <div class="pub-cal-nav">
-            <button id="cal-today-btn" title="חזרי להיום" style="width:auto;padding:0 14px;font-size:13px;font-weight:600;border-radius:99px">היום</button>
-            <button id="cal-prev-btn" title="חודש קודם">›</button>
-            <button id="cal-next-btn" title="חודש הבא">‹</button>
-          </div>
-        </div>
-        <div class="pub-cal-grid">
-          ${dayHeads.map(d => `<div class="pub-cal-dayhead">${d}</div>`).join('')}
-          ${cells.join('')}
-        </div>
-      </div>
-    `;
+  // Toggle inline expansion of a post card. Re-renders only that one
+  // card so we don't blow away other cards' state (e.g. an in-flight
+  // copy animation on a sibling).
+  function togglePostExpansion(post) {
+    if (expandedPostIds.has(post.id)) expandedPostIds.delete(post.id);
+    else expandedPostIds.add(post.id);
+    const card = document.querySelector(`.pub-post[data-post-id="${post.id}"]`);
+    if (!card) return;
+    card.outerHTML = renderPostCard(post);
+    // Re-wire just the new card's handlers
+    wirePostCardHandlers();
   }
 
-  function wireCalendarHandlers() {
-    document.getElementById('cal-prev-btn')?.addEventListener('click', () => {
-      calCursor.setMonth(calCursor.getMonth() - 1);
-      renderContent();
+  // Quick-add image: lets the user upload an image directly from a card
+  // without opening the full edit modal. Creates a hidden file input,
+  // uploads, then PATCHes the post with the new image_url.
+  function triggerImageUploadForPost(post) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('התמונה גדולה מדי (מעל 10MB)', 'error');
+        return;
+      }
+      try {
+        showToast('מעלה תמונה...');
+        const result = await API.publishing.uploadImage(file);
+        await API.publishing.updatePost(post.id, { image_url: result.url });
+        await reload();
+        showToast('התמונה נוספה');
+      } catch (err) {
+        showToast(err.message || 'העלאה נכשלה', 'error');
+      }
     });
-    document.getElementById('cal-next-btn')?.addEventListener('click', () => {
-      calCursor.setMonth(calCursor.getMonth() + 1);
-      renderContent();
-    });
-    document.getElementById('cal-today-btn')?.addEventListener('click', () => {
-      calCursor = new Date();
-      renderContent();
-    });
-    document.querySelectorAll('.pub-cal-cell:not(.is-empty)').forEach(cell => {
-      cell.addEventListener('click', (e) => {
-        // Click on an existing post chip → open it
-        const chip = e.target.closest('.pub-cal-post[data-post-id]');
-        if (chip) {
-          const id = parseInt(chip.dataset.postId, 10);
-          const post = posts.find(p => p.id === id);
-          if (post) openPreviewModal(post);
-          return;
-        }
-        // Click on empty cell area → open new post for that day
-        const day = parseInt(cell.dataset.day, 10);
-        const target = new Date(calCursor.getFullYear(), calCursor.getMonth(), day, 12, 0, 0);
-        openPostModal(null, { presetDate: target, presetStatus: 'scheduled' });
-      });
-    });
-  }
-
-  function syncViewToggleUi() {
-    const toggle = document.getElementById('pub-view-toggle');
-    if (!toggle) return;
-    toggle.querySelectorAll('button').forEach(b => {
-      b.classList.toggle('is-active', b.dataset.view === view);
-    });
-    // In calendar view, the status filter is implicit (any post with a
-    // publish_date). Hide the filter UI to reduce clutter.
-    document.getElementById('pub-filter-status').style.display = view === 'calendar' ? 'none' : '';
-    document.querySelector('.pub-filter-search').style.display = view === 'calendar' ? 'none' : '';
+    document.body.appendChild(input);
+    input.click();
+    setTimeout(() => input.remove(), 5000);
   }
 
   // ----- Copy logic ---------------------------------------------------
@@ -922,58 +916,6 @@
     }
   }
 
-  // ----- Preview modal ------------------------------------------------
-  // Click on a post's body or image opens this. Shows the FULL text
-  // (no clipping) and ALL actions inline — including the secondary
-  // ones (duplicate, move, delete) that don't fit on the card itself.
-  // Note: publish-to-group is no longer here. Groups live in the
-  // top-of-page bar so the user picks a destination AFTER copying.
-  function openPreviewModal(post) {
-    const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
-    const dateStr = post.publish_date ? formatDate(post.publish_date) : '';
-    const title = post.title && post.title.trim() ? post.title.trim() : null;
-
-    document.getElementById('preview-modal-title').textContent = title || `פוסט · ${statusLabel}`;
-    document.getElementById('preview-modal-content').innerHTML = `
-      ${post.image_url ? `<img class="pub-preview-image" src="${escapeHtml(post.image_url)}" alt="">` : ''}
-      ${title ? `<h3 style="font-size:18px;font-weight:800;color:var(--color-text);margin-bottom:10px;line-height:1.4">${escapeHtml(title)}</h3>` : ''}
-      <div class="pub-preview-text">${escapeHtml(post.text || '')}</div>
-      <div class="pub-preview-meta">
-        <span class="pub-post-status ${post.status}" style="position:static">${statusLabel}</span>
-        ${dateStr ? `<span>📅 ${escapeHtml(dateStr)}</span>` : ''}
-        ${post.tags && post.tags.length ? post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('') : ''}
-      </div>
-      <div class="pub-preview-actions">
-        <button class="btn btn-primary" data-prev-action="copy-text">📄 העתק טקסט</button>
-        <button class="btn btn-secondary" data-prev-action="copy-image" ${post.image_url ? '' : 'disabled'}>🖼️ העתק תמונה</button>
-        <button class="btn btn-secondary" data-prev-action="edit">✏️ ערוך</button>
-        <button class="btn btn-secondary" data-prev-action="duplicate">📋 שכפל</button>
-        <button class="btn btn-secondary" data-prev-action="move">🔀 העבר</button>
-        <button class="btn btn-secondary" data-prev-action="delete" style="color:var(--color-red)">🗑️ מחק</button>
-      </div>
-    `;
-
-    // Wire up actions
-    const content = document.getElementById('preview-modal-content');
-    content.querySelectorAll('[data-prev-action]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const a = btn.dataset.prevAction;
-        if (a === 'copy-text')  await handleCopyText(post, btn);
-        else if (a === 'copy-image') await handleCopyImage(post, btn);
-        else if (a === 'edit')      { closeModal('preview-modal'); openPostModal(post); }
-        else if (a === 'duplicate') { closeModal('preview-modal'); await handleDuplicate(post); }
-        else if (a === 'move')      { closeModal('preview-modal'); openMoveModal(post); }
-        else if (a === 'delete')    {
-          if (!confirm('למחוק את הפוסט?')) return;
-          closeModal('preview-modal');
-          await handleDelete(post);
-        }
-      });
-    });
-
-    openModal('preview-modal');
-  }
-
   // ----- Event wiring -------------------------------------------------
   function setupEventListeners() {
     document.getElementById('btn-new-post').addEventListener('click', () => {
@@ -1033,18 +975,6 @@
         loadPosts().then(renderContent);
       });
     });
-    document.getElementById('pub-view-toggle').querySelectorAll('button').forEach(b => {
-      b.addEventListener('click', () => {
-        const v = b.dataset.view;
-        if (v === view) return;
-        view = v;
-        // In calendar mode we want all posts (including out-of-month
-        // ones we'll just ignore at render time). loadPosts handles the
-        // filter difference internally.
-        loadPosts().then(renderContent);
-      });
-    });
-
   }
 
   function debounce(fn, ms) {

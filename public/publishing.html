@@ -424,119 +424,83 @@
       padding: 4px 6px; background: transparent;
     }
 
-    /* ----- View toggle (list vs calendar) ----- */
-    .pub-view-toggle {
-      display: inline-flex; gap: 4px;
-      padding: 3px;
-      background: var(--color-bg);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
+    /* ----- Drag-and-drop reordering for account tabs ----- */
+    .pub-tab[draggable="true"] { cursor: grab; }
+    .pub-tab.is-dragging       { opacity: 0.4; cursor: grabbing; }
+    .pub-tab.is-drop-target {
+      box-shadow: 0 0 0 3px var(--color-primary);
     }
-    .pub-view-toggle button {
-      padding: 6px 12px; border-radius: 6px;
-      border: none; background: transparent;
-      font-family: inherit; font-size: 13px; font-weight: 600;
-      color: var(--color-text-secondary); cursor: pointer;
-      display: inline-flex; align-items: center; gap: 5px;
-      transition: all 0.15s;
-    }
-    .pub-view-toggle button.is-active {
-      background: var(--color-white);
-      color: var(--color-primary);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .pub-view-toggle button svg { width: 14px; height: 14px; }
 
-    /* ----- Calendar view ----- */
-    .pub-calendar {
+    /* ----- Inline expansion (replacing the preview modal) -----
+       Click a post body → the card grows in place to reveal the full
+       body text, larger image and the secondary actions (duplicate,
+       move, delete). Click again to collapse. */
+    .pub-post-expanded {
+      display: none;
+      padding: 0 16px 14px;
+      animation: pub-expand-in 0.25s ease-out;
+    }
+    .pub-post.is-expanded .pub-post-expanded { display: block; }
+    .pub-post.is-expanded .pub-post-readmore { display: none; }
+    .pub-post.is-expanded .pub-post-title {
+      -webkit-line-clamp: unset;
+      display: block;
+    }
+    @keyframes pub-expand-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .pub-post-fulltext {
+      font-size: 14px; line-height: 1.7;
+      color: var(--color-text);
+      white-space: pre-wrap; word-break: break-word;
+      padding: 12px 14px;
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      margin-top: 10px;
+    }
+    .pub-post-fulltext:empty { display: none; }
+    .pub-post-secondary-actions {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border);
+    }
+    .pub-post-secondary-actions button {
+      flex: 1; min-width: 86px;
+      padding: 7px 10px; border-radius: var(--radius);
+      border: 1px solid var(--color-border);
       background: var(--color-white);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-xl);
-      padding: 18px;
-      margin-bottom: 30px;
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      color: var(--color-text-secondary);
+      cursor: pointer; transition: all 0.12s;
     }
-    .pub-cal-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 16px; padding-bottom: 14px;
-      border-bottom: 1px solid var(--color-border);
-    }
-    .pub-cal-title {
-      font-size: 18px; font-weight: 800; color: var(--color-text);
-    }
-    .pub-cal-nav {
-      display: inline-flex; gap: 8px;
-    }
-    .pub-cal-nav button {
-      width: 34px; height: 34px; border-radius: 50%;
-      border: 1px solid var(--color-border);
-      background: var(--color-white); cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-size: 16px; color: var(--color-text-secondary);
-      font-family: inherit;
-      transition: all 0.15s;
-    }
-    .pub-cal-nav button:hover {
+    .pub-post-secondary-actions button:hover {
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
-    .pub-cal-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
+    .pub-post-secondary-actions button.danger:hover {
+      border-color: var(--color-red);
+      color: var(--color-red);
+      background: rgba(226,68,92,0.05);
+    }
+    /* Quick-add image button visible on cards without an image */
+    .pub-post-add-image-btn {
+      position: absolute; inset: 0;
+      display: inline-flex; flex-direction: column;
+      align-items: center; justify-content: center;
       gap: 4px;
-    }
-    .pub-cal-dayhead {
-      font-size: 12px; font-weight: 700;
-      text-align: center; padding: 6px 0;
-      color: var(--color-text-secondary);
-      background: var(--color-bg); border-radius: 6px;
-    }
-    .pub-cal-cell {
-      min-height: 110px;
-      background: var(--color-bg);
-      border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 6px 8px;
-      display: flex; flex-direction: column; gap: 4px;
+      background: transparent; border: none;
+      font-family: inherit;
+      color: var(--color-text-light);
       cursor: pointer; transition: all 0.15s;
-      position: relative;
     }
-    .pub-cal-cell.is-empty { background: transparent; cursor: default; }
-    .pub-cal-cell:not(.is-empty):hover {
+    .pub-post-add-image-btn:hover {
       background: var(--color-accent-soft);
-      border-color: var(--color-primary);
+      color: var(--color-primary);
     }
-    .pub-cal-cell.is-today {
-      background: var(--color-accent-soft);
-      border-color: var(--color-primary);
-    }
-    .pub-cal-cell.is-past .pub-cal-day { color: var(--color-text-light); }
-    .pub-cal-day {
-      font-size: 13px; font-weight: 700;
-      color: var(--color-text);
-      text-align: end;
-    }
-    .pub-cal-post {
-      font-size: 11px; padding: 3px 7px;
-      border-radius: 5px; cursor: pointer;
-      background: var(--color-white);
-      border: 1px solid var(--color-border);
-      overflow: hidden; text-overflow: ellipsis;
-      white-space: nowrap;
-      transition: all 0.12s;
-    }
-    .pub-cal-post:hover {
-      border-color: var(--color-primary);
-      transform: translateX(-2px);
-    }
-    .pub-cal-post.draft     { border-right: 3px solid #6b6e8a; }
-    .pub-cal-post.scheduled { border-right: 3px solid #ea580c; }
-    .pub-cal-post.published { border-right: 3px solid #16a34a; }
-    .pub-cal-add {
-      font-size: 10px; color: var(--color-text-light);
-      text-align: center; padding: 2px;
-      opacity: 0; transition: opacity 0.15s;
-    }
-    .pub-cal-cell:hover .pub-cal-add { opacity: 1; }
+    .pub-post-add-image-btn .icon { font-size: 32px; opacity: 0.6; }
+    .pub-post-add-image-btn .label { font-size: 11.5px; font-weight: 600; }
 
     /* ----- Groups section in account modal ----- */
     .pub-group-add-row {
@@ -619,42 +583,10 @@
       font-style: italic;
     }
 
-    /* ----- Post preview modal (full-text view triggered by clicking the card) ----- */
-    .pub-preview-image {
-      width: 100%; max-height: 360px; object-fit: contain;
-      background: var(--color-bg);
-      border-radius: var(--radius); margin-bottom: 16px;
-    }
-    .pub-preview-text {
-      font-size: 15px; line-height: 1.75;
-      color: var(--color-text);
-      white-space: pre-wrap; word-break: break-word;
-      padding: 14px 16px; background: var(--color-bg);
-      border-radius: var(--radius);
-      margin-bottom: 14px;
-    }
-    .pub-preview-text:empty::before {
-      content: 'אין טקסט לפוסט הזה';
-      color: var(--color-text-light); font-style: italic;
-    }
-    .pub-preview-meta {
-      display: flex; flex-wrap: wrap; gap: 10px;
-      align-items: center; margin-bottom: 14px;
-      font-size: 12.5px; color: var(--color-text-secondary);
-    }
-    .pub-preview-actions {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      padding-top: 14px;
-      border-top: 1px solid var(--color-border);
-    }
-    .pub-preview-actions .btn { font-size: 13px; padding: 8px 14px; }
-
     /* Post-card body when small screen */
     @media (max-width: 600px) {
       .pub-posts { grid-template-columns: 1fr; }
       .pub-form-row.row-2 { grid-template-columns: 1fr; }
-      .pub-cal-cell { min-height: 80px; padding: 4px; }
-      .pub-cal-post { font-size: 10px; padding: 2px 5px; }
     }
 
     /* Make the post-card body click-area visible on hover */
@@ -755,16 +687,6 @@
           <button data-status="draft">טיוטה</button>
           <button data-status="scheduled">מתוכנן</button>
           <button data-status="published">פורסם</button>
-        </div>
-        <div class="pub-view-toggle" id="pub-view-toggle">
-          <button data-view="list" class="is-active" title="תצוגת רשימה">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            רשימה
-          </button>
-          <button data-view="calendar" title="תצוגת יומן">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            יומן
-          </button>
         </div>
       </div>
 
@@ -937,26 +859,8 @@
     </div>
   </div>
 
-  <!-- ============================================================
-       Modal: Post preview (full text + image + all actions)
-       Shown when user clicks on a post card body
-       ============================================================ -->
-  <div class="modal-overlay" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" aria-hidden="true">
-    <div class="modal modal-lg">
-      <div class="modal-header">
-        <h2 class="modal-title" id="preview-modal-title">תצוגת פוסט</h2>
-        <button class="modal-close" onclick="closeModal('preview-modal')" aria-label="סגור">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div id="preview-modal-content"></div>
-      </div>
-    </div>
-  </div>
-
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=6"></script>
+  <script src="js/publishing.js?v=7"></script>
 </body>
 </html>
