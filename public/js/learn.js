@@ -297,21 +297,17 @@
     titleEl.textContent = '...'
     contentEl.innerHTML = '<div class="reader-fallback"><div class="reader-fallback-icon">⏳</div><h3>טוען...</h3></div>'
 
-    // Watermark — repeats user identifier diagonally over the reader.
-    // Skip entirely for admin (you don't need to watermark your OWN content)
-    // and use email > display_name > username for everyone else.
-    if (userIsAdmin) {
-      watermarkEl.innerHTML = ''
-    } else {
-      const wmText = userEmail || userName || 'RePro'
-      const wmTiles = []
-      for (let r = 0; r < 14; r++) {
-        for (let c = 0; c < 6; c++) {
-          wmTiles.push(`<span style="top:${r * 80}px;right:${c * 280 - 100}px">${escapeHtml(wmText)}</span>`)
-        }
+    // Brand watermark — repeats 'RePro' diagonally over the reader.
+    // Always shown (including for admin) so any screenshot carries the
+    // brand mark as a clear 'this is RePro confidential material' signal.
+    const wmText = 'RePro'
+    const wmTiles = []
+    for (let r = 0; r < 14; r++) {
+      for (let c = 0; c < 6; c++) {
+        wmTiles.push(`<span style="top:${r * 80}px;right:${c * 280 - 100}px">${escapeHtml(wmText)}</span>`)
       }
-      watermarkEl.innerHTML = wmTiles.join('')
     }
+    watermarkEl.innerHTML = wmTiles.join('')
 
     try {
       const mod = await safeFetch('/training/modules/' + id)
@@ -400,11 +396,80 @@
     closeBtn?.addEventListener('click', closeReader)
     overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeReader() })
     reader?.addEventListener('contextmenu', (e) => e.preventDefault())
+
+    // Helper: blur + cover the reader content briefly when a screenshot
+    // attempt is detected. Won't STOP the screenshot (Win+Shift+S and
+    // PrintScreen are OS-level and can't be intercepted from the
+    // browser), but if the screenshot tool takes a moment to activate,
+    // the user often catches just the blanked screen with the warning.
+    let coverEl = null
+    const showCover = (msg) => {
+      if (overlay.style.display === 'none') return
+      if (coverEl) return // already showing
+      coverEl = document.createElement('div')
+      coverEl.style.cssText = `
+        position: fixed; inset: 0; z-index: 99999;
+        background: linear-gradient(135deg, #1a1f3a, #5e5ce6);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        color: white; font-family: 'Rubik', sans-serif;
+        font-size: 22px; font-weight: 700; text-align: center;
+        padding: 40px;
+      `
+      coverEl.innerHTML = `
+        <div style="font-size:80px;margin-bottom:20px">🚫📷</div>
+        <div>${msg}</div>
+        <div style="font-size:14px;font-weight:500;opacity:0.85;margin-top:12px;max-width:480px;line-height:1.6">
+          חומר זה מוגן בזכויות יוצרים. צילום או הפצה אסורים — חתימת המים מאפשרת איתור מקור הדליפה.
+        </div>
+      `
+      document.body.appendChild(coverEl)
+      setTimeout(() => {
+        if (coverEl) { coverEl.remove(); coverEl = null }
+      }, 2000)
+    }
+
     document.addEventListener('keydown', (e) => {
       if (overlay.style.display === 'none') return
-      if ((e.ctrlKey || e.metaKey) && ['p', 's', 'a', 'P', 'S', 'A'].includes(e.key)) e.preventDefault()
+      // Block printing/saving/select-all
+      if ((e.ctrlKey || e.metaKey) && ['p', 's', 'a', 'P', 'S', 'A'].includes(e.key)) {
+        e.preventDefault()
+        showCover('הדפסה ושמירה חסומות')
+        return
+      }
+      // Detect PrintScreen — blank the screen so the screenshot catches the cover
+      if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
+        e.preventDefault()
+        showCover('צילום מסך חסום')
+        try { navigator.clipboard?.writeText('') } catch {}
+        return
+      }
+      // Win+Shift+S triggers a blur, which we handle below — but also
+      // treat the literal key combo as a hint.
+      if (e.shiftKey && (e.metaKey || e.key === 'Meta') && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault()
+        showCover('צילום מסך חסום')
+        return
+      }
       if (e.key === 'Escape') closeReader()
     })
+
+    // When the user invokes Win+Shift+S, the Windows snipping tool steals
+    // focus from our window. We use that as a signal to cover the content.
+    // This also catches alt-tab, Cmd+Shift+4 on Mac, etc.
+    window.addEventListener('blur', () => {
+      if (overlay.style.display !== 'none') {
+        showCover('צילום מסך חסום')
+      }
+    })
+
+    // Tab visibility change (e.g. switching tabs) — blur immediately
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && overlay.style.display !== 'none') {
+        showCover('הצפייה הופסקה')
+      }
+    })
+
     reader?.addEventListener('dragstart', (e) => e.preventDefault())
   }
 
