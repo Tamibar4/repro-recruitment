@@ -388,6 +388,46 @@
 
   function closeReader() { document.getElementById('reader-overlay').style.display = 'none' }
 
+  // Pre-built cover element — kept hidden in the DOM and toggled via a
+  // single CSS class change. Avoids the createElement() round-trip when
+  // a screenshot signal fires, which is critical for catching Win+Shift+S
+  // before the snipping tool grabs the frame.
+  let screenshotCoverEl = null
+  function getScreenshotCover() {
+    if (screenshotCoverEl) return screenshotCoverEl
+    const el = document.createElement('div')
+    el.id = 'screenshot-cover'
+    el.style.cssText = [
+      'position: fixed', 'inset: 0', 'z-index: 999999',
+      'background: linear-gradient(135deg, #1a1f3a, #5e5ce6, #ec4899)',
+      'display: none',
+      'align-items: center', 'justify-content: center',
+      'flex-direction: column',
+      'color: white', 'font-family: Rubik, sans-serif',
+      'text-align: center', 'padding: 40px',
+      'cursor: pointer',
+      'will-change: opacity',
+    ].join(';')
+    el.innerHTML = `
+      <div style="font-size:96px;margin-bottom:24px;line-height:1">🚫📷</div>
+      <div style="font-size:28px;font-weight:800;margin-bottom:12px">צילום מסך חסום</div>
+      <div style="font-size:15px;font-weight:500;opacity:0.92;max-width:520px;line-height:1.7;margin-bottom:24px">
+        חומר זה מוגן בזכויות יוצרים של RePro. צילום, שיתוף או הפצה — אסורים על פי חוק.<br>
+        חתימת המים על המסך מאפשרת איתור מקור הדליפה.
+      </div>
+      <div style="font-size:13px;font-weight:600;opacity:0.7;background:rgba(255,255,255,0.15);padding:10px 22px;border-radius:99px;backdrop-filter:blur(8px)">
+        לחצי כדי להמשיך
+      </div>
+    `
+    document.body.appendChild(el)
+    // Click to dismiss — user has to acknowledge before continuing
+    el.addEventListener('click', () => {
+      el.style.display = 'none'
+    })
+    screenshotCoverEl = el
+    return el
+  }
+
   function setupReaderProtection() {
     const reader = document.getElementById('reader')
     const closeBtn = document.getElementById('reader-close')
@@ -397,76 +437,60 @@
     overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeReader() })
     reader?.addEventListener('contextmenu', (e) => e.preventDefault())
 
-    // Helper: blur + cover the reader content briefly when a screenshot
-    // attempt is detected. Won't STOP the screenshot (Win+Shift+S and
-    // PrintScreen are OS-level and can't be intercepted from the
-    // browser), but if the screenshot tool takes a moment to activate,
-    // the user often catches just the blanked screen with the warning.
-    let coverEl = null
-    const showCover = (msg) => {
+    // Show the cover SYNCHRONOUSLY (no createElement, no setTimeout). The
+    // cover stays visible until the user clicks it — that way even if the
+    // screenshot tool grabbed the frame BEFORE the cover painted, the user
+    // is forced to acknowledge it. They get reminded that screenshots are
+    // a violation, on every attempt.
+    const showCover = () => {
       if (overlay.style.display === 'none') return
-      if (coverEl) return // already showing
-      coverEl = document.createElement('div')
-      coverEl.style.cssText = `
-        position: fixed; inset: 0; z-index: 99999;
-        background: linear-gradient(135deg, #1a1f3a, #5e5ce6);
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        color: white; font-family: 'Rubik', sans-serif;
-        font-size: 22px; font-weight: 700; text-align: center;
-        padding: 40px;
-      `
-      coverEl.innerHTML = `
-        <div style="font-size:80px;margin-bottom:20px">🚫📷</div>
-        <div>${msg}</div>
-        <div style="font-size:14px;font-weight:500;opacity:0.85;margin-top:12px;max-width:480px;line-height:1.6">
-          חומר זה מוגן בזכויות יוצרים. צילום או הפצה אסורים — חתימת המים מאפשרת איתור מקור הדליפה.
-        </div>
-      `
-      document.body.appendChild(coverEl)
-      setTimeout(() => {
-        if (coverEl) { coverEl.remove(); coverEl = null }
-      }, 2000)
+      const c = getScreenshotCover()
+      c.style.display = 'flex'
     }
 
     document.addEventListener('keydown', (e) => {
       if (overlay.style.display === 'none') return
-      // Block printing/saving/select-all
       if ((e.ctrlKey || e.metaKey) && ['p', 's', 'a', 'P', 'S', 'A'].includes(e.key)) {
         e.preventDefault()
-        showCover('הדפסה ושמירה חסומות')
+        showCover()
         return
       }
-      // Detect PrintScreen — blank the screen so the screenshot catches the cover
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
         e.preventDefault()
-        showCover('צילום מסך חסום')
+        showCover()
         try { navigator.clipboard?.writeText('') } catch {}
         return
       }
-      // Win+Shift+S triggers a blur, which we handle below — but also
-      // treat the literal key combo as a hint.
+      // Win+Shift+S key combo (some browsers DO fire this, depending on
+      // OS-level interception order)
       if (e.shiftKey && (e.metaKey || e.key === 'Meta') && (e.key === 'S' || e.key === 's')) {
         e.preventDefault()
-        showCover('צילום מסך חסום')
+        showCover()
         return
       }
       if (e.key === 'Escape') closeReader()
     })
 
-    // When the user invokes Win+Shift+S, the Windows snipping tool steals
-    // focus from our window. We use that as a signal to cover the content.
-    // This also catches alt-tab, Cmd+Shift+4 on Mac, etc.
+    // Window losing focus — Win+Shift+S, Alt+Tab, switching apps, etc.
+    // This is the most reliable signal for Win+Shift+S because the
+    // snipping tool steals focus the moment it opens.
     window.addEventListener('blur', () => {
-      if (overlay.style.display !== 'none') {
-        showCover('צילום מסך חסום')
-      }
+      showCover()
     })
 
-    // Tab visibility change (e.g. switching tabs) — blur immediately
+    // Document visibility — switching tabs, minimizing, etc.
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && overlay.style.display !== 'none') {
-        showCover('הצפייה הופסקה')
+      if (document.hidden) showCover()
+    })
+
+    // Mouse leaving the window towards browser chrome (likely going to
+    // grab the snipping tool from the taskbar or start menu)
+    document.addEventListener('mouseleave', (e) => {
+      // mouseleave from <html> means cursor left the document area
+      if (overlay.style.display === 'none') return
+      if (e.clientY <= 0 || e.clientX <= 0 ||
+          e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+        showCover()
       }
     })
 
