@@ -355,8 +355,21 @@
     const url = '/api/training/modules/' + moduleId
       + '/view?token=' + encodeURIComponent(token)
 
+    // Heavy URL fragment to force "single page, fit page, no chrome".
+    // Different browsers respect different subsets of these params, so
+    // we throw a few in. `zoom=page-fit` is the Chromium one, `view=Fit`
+    // is the Adobe Open Parameters spec, `pagemode=none` hides side panels.
     const buildSlideUrl = (page) =>
-      url + '#page=' + page + '&view=Fit&toolbar=0&navpanes=0&scrollbar=0'
+      url
+      + '#page=' + page
+      + '&zoom=page-fit'
+      + '&view=Fit'
+      + '&pagemode=none'
+      + '&toolbar=0'
+      + '&navpanes=0'
+      + '&statusbar=0'
+      + '&messages=0'
+      + '&scrollbar=0'
 
     container.innerHTML = `
       <div class="pdf-stage">
@@ -367,9 +380,13 @@
         </div>
         <div class="pdf-page-counter" id="pdf-counter">— / —</div>
         <div class="pdf-slide-area" id="pdf-slide-area">
-          <iframe class="pdf-slide is-active" id="pdf-slide-a" title="דף נוכחי"
-                  src="${buildSlideUrl(1)}"></iframe>
-          <iframe class="pdf-slide" id="pdf-slide-b" title="דף הבא"></iframe>
+          <div class="pdf-slide-wrap" id="pdf-slide-wrap">
+            <iframe class="pdf-slide is-active" id="pdf-slide-a" title="דף נוכחי"
+                    scrolling="no" frameborder="0"
+                    src="${buildSlideUrl(1)}"></iframe>
+            <iframe class="pdf-slide" id="pdf-slide-b" title="דף הבא"
+                    scrolling="no" frameborder="0"></iframe>
+          </div>
         </div>
         <div class="pdf-nav">
           <button class="pdf-nav-btn" id="pdf-prev" title="הקודם" disabled>›</button>
@@ -380,6 +397,7 @@
     `
 
     const slideArea = container.querySelector('#pdf-slide-area')
+    const slideWrap = container.querySelector('#pdf-slide-wrap')
     const counterEl = container.querySelector('#pdf-counter')
     const dotsEl = container.querySelector('#pdf-dots')
     const prevBtn = container.querySelector('#pdf-prev')
@@ -393,6 +411,47 @@
       const pdfjsLib = await loadPdfJsLib()
       const pdf = await pdfjsLib.getDocument({ url }).promise
       const totalPages = pdf.numPages
+
+      // Read page 1 dimensions so we can size the slide-wrap to match the
+      // PDF page's aspect ratio EXACTLY. With no leftover space inside the
+      // iframe, the browser PDF viewer has nothing to scroll to — combined
+      // with `pointer-events: none` on the iframes, this gives us a true
+      // "one page per slide" presentation.
+      let pageRatio = 16 / 9 // safe default for Canva landscape
+      try {
+        const page1 = await pdf.getPage(1)
+        const vp = page1.getViewport({ scale: 1 })
+        if (vp.width > 0 && vp.height > 0) {
+          pageRatio = vp.width / vp.height
+        }
+      } catch (e) {
+        console.warn('learn: could not read page dimensions, using default ratio', e)
+      }
+
+      // Resize slideWrap to fit the PDF aspect ratio inside slideArea.
+      // We pick the larger of the two dimensions then clip to fit.
+      const fitWrap = () => {
+        if (!slideArea || !slideWrap) return
+        const aw = slideArea.clientWidth
+        const ah = slideArea.clientHeight
+        if (aw === 0 || ah === 0) return
+        // Try filling width; if that overflows height, fill height instead.
+        let w = aw
+        let h = aw / pageRatio
+        if (h > ah) { h = ah; w = ah * pageRatio }
+        // Tiny inset so the box-shadow has room to breathe
+        slideWrap.style.width  = Math.floor(w * 0.98) + 'px'
+        slideWrap.style.height = Math.floor(h * 0.98) + 'px'
+      }
+      fitWrap()
+      // Resize whenever the slide-area changes size (window resize,
+      // device-rotation, sidebar collapse, etc.)
+      let ro = null
+      try {
+        ro = new ResizeObserver(fitWrap)
+        ro.observe(slideArea)
+      } catch {}
+      window.addEventListener('resize', fitWrap)
 
       let currentPage = 1
       let animating = false

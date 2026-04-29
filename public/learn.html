@@ -341,10 +341,15 @@
     }
 
     /* ===== Slide-deck viewer =====
-       One PDF page at a time, beautifully framed in the center, with
-       smooth slide animations between pages. Built on PDF.js (each page
-       rendered to a <canvas>) — gives us full control over presentation,
-       transitions, and protection. */
+       One PDF page at a time, framed in the center, with smooth slide
+       animations between pages.
+
+       Approach: native browser PDF rendering inside iframes (only thing
+       that handles Hebrew RTL correctly), with the iframe sized to the
+       EXACT page aspect ratio so a single page fills it perfectly with
+       no leftover space. `pointer-events: none` on the iframe blocks
+       any internal scrolling — the only way to change pages is via our
+       prev/next buttons. */
     .pdf-stage {
       position: relative; width: 100%;
       height: calc(100vh - 200px); min-height: 580px;
@@ -356,14 +361,28 @@
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
       perspective: 1400px;
+      min-height: 0; /* allow flex child to shrink */
+    }
+    /* Inner aspect-ratio frame — sized by JS to match PDF page dimensions
+       exactly. Both iframes overlap inside this frame and cross-fade. */
+    .pdf-slide-wrap {
+      position: relative;
+      /* JS sets width/height in px based on actual page dimensions */
+      width: 100%; height: 100%;
+      max-width: 100%; max-height: 100%;
     }
     .pdf-slide {
-      position: absolute;
-      width: 96%; height: 100%;
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
       border: none;
       border-radius: 12px;
       box-shadow: 0 16px 50px rgba(94,92,230,0.30), 0 2px 6px rgba(26,31,58,0.08);
       background: white;
+      /* Block ALL interaction with the iframe — no scrolling, no clicking
+         inside the PDF viewer. User navigates only via our prev/next
+         buttons or arrow keys. This is what stops the "scrolling" view
+         the user complained about. */
+      pointer-events: none;
       transition: transform 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.15),
                   opacity 0.4s ease;
       will-change: transform, opacity;
@@ -744,7 +763,7 @@
   </div>
 
   <script src="js/api.js?v=3"></script>
-  <script src="js/learn.js?v=15"></script>
+  <script src="js/learn.js?v=16"></script>
   <script src="js/ai-widget.js?v=3"></script>
 </body>
 </html>
