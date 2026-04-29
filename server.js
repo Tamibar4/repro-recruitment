@@ -40,6 +40,13 @@ try {
   if (!fs.existsSync(TRAINING_DIR)) fs.mkdirSync(TRAINING_DIR, { recursive: true });
 } catch (e) { console.error('Could not create training dir:', e.message); }
 
+// Publishing post images (for Tami's Facebook publishing manager).
+// Stored next to DB so they survive Railway redeploys via the volume.
+const PUBLISHING_DIR = process.env.PUBLISHING_DIR || path.join(path.dirname(DB_FILE), 'uploads', 'posts');
+try {
+  if (!fs.existsSync(PUBLISHING_DIR)) fs.mkdirSync(PUBLISHING_DIR, { recursive: true });
+} catch (e) { console.error('Could not create publishing dir:', e.message); }
+
 // Anthropic SDK for AI tutor (lazy init - only if API key provided)
 let anthropicClient = null;
 function getAnthropicClient() {
@@ -499,7 +506,16 @@ const defaultData = {
   countries: DEFAULT_COUNTRIES,
   training_documents: [],
   training_conversations: [],
-  counters: { jobs: 0, candidates: 0, stage_history: 0, training_documents: 0, training_conversations: 0 }
+  // Tami's personal Facebook publishing manager. `facebook_accounts`
+  // are the Facebook profiles/pages she posts on; `facebook_posts` are
+  // the post drafts/scheduled/published items belonging to each account.
+  facebook_accounts: [],
+  facebook_posts: [],
+  counters: {
+    jobs: 0, candidates: 0, stage_history: 0,
+    training_documents: 0, training_conversations: 0,
+    facebook_accounts: 0, facebook_posts: 0
+  }
 };
 
 let data = defaultData;
@@ -529,6 +545,12 @@ function loadData() {
       if (!Array.isArray(data.training_conversations)) { data.training_conversations = []; saveData(); }
       if (!data.counters.training_documents) { data.counters.training_documents = 0; saveData(); }
       if (!data.counters.training_conversations) { data.counters.training_conversations = 0; saveData(); }
+      // Initialize Facebook publishing collections if missing (migration
+      // for existing databases that predate this feature)
+      if (!Array.isArray(data.facebook_accounts)) { data.facebook_accounts = []; saveData(); }
+      if (!Array.isArray(data.facebook_posts))    { data.facebook_posts = [];    saveData(); }
+      if (!data.counters.facebook_accounts)       { data.counters.facebook_accounts = 0; saveData(); }
+      if (!data.counters.facebook_posts)          { data.counters.facebook_posts = 0;    saveData(); }
       // Add default users if missing (migration for existing databases)
       if (!data.users || data.users.length === 0) {
         data.users = defaultUsers;
@@ -1050,7 +1072,7 @@ app.put('/api/auth/profile', (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   try {
-    const { display_name, email, avatar_url, notifications } = req.body;
+    const { display_name, email, avatar_url, notifications, username: newUsernameRaw } = req.body;
 
     if (display_name !== undefined) {
       const name = validateString(display_name, { required: true, maxLen: 64, minLen: 2 });
@@ -1065,6 +1087,50 @@ app.put('/api/auth/profile', (req, res) => {
       const emailTaken = data.users.find(u => u.email && u.email.toLowerCase() === em.toLowerCase() && u.username !== user.username);
       if (emailTaken) return res.status(409).json({ error: 'Email already in use' });
       user.email = em.toLowerCase();
+    }
+
+    // Username change — admin-only feature. Requires updating every place
+    // the username is referenced as a foreign key (created_by fields,
+    // sessions). The login token stays valid because we update the
+    // session's username field in-place.
+    if (newUsernameRaw !== undefined) {
+      if (user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can change their username' });
+      }
+      const newUsername = validateString(newUsernameRaw, { required: true, maxLen: 32, minLen: 3 }).toLowerCase();
+      if (!/^[a-z0-9._-]+$/.test(newUsername)) {
+        return res.status(400).json({ error: 'שם משתמש יכול להכיל רק אותיות אנגליות, מספרים, נקודה, מקף וקו תחתון' });
+      }
+      if (newUsername !== user.username) {
+        // Check uniqueness
+        const taken = data.users.find(u => u.username === newUsername);
+        if (taken) return res.status(409).json({ error: 'שם המשתמש כבר תפוס' });
+
+        const oldUsername = user.username;
+        // Update all created_by references across collections
+        const updateRef = (item) => {
+          if (item && item.created_by === oldUsername) item.created_by = newUsername;
+          if (item && item.uploaded_by === oldUsername) item.uploaded_by = newUsername;
+        };
+        (data.jobs || []).forEach(updateRef);
+        (data.candidates || []).forEach(updateRef);
+        (data.training_documents || []).forEach(updateRef);
+        (data.training_conversations || []).forEach((c) => {
+          if (c && c.username === oldUsername) c.username = newUsername;
+        });
+        (data.facebook_accounts || []).forEach(updateRef);
+        (data.facebook_posts || []).forEach(updateRef);
+
+        // Update all sessions that point to this user (this token + any
+        // others, e.g. from another browser/device)
+        sessions.forEach((s) => {
+          if (s.username === oldUsername) s.username = newUsername;
+        });
+
+        // Update the user record
+        user.username = newUsername;
+        auditLog('username_changed', { from: oldUsername, to: newUsername });
+      }
     }
 
     if (avatar_url !== undefined) {
@@ -2513,6 +2579,373 @@ app.get('/api/training/status', (req, res) => {
   res.json({
     ai_enabled: !!getAnthropicClient(),
     document_count: (data.training_documents || []).length
+  });
+});
+
+// ============================================================
+// PUBLISHING API — Tami's Facebook publishing manager (admin-only)
+// ============================================================
+// Lets the admin manage multiple Facebook accounts and the posts she
+// publishes on each. Each post can have a text body, an optional image,
+// status (draft / scheduled / published), tags, and a publish date.
+// All endpoints are admin-gated; recruiters never see this data.
+
+// Multer config for post images. 10MB cap, common image formats only.
+const publishingStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, PUBLISHING_DIR),
+  filename: (req, file, cb) => {
+    const ext = (path.extname(file.originalname || '') || '').toLowerCase();
+    cb(null, 'p_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex') + ext);
+  }
+});
+const publishingUpload = multer({
+  storage: publishingStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB — plenty for FB images
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype) || /\.(jpe?g|png|webp|gif)$/i.test(file.originalname || '')) {
+      cb(null, true);
+    } else {
+      cb(new Error('סוג תמונה לא נתמך (נתמכים: JPG, PNG, WEBP, GIF)'));
+    }
+  }
+});
+
+// Public static serving of uploaded post images. Filenames are
+// unguessable (timestamp + 96 bits of randomness), and these images
+// are intended to be posted on Facebook anyway, so a public URL is
+// acceptable.
+app.use('/uploads/posts', express.static(PUBLISHING_DIR, {
+  dotfiles: 'deny',
+  etag: true,
+  maxAge: '7d',
+}));
+
+// --- Helpers ---------------------------------------------------------
+const PUB_VALID_STATUSES = ['draft', 'scheduled', 'published'];
+const PUB_VALID_COLORS   = ['#0073ea', '#00c875', '#a358df', '#fdab3d', '#ec4899', '#e2445c'];
+
+function requireAdmin(req, res) {
+  if (!req.user || req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Admin only' });
+    return false;
+  }
+  return true;
+}
+
+function findAccount(id) {
+  const numId = parseInt(id, 10);
+  return data.facebook_accounts.find(a => a.id === numId);
+}
+function findPost(id) {
+  const numId = parseInt(id, 10);
+  return data.facebook_posts.find(p => p.id === numId);
+}
+
+// Serialize an account with a post-count breakdown by status, so the
+// frontend can show "3 drafts / 5 scheduled / 12 published" badges
+// without an extra API call.
+function serializeAccount(acc) {
+  const posts = data.facebook_posts.filter(p => p.account_id === acc.id);
+  const counts = { draft: 0, scheduled: 0, published: 0, total: posts.length };
+  for (const p of posts) {
+    if (counts[p.status] != null) counts[p.status]++;
+  }
+  return { ...acc, counts };
+}
+
+// --- Accounts CRUD ---------------------------------------------------
+
+// GET /api/publishing/accounts — list all of admin's Facebook accounts
+app.get('/api/publishing/accounts', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const accounts = (data.facebook_accounts || [])
+    .slice()
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || (a.id - b.id))
+    .map(serializeAccount);
+  res.json(accounts);
+});
+
+// POST /api/publishing/accounts — create a new Facebook account
+app.post('/api/publishing/accounts', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const name = validateString(req.body?.name, { required: true, maxLen: 80, minLen: 1 });
+    const profile_url = req.body?.profile_url
+      ? validateString(req.body.profile_url, { required: false, maxLen: 500 })
+      : null;
+    let color = req.body?.color || '#0073ea';
+    if (!PUB_VALID_COLORS.includes(color)) color = '#0073ea';
+    const icon = req.body?.icon ? String(req.body.icon).slice(0, 8) : '👤';
+
+    const account = {
+      id: nextId('facebook_accounts'),
+      name,
+      profile_url,
+      color,
+      icon,
+      sort_order: data.facebook_accounts.length,
+      created_by: req.user.username,
+      created_at: new Date().toISOString()
+    };
+    data.facebook_accounts.push(account);
+    saveData();
+    auditLog('publishing_account_create', { id: account.id, name, by: req.user.username });
+    res.status(201).json(serializeAccount(account));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/publishing/accounts/:id — update an account
+app.put('/api/publishing/accounts/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const acc = findAccount(req.params.id);
+  if (!acc) return res.status(404).json({ error: 'Account not found' });
+  try {
+    if (req.body.name !== undefined) {
+      acc.name = validateString(req.body.name, { required: true, maxLen: 80, minLen: 1 });
+    }
+    if (req.body.profile_url !== undefined) {
+      acc.profile_url = req.body.profile_url
+        ? validateString(req.body.profile_url, { required: false, maxLen: 500 })
+        : null;
+    }
+    if (req.body.color !== undefined && PUB_VALID_COLORS.includes(req.body.color)) {
+      acc.color = req.body.color;
+    }
+    if (req.body.icon !== undefined) {
+      acc.icon = String(req.body.icon).slice(0, 8);
+    }
+    if (req.body.sort_order !== undefined) {
+      acc.sort_order = parseInt(req.body.sort_order, 10) || 0;
+    }
+    saveData();
+    res.json(serializeAccount(acc));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/publishing/accounts/:id — delete an account AND all its posts
+app.delete('/api/publishing/accounts/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const acc = findAccount(req.params.id);
+  if (!acc) return res.status(404).json({ error: 'Account not found' });
+
+  // Cascade-delete posts; also unlink any uploaded images from disk
+  const postsToDelete = data.facebook_posts.filter(p => p.account_id === acc.id);
+  for (const post of postsToDelete) {
+    if (post.image_url && post.image_url.startsWith('/uploads/posts/')) {
+      const fname = post.image_url.replace(/^\/uploads\/posts\//, '');
+      const fpath = path.join(PUBLISHING_DIR, fname);
+      try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch (e) { console.warn('Could not delete', fpath, e.message); }
+    }
+  }
+  data.facebook_posts = data.facebook_posts.filter(p => p.account_id !== acc.id);
+  data.facebook_accounts = data.facebook_accounts.filter(a => a.id !== acc.id);
+  saveData();
+  auditLog('publishing_account_delete', { id: acc.id, name: acc.name, posts_deleted: postsToDelete.length, by: req.user.username });
+  res.json({ success: true, posts_deleted: postsToDelete.length });
+});
+
+// --- Posts CRUD ------------------------------------------------------
+
+// GET /api/publishing/posts — list posts (filterable by account_id, status, tag, q)
+app.get('/api/publishing/posts', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  let posts = (data.facebook_posts || []).slice();
+
+  if (req.query.account_id) {
+    const aid = parseInt(req.query.account_id, 10);
+    posts = posts.filter(p => p.account_id === aid);
+  }
+  if (req.query.status && PUB_VALID_STATUSES.includes(req.query.status)) {
+    posts = posts.filter(p => p.status === req.query.status);
+  }
+  if (req.query.tag) {
+    const tag = String(req.query.tag).toLowerCase();
+    posts = posts.filter(p => (p.tags || []).some(t => String(t).toLowerCase() === tag));
+  }
+  if (req.query.q) {
+    const q = String(req.query.q).toLowerCase();
+    posts = posts.filter(p => (p.text || '').toLowerCase().includes(q));
+  }
+
+  // Sort: most recently updated first
+  posts.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+  res.json(posts);
+});
+
+// POST /api/publishing/posts — create a new post
+app.post('/api/publishing/posts', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const account_id = parseInt(req.body?.account_id, 10);
+    if (!account_id || !findAccount(account_id)) {
+      return res.status(400).json({ error: 'Invalid account_id' });
+    }
+    const text = req.body?.text != null
+      ? validateString(req.body.text, { required: false, maxLen: 5000 })
+      : '';
+    let status = req.body?.status || 'draft';
+    if (!PUB_VALID_STATUSES.includes(status)) status = 'draft';
+    const image_url = req.body?.image_url ? String(req.body.image_url).slice(0, 500) : null;
+    const tags = Array.isArray(req.body?.tags)
+      ? req.body.tags.map(t => String(t).trim().slice(0, 32)).filter(Boolean).slice(0, 20)
+      : [];
+    const publish_date = req.body?.publish_date ? String(req.body.publish_date).slice(0, 32) : null;
+
+    const now = new Date().toISOString();
+    const post = {
+      id: nextId('facebook_posts'),
+      account_id,
+      text,
+      image_url,
+      tags,
+      status,
+      publish_date,
+      created_at: now,
+      updated_at: now,
+      created_by: req.user.username
+    };
+    data.facebook_posts.push(post);
+    saveData();
+    res.status(201).json(post);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/publishing/posts/:id — update a post
+app.put('/api/publishing/posts/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const post = findPost(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  try {
+    if (req.body.account_id !== undefined) {
+      const aid = parseInt(req.body.account_id, 10);
+      if (!aid || !findAccount(aid)) return res.status(400).json({ error: 'Invalid account_id' });
+      post.account_id = aid;
+    }
+    if (req.body.text !== undefined) {
+      post.text = validateString(req.body.text, { required: false, maxLen: 5000 }) || '';
+    }
+    if (req.body.image_url !== undefined) {
+      // Old image to potentially clean up if replaced
+      const oldImg = post.image_url;
+      post.image_url = req.body.image_url ? String(req.body.image_url).slice(0, 500) : null;
+      if (oldImg && oldImg !== post.image_url && oldImg.startsWith('/uploads/posts/')) {
+        const fname = oldImg.replace(/^\/uploads\/posts\//, '');
+        const fpath = path.join(PUBLISHING_DIR, fname);
+        try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+      }
+    }
+    if (req.body.tags !== undefined) {
+      post.tags = Array.isArray(req.body.tags)
+        ? req.body.tags.map(t => String(t).trim().slice(0, 32)).filter(Boolean).slice(0, 20)
+        : [];
+    }
+    if (req.body.status !== undefined && PUB_VALID_STATUSES.includes(req.body.status)) {
+      post.status = req.body.status;
+    }
+    if (req.body.publish_date !== undefined) {
+      post.publish_date = req.body.publish_date ? String(req.body.publish_date).slice(0, 32) : null;
+    }
+    post.updated_at = new Date().toISOString();
+    saveData();
+    res.json(post);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/publishing/posts/:id — delete a post (and its image, if any)
+app.delete('/api/publishing/posts/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const idx = data.facebook_posts.findIndex(p => p.id === parseInt(req.params.id, 10));
+  if (idx === -1) return res.status(404).json({ error: 'Post not found' });
+  const post = data.facebook_posts[idx];
+  if (post.image_url && post.image_url.startsWith('/uploads/posts/')) {
+    const fname = post.image_url.replace(/^\/uploads\/posts\//, '');
+    const fpath = path.join(PUBLISHING_DIR, fname);
+    try { if (fs.existsSync(fpath)) fs.unlinkSync(fpath); } catch {}
+  }
+  data.facebook_posts.splice(idx, 1);
+  saveData();
+  res.json({ success: true });
+});
+
+// POST /api/publishing/posts/:id/duplicate — clone a post as a fresh draft
+app.post('/api/publishing/posts/:id/duplicate', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const orig = findPost(req.params.id);
+  if (!orig) return res.status(404).json({ error: 'Post not found' });
+  const now = new Date().toISOString();
+  // Note: duplicated post points to the SAME image_url. We don't copy
+  // the file — multiple posts can reference the same image just fine,
+  // and this saves disk + matches the user's likely intent (small
+  // variations of the same announcement).
+  const dup = {
+    id: nextId('facebook_posts'),
+    account_id: req.body?.account_id ? parseInt(req.body.account_id, 10) : orig.account_id,
+    text: orig.text,
+    image_url: orig.image_url,
+    tags: Array.isArray(orig.tags) ? orig.tags.slice() : [],
+    status: 'draft',         // always start as draft
+    publish_date: null,
+    created_at: now,
+    updated_at: now,
+    created_by: req.user.username
+  };
+  if (!findAccount(dup.account_id)) dup.account_id = orig.account_id;
+  data.facebook_posts.push(dup);
+  saveData();
+  res.status(201).json(dup);
+});
+
+// PATCH /api/publishing/posts/:id/move — move post to another account
+app.patch('/api/publishing/posts/:id/move', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const post = findPost(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  const newAccountId = parseInt(req.body?.account_id, 10);
+  if (!newAccountId || !findAccount(newAccountId)) {
+    return res.status(400).json({ error: 'Invalid target account_id' });
+  }
+  post.account_id = newAccountId;
+  post.updated_at = new Date().toISOString();
+  saveData();
+  res.json(post);
+});
+
+// GET /api/publishing/tags — return all unique tags across all posts
+app.get('/api/publishing/tags', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const set = new Set();
+  for (const p of data.facebook_posts || []) {
+    for (const t of (p.tags || [])) set.add(t);
+  }
+  const tags = Array.from(set).sort((a, b) => a.localeCompare(b, 'he'));
+  res.json(tags);
+});
+
+// POST /api/publishing/upload-image — upload an image, return its URL
+app.post('/api/publishing/upload-image', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  publishingUpload.single('image')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'התמונה גדולה מדי (מקסימום 10MB)' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) return res.status(400).json({ error: 'לא הועלתה תמונה' });
+    res.status(201).json({
+      url: '/uploads/posts/' + req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
   });
 });
 

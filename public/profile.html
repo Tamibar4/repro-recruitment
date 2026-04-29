@@ -134,6 +134,11 @@
           <span>הכשרות</span>
         </a>
 
+        <a href="publishing.html" class="nav-item admin-only-nav" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-3 18-7-7-8-3z"/></svg>
+          <span>פרסומים</span>
+        </a>
+
         <a href="training.html" class="nav-item admin-only-nav" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
@@ -199,8 +204,8 @@
 
           <div class="profile-field">
             <label>שם משתמש</label>
-            <input type="text" id="input-username" disabled>
-            <div class="field-hint">שם המשתמש לא ניתן לשינוי</div>
+            <input type="text" id="input-username" dir="ltr" maxlength="32" disabled>
+            <div class="field-hint" id="input-username-hint">שם המשתמש לא ניתן לשינוי</div>
           </div>
 
           <div class="profile-field">
@@ -322,7 +327,18 @@
 
       // Form fields
       document.getElementById('input-display-name').value = p.display_name || '';
-      document.getElementById('input-username').value = p.username || '';
+      const usernameInput = document.getElementById('input-username');
+      const usernameHint  = document.getElementById('input-username-hint');
+      usernameInput.value = p.username || '';
+      // Username is admin-only-editable. The server enforces this too,
+      // but we hide the affordance from regular users to avoid confusion.
+      if (p.role === 'admin') {
+        usernameInput.disabled = false;
+        usernameHint.textContent = 'אותיות אנגליות, מספרים, נקודה, מקף וקו תחתון בלבד · 3-32 תווים';
+      } else {
+        usernameInput.disabled = true;
+        usernameHint.textContent = 'שם המשתמש לא ניתן לשינוי';
+      }
       document.getElementById('input-email').value = p.email || '';
 
       // Notifications
@@ -343,17 +359,28 @@
     // Save profile
     document.getElementById('btn-save-profile').addEventListener('click', async () => {
       try {
+        const payload = {
+          display_name: document.getElementById('input-display-name').value.trim(),
+          email: document.getElementById('input-email').value.trim()
+        };
+        // Include username only if (a) the user is admin and (b) the
+        // value actually changed. The server still re-validates this.
+        const usernameInput = document.getElementById('input-username');
+        if (!usernameInput.disabled) {
+          const newUsername = usernameInput.value.trim().toLowerCase();
+          if (newUsername && newUsername !== (profileData.username || '').toLowerCase()) {
+            payload.username = newUsername;
+          }
+        }
         const result = await API.request('/auth/profile', {
           method: 'PUT',
-          body: JSON.stringify({
-            display_name: document.getElementById('input-display-name').value.trim(),
-            email: document.getElementById('input-email').value.trim()
-          })
+          body: JSON.stringify(payload)
         });
-        // Update local storage
+        // Update local storage — including username if it changed
         const user = API.getCurrentUser();
         if (user) {
           user.display_name = result.display_name;
+          user.username = result.username;
           localStorage.setItem('auth_user', JSON.stringify(user));
         }
         profileData = result;

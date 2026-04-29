@@ -117,6 +117,74 @@ const API = {
   // ---------- Stats ----------
   stats() {
     return API.request('/stats');
+  },
+
+  // ---------- Publishing (Tami's Facebook publishing manager, admin-only) ----------
+  publishing: {
+    // Accounts
+    listAccounts() {
+      return API.request('/publishing/accounts');
+    },
+    createAccount(data) {
+      return API.request('/publishing/accounts', { method: 'POST', body: JSON.stringify(data) });
+    },
+    updateAccount(id, data) {
+      return API.request('/publishing/accounts/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    },
+    deleteAccount(id) {
+      return API.request('/publishing/accounts/' + id, { method: 'DELETE' });
+    },
+
+    // Posts
+    listPosts(filters = {}) {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v != null && v !== '' && v !== 'all') params.append(k, v);
+      });
+      const qs = params.toString();
+      return API.request('/publishing/posts' + (qs ? '?' + qs : ''));
+    },
+    createPost(data) {
+      return API.request('/publishing/posts', { method: 'POST', body: JSON.stringify(data) });
+    },
+    updatePost(id, data) {
+      return API.request('/publishing/posts/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    },
+    deletePost(id) {
+      return API.request('/publishing/posts/' + id, { method: 'DELETE' });
+    },
+    duplicatePost(id, accountId) {
+      return API.request('/publishing/posts/' + id + '/duplicate', {
+        method: 'POST',
+        body: JSON.stringify(accountId ? { account_id: accountId } : {})
+      });
+    },
+    movePost(id, accountId) {
+      return API.request('/publishing/posts/' + id + '/move', {
+        method: 'PATCH',
+        body: JSON.stringify({ account_id: accountId })
+      });
+    },
+
+    // Tags + image upload
+    listTags() {
+      return API.request('/publishing/tags');
+    },
+    async uploadImage(file) {
+      const fd = new FormData();
+      fd.append('image', file);
+      const token = API.getToken();
+      const res = await fetch(API.baseUrl + '/publishing/upload-image', {
+        method: 'POST',
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+        body: fd
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Upload failed');
+      }
+      return res.json();
+    }
   }
 };
 
