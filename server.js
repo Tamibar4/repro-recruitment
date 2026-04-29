@@ -2607,8 +2607,20 @@ app.get('/api/training/status', (req, res) => {
 // All endpoints are admin-gated; recruiters never see this data.
 
 // Multer config for post images. 10MB cap, common image formats only.
+// Re-creates the destination directory on every upload in case the volume
+// was re-mounted or the dir was deleted between requests.
 const publishingStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, PUBLISHING_DIR),
+  destination: (req, file, cb) => {
+    try {
+      if (!fs.existsSync(PUBLISHING_DIR)) {
+        fs.mkdirSync(PUBLISHING_DIR, { recursive: true });
+      }
+      cb(null, PUBLISHING_DIR);
+    } catch (e) {
+      console.error('Could not create PUBLISHING_DIR:', e.message);
+      cb(e);
+    }
+  },
   filename: (req, file, cb) => {
     const ext = (path.extname(file.originalname || '') || '').toLowerCase();
     cb(null, 'p_' + Date.now() + '_' + crypto.randomBytes(6).toString('hex') + ext);
@@ -3064,12 +3076,21 @@ app.post('/api/publishing/upload-image', (req, res) => {
   if (!requireAdmin(req, res)) return;
   publishingUpload.single('image')(req, res, (err) => {
     if (err) {
+      console.error('Upload-image multer error:', err);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({ error: 'התמונה גדולה מדי (מקסימום 10MB)' });
       }
       return res.status(400).json({ error: err.message });
     }
     if (!req.file) return res.status(400).json({ error: 'לא הועלתה תמונה' });
+    // Verify the file actually landed on disk (Railway volumes can fail
+    // silently if not mounted; this catches that case).
+    const fpath = path.join(PUBLISHING_DIR, req.file.filename);
+    if (!fs.existsSync(fpath)) {
+      console.error('Upload claimed success but file not on disk:', fpath);
+      return res.status(500).json({ error: 'התמונה לא נשמרה לדיסק. בדקי שיש Volume מחובר ב-Railway.' });
+    }
+    console.log('Image uploaded:', req.file.filename, '(' + req.file.size + ' bytes) to ' + fpath);
     res.status(201).json({
       url: '/uploads/posts/' + req.file.filename,
       size: req.file.size,

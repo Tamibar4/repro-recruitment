@@ -431,59 +431,6 @@
       box-shadow: 0 0 0 3px var(--color-primary);
     }
 
-    /* ----- Inline expansion (replacing the preview modal) -----
-       Click a post body → the card grows in place to reveal the full
-       body text, larger image and the secondary actions (duplicate,
-       move, delete). Click again to collapse. */
-    .pub-post-expanded {
-      display: none;
-      padding: 0 16px 14px;
-      animation: pub-expand-in 0.25s ease-out;
-    }
-    .pub-post.is-expanded .pub-post-expanded { display: block; }
-    .pub-post.is-expanded .pub-post-readmore { display: none; }
-    .pub-post.is-expanded .pub-post-title {
-      -webkit-line-clamp: unset;
-      display: block;
-    }
-    @keyframes pub-expand-in {
-      from { opacity: 0; transform: translateY(-4px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .pub-post-fulltext {
-      font-size: 14px; line-height: 1.7;
-      color: var(--color-text);
-      white-space: pre-wrap; word-break: break-word;
-      padding: 12px 14px;
-      background: var(--color-bg);
-      border-radius: var(--radius);
-      margin-top: 10px;
-    }
-    .pub-post-fulltext:empty { display: none; }
-    .pub-post-secondary-actions {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--color-border);
-    }
-    .pub-post-secondary-actions button {
-      flex: 1; min-width: 86px;
-      padding: 7px 10px; border-radius: var(--radius);
-      border: 1px solid var(--color-border);
-      background: var(--color-white);
-      font-family: inherit; font-size: 12.5px; font-weight: 600;
-      color: var(--color-text-secondary);
-      cursor: pointer; transition: all 0.12s;
-    }
-    .pub-post-secondary-actions button:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-    }
-    .pub-post-secondary-actions button.danger:hover {
-      border-color: var(--color-red);
-      color: var(--color-red);
-      background: rgba(226,68,92,0.05);
-    }
     /* Quick-add image button visible on cards without an image. Made
        bold so it doesn't look like an empty placeholder. */
     .pub-post-add-image-btn {
@@ -588,6 +535,40 @@
       font-size: 12px; color: var(--color-text-light);
       font-style: italic;
     }
+
+    /* ----- Preview modal (full-text view triggered by clicking the card) ----- */
+    .pub-preview-image {
+      width: 100%; max-height: 360px; object-fit: contain;
+      background: var(--color-bg);
+      border-radius: var(--radius); margin-bottom: 16px;
+    }
+    .pub-preview-title {
+      font-size: 20px; font-weight: 800; color: var(--color-text);
+      line-height: 1.4; margin-bottom: 12px;
+    }
+    .pub-preview-text {
+      font-size: 15px; line-height: 1.75;
+      color: var(--color-text);
+      white-space: pre-wrap; word-break: break-word;
+      padding: 14px 16px; background: var(--color-bg);
+      border-radius: var(--radius);
+      margin-bottom: 14px;
+    }
+    .pub-preview-text:empty::before {
+      content: 'אין טקסט לפוסט הזה';
+      color: var(--color-text-light); font-style: italic;
+    }
+    .pub-preview-meta {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      align-items: center; margin-bottom: 14px;
+      font-size: 12.5px; color: var(--color-text-secondary);
+    }
+    .pub-preview-actions {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding-top: 14px;
+      border-top: 1px solid var(--color-border);
+    }
+    .pub-preview-actions .btn { font-size: 13px; padding: 8px 14px; }
 
     /* Post-card body when small screen */
     @media (max-width: 600px) {
@@ -865,8 +846,25 @@
     </div>
   </div>
 
+  <!-- ============================================================
+       Modal: Post preview (full text + image, opened on card click)
+       ============================================================ -->
+  <div class="modal-overlay" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="preview-modal-title">תצוגת פוסט</h2>
+        <button class="modal-close" onclick="closeModal('preview-modal')" aria-label="סגור">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="preview-modal-content"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=9"></script>
+  <script src="js/publishing.js?v=10"></script>
 </body>
 </html>

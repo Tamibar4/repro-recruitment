@@ -27,7 +27,6 @@
   let currentAccountId = null;
   let allTags = [];
   let filters = { status: 'all', q: '' };
-  let expandedPostIds = new Set();  // posts currently expanded inline
   let draggingAccountId = null;   // tab being dragged (account id)
 
   // Display title for a post: ONLY the explicit title field. No fallback
@@ -313,53 +312,49 @@
     wirePostCardHandlers();
   }
 
-  // Returns an authenticated fallback URL for an image if direct static
-  // serving fails. Used by <img onerror=...>.
-  function authImageFallback(staticUrl) {
-    if (!staticUrl || !staticUrl.startsWith('/uploads/posts/')) return null;
-    const filename = staticUrl.replace(/^\/uploads\/posts\//, '');
-    const token = API.getToken();
-    return '/api/publishing/image/' + encodeURIComponent(filename) +
-           (token ? '?token=' + encodeURIComponent(token) : '');
+  // Build the actual <img src> URL we use for post images. We always
+  // route through the authenticated /api/publishing/image endpoint
+  // because it's been more reliable across environments than direct
+  // static serving (Railway volumes etc). The token is included in
+  // the query string because <img> tags can't set Authorization headers.
+  function imageUrl(rawUrl) {
+    if (!rawUrl) return null;
+    if (rawUrl.startsWith('/uploads/posts/')) {
+      const filename = rawUrl.replace(/^\/uploads\/posts\//, '');
+      const token = API.getToken();
+      return '/api/publishing/image/' + encodeURIComponent(filename) +
+             (token ? '?token=' + encodeURIComponent(token) : '');
+    }
+    return rawUrl; // already a full URL or data: URL
   }
 
   function renderPostCard(post) {
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDateShort(post.publish_date) : '';
     const title = postTitle(post);
-    const isExpanded = expandedPostIds.has(post.id);
-    const fallbackUrl = authImageFallback(post.image_url);
+    const imgSrc = imageUrl(post.image_url);
     return `
-      <article class="pub-post ${isExpanded ? 'is-expanded' : ''}" data-post-id="${post.id}">
+      <article class="pub-post" data-post-id="${post.id}">
         <div class="pub-post-image">
-          ${post.image_url
-            ? `<img src="${escapeHtml(post.image_url)}" alt="" loading="lazy"
-                    data-fallback="${escapeHtml(fallbackUrl || '')}"
-                    onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}else{this.style.display='none';}">`
+          ${imgSrc
+            ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy"
+                    onerror="this.parentElement.innerHTML='<span class=&quot;pub-post-image-empty&quot; style=&quot;color:#e2445c&quot;>⚠️ תמונה לא נטענה</span><span class=&quot;pub-post-status ${post.status}&quot;>${escapeHtml(statusLabel)}</span>';">`
             : `<button type="button" class="pub-post-add-image-btn" data-action="add-image" title="הוסיפי תמונה">
                  <span class="icon">📷</span>
                  <span class="label">הוסיפי תמונה</span>
                </button>`}
           <span class="pub-post-status ${post.status}">${statusLabel}</span>
         </div>
-        <div class="pub-post-body pub-post-clickable" data-action="toggle"
-             title="${isExpanded ? 'לחצי לסגור' : 'לחצי לראות את הפוסט המלא'}">
+        <div class="pub-post-body pub-post-clickable" data-action="preview"
+             title="לחצי לראות את התוכן המלא">
           <div class="pub-post-title">${escapeHtml(title)}</div>
-          ${post.text && !isExpanded ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
+          ${post.text ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
           ${post.tags && post.tags.length ? `
             <div class="pub-post-tags">
               ${post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('')}
             </div>` : ''}
           <div class="pub-post-meta">
             ${dateStr ? `📅 ${escapeHtml(dateStr)}` : `נערך ${escapeHtml(formatDateShort(post.updated_at || post.created_at))}`}
-          </div>
-        </div>
-        <div class="pub-post-expanded">
-          ${post.text ? `<div class="pub-post-fulltext">${escapeHtml(post.text)}</div>` : ''}
-          <div class="pub-post-secondary-actions">
-            <button data-action="duplicate">📋 שכפלי</button>
-            <button data-action="move">🔀 העבירי</button>
-            <button class="danger" data-action="delete">🗑️ מחקי</button>
           </div>
         </div>
         <div class="pub-post-actions">
@@ -388,30 +383,64 @@
           const action = el.dataset.action;
           const post = posts.find(p => p.id === id);
           if (!post) return;
-          if (action === 'toggle') togglePostExpansion(post);
+          if (action === 'preview') openPreviewModal(post);
           else if (action === 'copy-text')  await handleCopyText(post, el);
           else if (action === 'copy-image') await handleCopyImage(post, el);
           else if (action === 'edit')       openPostModal(post);
           else if (action === 'add-image')  triggerImageUploadForPost(post);
-          else if (action === 'duplicate')  await handleDuplicate(post);
-          else if (action === 'move')       openMoveModal(post);
-          else if (action === 'delete')     await handleDelete(post);
         });
       });
     });
   }
 
-  // Toggle inline expansion of a post card. Re-renders only that one
-  // card so we don't blow away other cards' state (e.g. an in-flight
-  // copy animation on a sibling).
-  function togglePostExpansion(post) {
-    if (expandedPostIds.has(post.id)) expandedPostIds.delete(post.id);
-    else expandedPostIds.add(post.id);
-    const card = document.querySelector(`.pub-post[data-post-id="${post.id}"]`);
-    if (!card) return;
-    card.outerHTML = renderPostCard(post);
-    // Re-wire just the new card's handlers
-    wirePostCardHandlers();
+  // Modal that shows the full post content + every action when the user
+  // clicks the body of a card. The user explicitly asked for a window
+  // (modal) instead of inline expansion.
+  function openPreviewModal(post) {
+    const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
+    const dateStr = post.publish_date ? formatDate(post.publish_date) : '';
+    const title = postTitle(post);
+    const imgSrc = imageUrl(post.image_url);
+
+    document.getElementById('preview-modal-title').textContent = title || `פוסט · ${statusLabel}`;
+    document.getElementById('preview-modal-content').innerHTML = `
+      ${imgSrc ? `<img class="pub-preview-image" src="${escapeHtml(imgSrc)}" alt=""
+                       onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'padding:14px;background:rgba(226,68,92,0.1);color:var(--color-red);border-radius:8px;margin-bottom:14px;text-align:center\\'>⚠️ התמונה לא נטענה. נסי להעלות שוב.</div>');">` : ''}
+      ${title ? `<div class="pub-preview-title">${escapeHtml(title)}</div>` : ''}
+      <div class="pub-preview-text">${escapeHtml(post.text || '')}</div>
+      <div class="pub-preview-meta">
+        <span class="pub-post-status ${post.status}" style="position:static">${statusLabel}</span>
+        ${dateStr ? `<span>📅 ${escapeHtml(dateStr)}</span>` : ''}
+        ${post.tags && post.tags.length ? post.tags.map(t => `<span class="pub-tag">${escapeHtml(t)}</span>`).join('') : ''}
+      </div>
+      <div class="pub-preview-actions">
+        <button class="btn btn-primary"   data-prev-action="copy-text">📄 העתק טקסט</button>
+        <button class="btn btn-secondary" data-prev-action="copy-image" ${post.image_url ? '' : 'disabled'}>🖼️ העתק תמונה</button>
+        <button class="btn btn-secondary" data-prev-action="edit">✏️ ערוך</button>
+        <button class="btn btn-secondary" data-prev-action="duplicate">📋 שכפלי</button>
+        <button class="btn btn-secondary" data-prev-action="move">🔀 העבירי</button>
+        <button class="btn btn-secondary" data-prev-action="delete" style="color:var(--color-red)">🗑️ מחקי</button>
+      </div>
+    `;
+
+    const content = document.getElementById('preview-modal-content');
+    content.querySelectorAll('[data-prev-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const a = btn.dataset.prevAction;
+        if (a === 'copy-text')      await handleCopyText(post, btn);
+        else if (a === 'copy-image') await handleCopyImage(post, btn);
+        else if (a === 'edit')      { closeModal('preview-modal'); openPostModal(post); }
+        else if (a === 'duplicate') { closeModal('preview-modal'); await handleDuplicate(post); }
+        else if (a === 'move')      { closeModal('preview-modal'); openMoveModal(post); }
+        else if (a === 'delete')    {
+          if (!confirm('למחוק את הפוסט?')) return;
+          closeModal('preview-modal');
+          await handleDelete(post);
+        }
+      });
+    });
+
+    openModal('preview-modal');
   }
 
   // Quick-add image: lets the user upload an image directly from a card
@@ -489,7 +518,10 @@
       if (!navigator.clipboard?.write || !window.ClipboardItem) {
         throw new Error('ClipboardItem unsupported');
       }
-      const res = await fetch(post.image_url);
+      // Use the same authenticated URL the <img> tag uses, so this works
+      // even if direct static serving is blocked.
+      const fetchUrl = imageUrl(post.image_url);
+      const res = await fetch(fetchUrl);
       if (!res.ok) throw new Error('Failed to fetch image');
       const blob = await res.blob();
       const pngBlob = blob.type === 'image/png' ? blob : await convertToPng(blob);
