@@ -450,6 +450,18 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
+// 6b. Static serving for publishing post images. Registered EARLY so it
+// runs before the auth middleware (which protects /api/*) and before
+// any other route that might intercept. PUBLISHING_DIR may live on a
+// Railway volume so it's not under public/. Filenames are unguessable
+// (timestamp + 96 bits of randomness) so a public URL is acceptable.
+app.use('/uploads/posts', express.static(PUBLISHING_DIR, {
+  dotfiles: 'deny',
+  etag: true,
+  maxAge: '7d',
+  fallthrough: false  // 404 instead of falling through to other handlers
+}));
+
 // ============================================================
 // Simple JSON Database Layer
 // ============================================================
@@ -2615,15 +2627,35 @@ const publishingUpload = multer({
   }
 });
 
-// Public static serving of uploaded post images. Filenames are
-// unguessable (timestamp + 96 bits of randomness), and these images
-// are intended to be posted on Facebook anyway, so a public URL is
-// acceptable.
-app.use('/uploads/posts', express.static(PUBLISHING_DIR, {
-  dotfiles: 'deny',
-  etag: true,
-  maxAge: '7d',
-}));
+// (Static serving for /uploads/posts is registered early in the file,
+// near the public/ static handler — see "6b" above. Doing it there
+// instead of here ensures it runs before the auth middleware and
+// before any route that might intercept the path.)
+
+// Authenticated fallback for serving post images. Used by the frontend
+// when a direct <img src="/uploads/posts/..."> can't be served (e.g.
+// some hosting environments restrict static serving outside the project
+// root). The frontend falls back to /api/publishing/image/:filename
+// with a token query string so <img> tags can still authenticate.
+app.get('/api/publishing/image/:filename', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const filename = req.params.filename || '';
+  // Defense against path traversal — only allow our uploaded filename pattern
+  if (!/^p_\d+_[a-f0-9]+\.[a-z0-9]+$/i.test(filename)) {
+    return res.status(400).json({ error: 'Bad filename' });
+  }
+  const fpath = path.join(PUBLISHING_DIR, filename);
+  if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'Image not found' });
+  // Set a sensible Content-Type from extension
+  const ext = path.extname(filename).toLowerCase();
+  const ct = ext === '.png'  ? 'image/png'
+           : ext === '.gif'  ? 'image/gif'
+           : ext === '.webp' ? 'image/webp'
+           : 'image/jpeg';
+  res.setHeader('Content-Type', ct);
+  res.setHeader('Cache-Control', 'private, max-age=604800');
+  fs.createReadStream(fpath).pipe(res);
+});
 
 // --- Helpers ---------------------------------------------------------
 const PUB_VALID_STATUSES = ['draft', 'scheduled', 'published'];

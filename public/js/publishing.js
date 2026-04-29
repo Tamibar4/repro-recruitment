@@ -313,16 +313,29 @@
     wirePostCardHandlers();
   }
 
+  // Returns an authenticated fallback URL for an image if direct static
+  // serving fails. Used by <img onerror=...>.
+  function authImageFallback(staticUrl) {
+    if (!staticUrl || !staticUrl.startsWith('/uploads/posts/')) return null;
+    const filename = staticUrl.replace(/^\/uploads\/posts\//, '');
+    const token = API.getToken();
+    return '/api/publishing/image/' + encodeURIComponent(filename) +
+           (token ? '?token=' + encodeURIComponent(token) : '');
+  }
+
   function renderPostCard(post) {
     const statusLabel = { draft: 'טיוטה', scheduled: 'מתוכנן', published: 'פורסם' }[post.status] || post.status;
     const dateStr = post.publish_date ? formatDateShort(post.publish_date) : '';
     const title = postTitle(post);
     const isExpanded = expandedPostIds.has(post.id);
+    const fallbackUrl = authImageFallback(post.image_url);
     return `
       <article class="pub-post ${isExpanded ? 'is-expanded' : ''}" data-post-id="${post.id}">
         <div class="pub-post-image">
           ${post.image_url
-            ? `<img src="${escapeHtml(post.image_url)}" alt="" loading="lazy">`
+            ? `<img src="${escapeHtml(post.image_url)}" alt="" loading="lazy"
+                    data-fallback="${escapeHtml(fallbackUrl || '')}"
+                    onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}else{this.style.display='none';}">`
             : `<button type="button" class="pub-post-add-image-btn" data-action="add-image" title="הוסיפי תמונה">
                  <span class="icon">📷</span>
                  <span class="label">הוסיפי תמונה</span>
