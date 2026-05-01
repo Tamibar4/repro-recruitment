@@ -242,12 +242,12 @@
     <div class="modal">
       <div class="modal-header">
         <h2 class="modal-title" id="candidate-modal-title" data-i18n="new_candidate">מועמד חדש</h2>
-        <button class="modal-close" onclick="closeModal('candidate-modal')" aria-label="סגור" data-i18n-aria-label="close">
+        <button class="modal-close" data-close="candidate-modal" aria-label="סגור" data-i18n-aria-label="close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <form id="candidate-form" onsubmit="return false">
+        <form id="candidate-form" data-no-submit>
           <input type="hidden" id="candidate-id">
           <div class="form-grid">
             <div class="form-field">
@@ -378,7 +378,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-danger" id="btn-delete-candidate" data-i18n="delete" style="margin-right: auto;">מחיקה</button>
-        <button class="btn btn-secondary" onclick="closeModal('candidate-modal')" data-i18n="cancel">ביטול</button>
+        <button class="btn btn-secondary" data-close="candidate-modal" data-i18n="cancel">ביטול</button>
         <button class="btn btn-primary" id="btn-save-candidate" data-i18n="save">שמירה</button>
       </div>
     </div>
@@ -389,7 +389,7 @@
     <div class="modal" style="max-width:520px">
       <div class="modal-header">
         <h2 class="modal-title">✅ סגירת פולואפ</h2>
-        <button class="modal-close" onclick="closeModal('followup-complete-modal')" aria-label="סגור">
+        <button class="modal-close" data-close="followup-complete-modal" aria-label="סגור">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -438,7 +438,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('followup-complete-modal')">ביטול</button>
+        <button class="btn btn-secondary" data-close="followup-complete-modal">ביטול</button>
         <button class="btn btn-primary" id="fuc-save-btn">✓ סגור פולואפ</button>
       </div>
     </div>
@@ -449,6 +449,8 @@
   <script src="js/candidates.js?v=5"></script>
   <script src="js/ai-widget.js?v=3"></script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

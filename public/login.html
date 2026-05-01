@@ -248,7 +248,7 @@
       <div class="login-welcome" data-i18n="login_welcome">ברוכים הבאים - התחברו כדי להמשיך</div>
     </div>
     <div class="login-body">
-      <form id="login-form" onsubmit="return false">
+      <form id="login-form" data-no-submit>
         <div class="login-error" id="login-error"></div>
         <div class="login-field">
           <label data-i18n="username">שם משתמש</label>
@@ -265,6 +265,12 @@
         <a href="forgot-password.html" class="login-link-forgot">שכחתי סיסמה</a>
         <span class="login-link-sep">&middot;</span>
         <a href="signup.html" class="login-link-signup">הרשמה</a>
+      </div>
+
+      <div class="login-legal" style="margin-top:20px;text-align:center;font-size:12.5px;color:#6b7280">
+        <a href="/privacy" style="color:#6b7280;text-decoration:underline">מדיניות פרטיות</a>
+        <span>&middot;</span>
+        <a href="/terms" style="color:#6b7280;text-decoration:underline">תנאי שימוש</a>
       </div>
 
       <div id="login-pending-msg" class="login-pending" style="display:none">
@@ -327,6 +333,8 @@
     document.getElementById('username').focus();
   </script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

@@ -1024,12 +1024,12 @@
     <div class="modal">
       <div class="modal-header">
         <h2 class="modal-title" id="account-modal-title">חשבון פייסבוק חדש</h2>
-        <button class="modal-close" onclick="closeModal('account-modal')" aria-label="סגור">
+        <button class="modal-close" data-close="account-modal" aria-label="סגור">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <form id="account-form" onsubmit="return false">
+        <form id="account-form" data-no-submit>
           <input type="hidden" id="account-id">
           <div class="pub-form-row">
             <label for="account-name">שם החשבון *</label>
@@ -1079,7 +1079,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="account-delete-btn" style="display:none">🗑️ מחק חשבון</button>
         <div style="flex:1"></div>
-        <button type="button" class="btn btn-secondary" onclick="closeModal('account-modal')">ביטול</button>
+        <button type="button" class="btn btn-secondary" data-close="account-modal">ביטול</button>
         <button type="button" class="btn btn-primary" id="account-save-btn">שמור</button>
       </div>
     </div>
@@ -1092,12 +1092,12 @@
     <div class="modal modal-lg">
       <div class="modal-header">
         <h2 class="modal-title" id="post-modal-title">פוסט חדש</h2>
-        <button class="modal-close" onclick="closeModal('post-modal')" aria-label="סגור">
+        <button class="modal-close" data-close="post-modal" aria-label="סגור">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <form id="post-form" onsubmit="return false">
+        <form id="post-form" data-no-submit>
           <input type="hidden" id="post-id">
           <div class="pub-form-row">
             <label for="post-account">חשבון פייסבוק *</label>
@@ -1154,7 +1154,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="post-delete-btn" style="display:none">🗑️ מחק</button>
         <div style="flex:1"></div>
-        <button type="button" class="btn btn-secondary" onclick="closeModal('post-modal')">ביטול</button>
+        <button type="button" class="btn btn-secondary" data-close="post-modal">ביטול</button>
         <button type="button" class="btn btn-primary" id="post-save-btn">שמור</button>
       </div>
     </div>
@@ -1167,7 +1167,7 @@
     <div class="modal">
       <div class="modal-header">
         <h2 class="modal-title" id="move-modal-title">העברת פוסט</h2>
-        <button class="modal-close" onclick="closeModal('move-modal')" aria-label="סגור">
+        <button class="modal-close" data-close="move-modal" aria-label="סגור">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -1178,7 +1178,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('move-modal')">ביטול</button>
+        <button type="button" class="btn btn-secondary" data-close="move-modal">ביטול</button>
         <button type="button" class="btn btn-primary" id="move-confirm-btn">העבר</button>
       </div>
     </div>
@@ -1191,7 +1191,7 @@
     <div class="modal modal-lg">
       <div class="modal-header">
         <h2 class="modal-title" id="preview-modal-title">תצוגת פוסט</h2>
-        <button class="modal-close" onclick="closeModal('preview-modal')" aria-label="סגור">
+        <button class="modal-close" data-close="preview-modal" aria-label="סגור">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -1205,6 +1205,8 @@
   <script src="js/api.js?v=5"></script>
   <script src="js/publishing.js?v=14"></script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

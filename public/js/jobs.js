@@ -437,7 +437,7 @@ function renderDetailsModalBody() {
       <div class="details-section">
         <div class="details-label">📋 ${I18n.t('description')}</div>
         <div class="details-value details-text">${escapeHtml(job.description)}</div>
-        <button class="btn-copy-below" onclick="copyDescription(this)" data-text="${escapeHtml(job.description).replace(/"/g, '&quot;')}">
+        <button class="btn-copy-below" data-action="copy-description" data-text="${escapeHtml(job.description).replace(/"/g, '&quot;')}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -1257,6 +1257,10 @@ function showAddCountryDialog() {
     showToast(err.message, 'error');
   });
 }
+
+// CSP-safe action wiring (replaces inline onclick="copyDescription(this)").
+window.__uiActions = window.__uiActions || {};
+window.__uiActions['copy-description'] = (el) => copyDescription(el);
 
 // ---------- Initialize ----------
 (async function init() {

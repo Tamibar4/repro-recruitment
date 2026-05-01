@@ -166,12 +166,12 @@
     <div class="modal modal-lg">
       <div class="modal-header">
         <h2 class="modal-title" id="job-modal-title" data-i18n="new_job">משרה חדשה</h2>
-        <button class="modal-close" onclick="closeModal('job-modal')" aria-label="סגור" data-i18n-aria-label="close">
+        <button class="modal-close" data-close="job-modal" aria-label="סגור" data-i18n-aria-label="close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
-        <form id="job-form" onsubmit="return false">
+        <form id="job-form" data-no-submit>
           <input type="hidden" id="job-id">
           <div class="form-grid">
             <div class="form-field full">
@@ -256,7 +256,7 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('job-modal')" data-i18n="cancel">ביטול</button>
+        <button class="btn btn-secondary" data-close="job-modal" data-i18n="cancel">ביטול</button>
         <button class="btn btn-primary" id="btn-save-job" data-i18n="save">שמירה</button>
       </div>
     </div>
@@ -267,7 +267,7 @@
     <div class="modal modal-lg">
       <div class="modal-header">
         <h2 class="modal-title" id="job-details-title" data-i18n="job_details">פרטים על המשרה</h2>
-        <button class="modal-close" onclick="closeModal('job-details-modal')" aria-label="סגור" data-i18n-aria-label="close">
+        <button class="modal-close" data-close="job-details-modal" aria-label="סגור" data-i18n-aria-label="close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -290,6 +290,8 @@
   <script src="js/jobs.js?v=4"></script>
   <script src="js/ai-widget.js?v=3"></script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

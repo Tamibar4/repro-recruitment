@@ -214,14 +214,28 @@ function rateLimit({ key, limit, windowMs }) {
   const now = Date.now();
   const record = rateLimitStore.get(key);
   if (!record || record.resetAt < now) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true, remaining: limit - 1 };
+    const resetAt = now + windowMs;
+    rateLimitStore.set(key, { count: 1, resetAt });
+    return { ok: true, limit, remaining: limit - 1, resetAt, windowMs };
   }
   record.count++;
   if (record.count > limit) {
-    return { ok: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
+    return { ok: false, limit, remaining: 0, resetAt: record.resetAt, windowMs, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
   }
-  return { ok: true, remaining: limit - record.count };
+  return { ok: true, limit, remaining: limit - record.count, resetAt: record.resetAt, windowMs };
+}
+
+// Helper: emit RFC 9239 + legacy X-RateLimit-* headers so external scanners
+// (and clients) can see that rate limiting is enforced.
+function setRateLimitHeaders(res, result) {
+  if (!result || res.headersSent) return;
+  res.setHeader('RateLimit-Policy', `${result.limit};w=${Math.round(result.windowMs / 1000)}`);
+  res.setHeader('RateLimit-Limit', String(result.limit));
+  res.setHeader('RateLimit-Remaining', String(Math.max(0, result.remaining)));
+  res.setHeader('RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
+  res.setHeader('X-RateLimit-Limit', String(result.limit));
+  res.setHeader('X-RateLimit-Remaining', String(Math.max(0, result.remaining)));
+  res.setHeader('X-RateLimit-Reset', String(Math.ceil(result.resetAt / 1000)));
 }
 
 // Cleanup expired rate-limit entries every 5 minutes
@@ -365,6 +379,10 @@ function originGuard(req, res, next) {
 
 // 1. Security headers (Helmet-style, hand-rolled to avoid extra deps)
 app.use((req, res, next) => {
+  // Per-request nonce for CSP — used by serveHtmlWithNonce to authorize
+  // inline <script> blocks without requiring 'unsafe-inline'.
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '0'); // Modern browsers ignore this; CSP is the real defense
@@ -374,7 +392,8 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
-  // Strict Content Security Policy - blocks XSS, inline scripts, external resources
+  // Strict Content Security Policy - blocks XSS, external resources, and
+  // inline scripts that don't carry the per-request nonce.
   // cdnjs.cloudflare.com is allowlisted because /learn.html lazy-loads PDF.js
   // from there to render training PDFs in-browser. blob: lets PDF.js spawn
   // its web worker.
@@ -382,7 +401,7 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+      `script-src 'self' 'nonce-${res.locals.cspNonce}' https://cdnjs.cloudflare.com`,
       "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
@@ -430,12 +449,42 @@ app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) return next();
   const ip = getClientIp(req);
   const result = rateLimit({ key: 'global:' + ip, limit: 300, windowMs: 60 * 1000 }); // 300 req/min
+  setRateLimitHeaders(res, result);
   if (!result.ok) {
     res.setHeader('Retry-After', String(result.retryAfter));
     return res.status(429).json({ error: 'Too many requests' });
   }
   next();
 });
+
+// 5b. Custom HTML serving with per-request CSP nonce injection.
+// Registered BEFORE express.static so it owns *.html. Every <script> tag
+// (without an existing nonce attribute) gets nonce="..." injected so it can
+// run under the strict CSP that no longer allows 'unsafe-inline'.
+const PUBLIC_DIR = path.join(__dirname, 'public');
+function serveHtmlWithNonce(req, res, next) {
+  let urlPath = req.path === '/' ? '/index.html' : req.path;
+  if (!urlPath.endsWith('.html')) return next();
+  // Path traversal guard: reject anything that would escape PUBLIC_DIR.
+  const decoded = decodeURIComponent(urlPath);
+  if (decoded.includes('\0') || decoded.includes('..')) return res.status(403).end();
+  const filePath = path.join(PUBLIC_DIR, decoded);
+  if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== PUBLIC_DIR) {
+    return res.status(403).end();
+  }
+  fs.readFile(filePath, 'utf-8', (err, content) => {
+    if (err) return next();
+    const nonce = res.locals.cspNonce;
+    const out = content.replace(
+      /<script(?![^>]*\bnonce=)([^>]*)>/gi,
+      `<script nonce="${nonce}"$1>`
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.send(out);
+  });
+}
+app.get(/\.html$/, serveHtmlWithNonce);
 
 // 6. Static files - safe directory only
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -3201,8 +3250,21 @@ app.post('/api/publishing/upload-image', (req, res) => {
 // ============================================================
 // Serve HTML pages
 // ============================================================
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/', (req, res, next) => {
+  // Reuse the nonce-injecting handler so '/' gets the same CSP treatment.
+  req.url = '/index.html';
+  serveHtmlWithNonce(req, res, () => res.status(404).end());
+});
+
+// Friendly URLs for the privacy / terms pages (also map common aliases
+// so external scanners and users find them at any of the conventional paths).
+app.get(['/privacy', '/privacy-policy'], (req, res) => {
+  req.url = '/privacy.html';
+  serveHtmlWithNonce(req, res, () => res.status(404).end());
+});
+app.get(['/terms', '/tos', '/terms-of-service'], (req, res) => {
+  req.url = '/terms.html';
+  serveHtmlWithNonce(req, res, () => res.status(404).end());
 });
 
 // ---------- Start Server ----------

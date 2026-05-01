@@ -400,8 +400,7 @@
           <div class="pub-post-title">${escapeHtml(title)}</div>
           ${post.text ? `<div class="pub-post-readmore">לחצי לראות את הפוסט המלא ←</div>` : ''}
           ${post.reference_url ? `
-            <a class="pub-post-reflink" href="${escapeHtml(post.reference_url)}" target="_blank" rel="noopener noreferrer"
-               onclick="event.stopPropagation()">
+            <a class="pub-post-reflink" href="${escapeHtml(post.reference_url)}" target="_blank" rel="noopener noreferrer" data-stop>
               קישור לפוסט מקורי
             </a>` : ''}
           ${post.tags && post.tags.length ? `
@@ -539,7 +538,8 @@
         <div class="pub-carousel" data-current="0">
           <div class="pub-carousel-stage" id="carousel-stage">
             <img src="${escapeHtml(imageUrl(images[0]))}" alt=""
-                 onerror="this.outerHTML='<div style=&quot;padding:24px;color:var(--color-red);text-align:center&quot;>⚠️ התמונה לא נטענה. נסי להעלות שוב.</div>';">
+                 data-fallback="⚠️ התמונה לא נטענה. נסי להעלות שוב."
+                 data-fallback-style="padding:24px;color:var(--color-red);text-align:center">
           </div>
           ${images.length > 1 ? `
             <button class="pub-carousel-nav prev" id="carousel-prev" title="הקודם" disabled>›</button>
@@ -616,7 +616,8 @@
         if (idx < 0 || idx >= images.length) return;
         currentImageIdx = idx;
         stage.innerHTML = `<img src="${escapeHtml(imageUrl(images[idx]))}" alt=""
-          onerror="this.outerHTML='<div style=&quot;padding:24px;color:var(--color-red);text-align:center&quot;>⚠️ התמונה לא נטענה</div>';">`;
+          data-fallback="⚠️ התמונה לא נטענה"
+          data-fallback-style="padding:24px;color:var(--color-red);text-align:center">`;
         if (counter) counter.textContent = `${idx + 1} / ${images.length}`;
         if (dotsWrap) {
           dotsWrap.querySelectorAll('button').forEach((d, i) => d.classList.toggle('active', i === idx));
@@ -1152,7 +1153,8 @@
       return `
         <div class="pub-image-thumb ${isSel ? 'is-selected' : ''}" data-img-url="${escapeHtml(url)}" data-idx="${i}">
           <img src="${escapeHtml(imageUrl(url))}" alt="" loading="lazy"
-               onerror="this.parentElement.innerHTML='<div style=&quot;color:#e2445c;font-size:10px;padding:6px;text-align:center&quot;>⚠️ תמונה לא נטענה</div>';">
+               data-fallback="⚠️ תמונה לא נטענה"
+               data-fallback-style="color:#e2445c;font-size:10px;padding:6px;text-align:center">
           <button type="button" class="pub-image-thumb-delete" data-del-idx="${i}" title="מחקי תמונה">✕</button>
         </div>
       `;

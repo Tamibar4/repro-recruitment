@@ -132,7 +132,7 @@
       <div class="auth-subtitle" data-i18n="signup_title">הרשמה למערכת</div>
     </div>
     <div class="auth-body">
-      <form id="signup-form" onsubmit="return false">
+      <form id="signup-form" data-no-submit>
         <div class="auth-error" id="signup-error"></div>
         <div class="auth-success" id="signup-success">
           <div class="success-checkmark">
@@ -168,6 +168,11 @@
       <div class="auth-link">
         <span data-i18n="already_have_account">כבר יש לך חשבון?</span>
         <a href="login.html" data-i18n="login_button">התחברות</a>
+      </div>
+      <div class="auth-legal" style="margin-top:18px;text-align:center;font-size:12.5px;color:#6b7280">
+        <a href="/privacy" style="color:#6b7280;text-decoration:underline">מדיניות פרטיות</a>
+        <span>&middot;</span>
+        <a href="/terms" style="color:#6b7280;text-decoration:underline">תנאי שימוש</a>
       </div>
     </div>
   </div>
@@ -218,6 +223,8 @@
     document.getElementById('signup-name').focus();
   </script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

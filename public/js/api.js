@@ -425,11 +425,19 @@ function showDuplicateAlert(existing) {
           <div class="dup-row"><span>👥 בטיפול של:</span><strong>${escapeHtml(existing.created_by || 'לא ידוע')}</strong></div>
         </div>
       </div>
-      <button class="duplicate-alert-close" onclick="this.closest('.duplicate-alert-overlay').remove()">הבנתי</button>
+      <button class="duplicate-alert-close" data-action="close-duplicate-alert">הבנתי</button>
     </div>
   `;
   document.body.appendChild(overlay);
 }
+
+// CSP-safe action: close the duplicate-candidate alert overlay (replaces the
+// inline onclick that called .closest('.duplicate-alert-overlay').remove()).
+window.__uiActions = window.__uiActions || {};
+window.__uiActions['close-duplicate-alert'] = (el) => {
+  const overlay = el.closest('.duplicate-alert-overlay');
+  if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+};
 
 function checkAuth() {
   // Skip on login page

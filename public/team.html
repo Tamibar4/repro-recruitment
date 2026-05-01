@@ -208,7 +208,7 @@
         const initial = (u.display_name || u.username || '?').charAt(0).toUpperCase();
         const isSelected = selectedUser === u.username;
         return `
-          <div class="team-card ${isSelected ? 'selected' : ''}" data-user="${u.username}" onclick="selectUser('${u.username}')">
+          <div class="team-card ${isSelected ? 'selected' : ''}" data-user="${u.username}" data-action="select-user" data-username="${u.username}">
             <div class="team-card-top">
               <div class="team-avatar">${initial}</div>
               <div>
@@ -379,10 +379,16 @@
       }
     }
 
+    // CSP-safe action wiring (replaces inline onclick="selectUser(...)" on team cards).
+    window.__uiActions = window.__uiActions || {};
+    window.__uiActions['select-user'] = (el) => selectUser(el.dataset.username);
+
     loadTeam();
   </script>
   <script src="js/ai-widget.js?v=3"></script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>

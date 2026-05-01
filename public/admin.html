@@ -308,10 +308,10 @@
                   <td>${u.created_at ? formatDate(u.created_at) : '—'}</td>
                   <td>
                     <div class="user-actions">
-                      <button class="btn btn-approve btn-sm" onclick="approveUser('${escapeHtml(u.username)}')">
+                      <button class="btn btn-approve btn-sm" data-action="approve-user" data-username="${escapeHtml(u.username)}">
                         ✓ אישור
                       </button>
-                      <button class="btn btn-reject btn-sm" onclick="rejectUser('${escapeHtml(u.username)}')">
+                      <button class="btn btn-reject btn-sm" data-action="reject-user" data-username="${escapeHtml(u.username)}">
                         ✕ דחייה
                       </button>
                     </div>
@@ -397,10 +397,17 @@
       return new Date(d).toLocaleDateString('he-IL', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    // CSP-safe action wiring (replaces inline onclick="approveUser(...)" / "rejectUser(...)").
+    window.__uiActions = window.__uiActions || {};
+    window.__uiActions['approve-user'] = (el) => approveUser(el.dataset.username);
+    window.__uiActions['reject-user']  = (el) => rejectUser(el.dataset.username);
+
     loadUsers();
   </script>
   <script src="js/ai-widget.js?v=3"></script>
 
+  <script src="js/ui-handlers.js?v=1"></script>
+  <script src="js/consent-banner.js?v=1"></script>
   <script src="/js/pwa.js?v=1"></script>
 </body>
 </html>
