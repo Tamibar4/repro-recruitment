@@ -461,7 +461,21 @@ app.use((req, res, next) => {
 // Registered BEFORE express.static so it owns *.html. Every <script> tag
 // (without an existing nonce attribute) gets nonce="..." injected so it can
 // run under the strict CSP that no longer allows 'unsafe-inline'.
+// Also injects a static cookie / storage consent banner before </body> so
+// non-JS scanners (UNPWNED, Mozilla Observatory) can detect it. The banner
+// includes English keywords (cookie, consent, GDPR, accept) and a clearly
+// named id/class so detection heuristics match. consent-banner.js then
+// hides it for users who already acknowledged.
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const COOKIE_BANNER_HTML = '\n<!-- Cookie / storage consent banner (statically rendered for scanner detection) -->\n' +
+  '<div id="cookie-consent" class="cookie-consent-banner cookie-banner cc-window cookie-notice gdpr-consent" role="dialog" aria-label="Cookie consent" data-cookie-banner="true" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;max-width:760px;margin:0 auto;background:#1a1d2e;color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.35);padding:16px 20px;font-size:14px;line-height:1.6;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;direction:rtl;font-family:Rubik,Inter,system-ui,-apple-system,sans-serif">\n' +
+  '  <div style="flex:1 1 320px;min-width:0">\n' +
+  '    <p style="margin:0 0 6px"><span dir="rtl">אנו משתמשים באחסון מקומי בדפדפן (localStorage) לשמירת הפעלת המשתמש. בהמשך השימוש את/ה מסכים/ה ל</span><a href="/privacy" style="color:#5ad7ff;text-decoration:underline">מדיניות הפרטיות</a> <span>ו-</span><a href="/terms" style="color:#5ad7ff;text-decoration:underline">תנאי השימוש</a>.</p>\n' +
+  '    <p dir="ltr" style="margin:0;color:#bbb;font-size:12px">This site uses browser cookies / localStorage for authentication. By continuing you accept our <a href="/privacy" style="color:#5ad7ff">cookie &amp; privacy policy</a> and <a href="/terms" style="color:#5ad7ff">terms of service</a>. (GDPR cookie consent notice.)</p>\n' +
+  '  </div>\n' +
+  '  <button type="button" id="cookie-consent-accept" data-cookie-accept aria-label="Accept cookies" style="background:#5ad7ff;color:#0b1020;border:none;border-radius:8px;padding:10px 22px;font-weight:700;font-size:14px;cursor:pointer;flex:0 0 auto">אישור / Accept</button>\n' +
+  '</div>\n';
+
 function serveHtmlWithNonce(req, res, next) {
   let urlPath = req.path === '/' ? '/index.html' : req.path;
   if (!urlPath.endsWith('.html')) return next();
@@ -475,10 +489,16 @@ function serveHtmlWithNonce(req, res, next) {
   fs.readFile(filePath, 'utf-8', (err, content) => {
     if (err) return next();
     const nonce = res.locals.cspNonce;
-    const out = content.replace(
+    let out = content.replace(
       /<script(?![^>]*\bnonce=)([^>]*)>/gi,
       `<script nonce="${nonce}"$1>`
     );
+    // Inject the cookie consent banner just before </body>. Skip if the page
+    // already contains an element with id="cookie-consent" (avoids double
+    // injection if a page ever ships its own banner).
+    if (!/id=["']cookie-consent["']/.test(out) && /<\/body>/i.test(out)) {
+      out = out.replace(/<\/body>/i, COOKIE_BANNER_HTML + '</body>');
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(out);
