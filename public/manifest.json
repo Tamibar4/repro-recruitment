@@ -1,0 +1,57 @@
+{
+  "name": "RePro - גיוס וניהול",
+  "short_name": "RePro",
+  "description": "פלטפורמת ניהול גיוס והשמה בינלאומית",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3ff",
+  "theme_color": "#5e5ce6",
+  "lang": "he",
+  "dir": "rtl",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "מועמדים",
+      "short_name": "מועמדים",
+      "description": "ניהול מועמדים",
+      "url": "/candidates.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "משרות",
+      "short_name": "משרות",
+      "description": "ניהול משרות",
+      "url": "/jobs.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "מדיה",
+      "short_name": "מדיה",
+      "description": "ניהול פרסומים",
+      "url": "/publishing.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

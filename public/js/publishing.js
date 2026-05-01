@@ -1161,7 +1161,7 @@
       <div class="pub-image-gallery">
         ${thumbs}
         <label class="pub-image-add-thumb" title="העלי תמונה נוספת">
-          <input type="file" id="post-image-file" accept="image/*">
+          <input type="file" id="post-image-file" accept="image/*" capture="environment">
           <span class="icon">+</span>
           <span class="label">${postImages.length === 0 ? 'הוסיפי תמונה' : 'תמונה נוספת'}</span>
         </label>
