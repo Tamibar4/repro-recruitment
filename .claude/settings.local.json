@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(rm \"C:\\\\Users\\\\gar07\\\\OneDrive\\\\שולחן העבודה\\\\Cloude code\\\\ריפרו\\\\.claude\\\\agents\\\\repro-security.md\")",
+      "Bash(rmdir \"C:\\\\Users\\\\gar07\\\\OneDrive\\\\שולחן העבודה\\\\Cloude code\\\\ריפרו\\\\.claude\\\\agents\")"
+    ]
+  }
+}

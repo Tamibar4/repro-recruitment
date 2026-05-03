@@ -12,7 +12,7 @@
  * — the activate handler then deletes any older caches so users always
  * get fresh code on first load after a deploy.
  */
-const CACHE_VERSION = 'repro-v1';
+const CACHE_VERSION = 'repro-v2';
 
 // Files to pre-cache so the app shell loads even on a cold offline start
 const APP_SHELL = [
@@ -71,27 +71,15 @@ self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests (CDN scripts etc.)
   if (url.origin !== self.location.origin) return;
 
-  // API: network-first
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          // Don't cache POSTed-back data or auth-sensitive responses;
-          // only cache successful GETs of things like /api/jobs etc.
-          // Even those, we cache lightly so the offline fallback has
-          // something stale rather than nothing.
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_VERSION).then((c) => c.put(req, clone)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
-    return;
-  }
+  // API requests: COMPLETELY transparent. We don't cache, intercept,
+  // or even observe them. The server is always source of truth and
+  // we don't want to risk serving stale auth-bound data.
+  if (url.pathname.startsWith('/api/')) return;
 
-  // App shell: cache-first
+  // Uploaded images served from the volume — also let through directly.
+  if (url.pathname.startsWith('/uploads/')) return;
+
+  // App shell + static assets: cache-first
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
@@ -103,8 +91,8 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       }).catch(() =>
-        // Last-resort offline fallback: return the cached homepage
-        caches.match('/index.html')
+        // Last-resort offline fallback for navigation: return the cached homepage
+        req.mode === 'navigate' ? caches.match('/index.html') : Response.error()
       );
     })
   );
