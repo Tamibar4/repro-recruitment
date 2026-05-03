@@ -2752,6 +2752,25 @@ function findPost(id) {
   return data.facebook_posts.find(p => p.id === numId);
 }
 
+// Sanitize an image URL submitted by the client. Two valid shapes:
+//   - data:image/...;base64,XXXX  (the new in-DB storage format)
+//   - any other URL (legacy /uploads/posts/X, https://..., etc.)
+// Truncating data URLs at 500 chars would corrupt the image (was the
+// bug in the first iteration of this feature). For non-data URLs we
+// keep the 500-char cap because there's no legitimate reason a path
+// should be longer.
+function sanitizeImageUrl(raw) {
+  if (raw == null) return null;
+  const s = String(raw);
+  if (!s) return null;
+  if (s.startsWith('data:')) {
+    // Hard upper bound on encoded size — 10MB base64 ≈ 7.5MB raw image,
+    // far above what our client-side resize ever produces.
+    return s.length > 10 * 1024 * 1024 ? null : s;
+  }
+  return s.slice(0, 500);
+}
+
 // Serialize an account with a post-count breakdown by status, so the
 // frontend can show "3 drafts / 5 scheduled / 12 published" badges
 // without an extra API call.
@@ -2935,12 +2954,12 @@ app.post('/api/publishing/posts', (req, res) => {
     let status = req.body?.status || 'draft';
     if (!PUB_VALID_STATUSES.includes(status)) status = 'draft';
     const images = Array.isArray(req.body?.images)
-      ? req.body.images.map(u => String(u).slice(0, 500)).filter(Boolean).slice(0, 10)
+      ? req.body.images.map(sanitizeImageUrl).filter(Boolean).slice(0, 10)
       : [];
     // image_url = the currently-selected image (for cards/copy). Defaults
     // to the first one in the list. If body sends image_url separately,
     // we accept it as long as it's in `images` (or null to clear).
-    let image_url = req.body?.image_url ? String(req.body.image_url).slice(0, 500) : null;
+    let image_url = sanitizeImageUrl(req.body?.image_url);
     if (image_url && images.length > 0 && !images.includes(image_url)) {
       // Selected image wasn't in the list — assume it should be added
       images.push(image_url);
@@ -3017,7 +3036,7 @@ app.put('/api/publishing/posts/:id', (req, res) => {
     }
     if (req.body.images !== undefined) {
       const newList = Array.isArray(req.body.images)
-        ? req.body.images.map(u => String(u).slice(0, 500)).filter(Boolean).slice(0, 10)
+        ? req.body.images.map(sanitizeImageUrl).filter(Boolean).slice(0, 10)
         : [];
       // Delete files that were dropped from the list (cleanup orphan uploads)
       const oldList = post.images || (post.image_url ? [post.image_url] : []);
@@ -3032,7 +3051,7 @@ app.put('/api/publishing/posts/:id', (req, res) => {
       post.images = newList;
     }
     if (req.body.image_url !== undefined) {
-      const requested = req.body.image_url ? String(req.body.image_url).slice(0, 500) : null;
+      const requested = sanitizeImageUrl(req.body.image_url);
       // If requested URL exists in our images list (or is null), accept.
       // Otherwise default to the first image (or null).
       const list = post.images || [];
