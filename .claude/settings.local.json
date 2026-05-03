@@ -5,7 +5,8 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(rm \"C:\\\\Users\\\\gar07\\\\OneDrive\\\\שולחן העבודה\\\\Cloude code\\\\ריפרו\\\\.claude\\\\agents\\\\repro-security.md\")",
-      "Bash(rmdir \"C:\\\\Users\\\\gar07\\\\OneDrive\\\\שולחן העבודה\\\\Cloude code\\\\ריפרו\\\\.claude\\\\agents\")"
+      "Bash(rmdir \"C:\\\\Users\\\\gar07\\\\OneDrive\\\\שולחן העבודה\\\\Cloude code\\\\ריפרו\\\\.claude\\\\agents\")",
+      "Bash(node -c server.js)"
     ]
   }
 }

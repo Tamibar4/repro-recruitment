@@ -438,8 +438,12 @@ app.use(cors({
   maxAge: 86400
 }));
 
-// 3. JSON body limit (prevent JSON DoS)
-app.use(express.json({ limit: '256kb' }));
+// 3. JSON body limit (prevent JSON DoS).
+// Bumped to 25MB because /api/publishing/posts now carries base64
+// data URLs for images (10 images × ~400KB each + text + metadata
+// can easily reach a few MB). All write routes are still admin-gated,
+// so the DoS surface stays small.
+app.use(express.json({ limit: '25mb' }));
 
 // 4. Origin guard (CSRF defense in depth)
 app.use(originGuard);
