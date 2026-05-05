@@ -12,7 +12,7 @@
  * — the activate handler then deletes any older caches so users always
  * get fresh code on first load after a deploy.
  */
-const CACHE_VERSION = 'repro-v3';
+const CACHE_VERSION = 'repro-v4';
 
 // Files to pre-cache so the app shell loads even on a cold offline start
 const APP_SHELL = [
@@ -79,21 +79,42 @@ self.addEventListener('fetch', (event) => {
   // Uploaded images served from the volume — also let through directly.
   if (url.pathname.startsWith('/uploads/')) return;
 
-  // App shell + static assets: cache-first
+  // HTML navigations: NETWORK-FIRST. Always try the network so users
+  // see new deploys immediately. Fall back to cache only when offline.
+  // This was the cause of the user's "I don't see the new feature"
+  // problem — the cache-first strategy was pinning her to the
+  // last-installed app shell version even after redeploys.
+  const isHtml = req.mode === 'navigate' ||
+                 req.destination === 'document' ||
+                 (req.headers.get('accept') || '').includes('text/html');
+  if (isHtml) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok && res.type === 'basic') {
+            const clone = res.clone();
+            caches.open(CACHE_VERSION).then((c) => c.put(req, clone)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((c) => c || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Other static assets (CSS/JS/images/fonts): cache-first for speed.
+  // JS/CSS files use ?v=NN query strings so a bump in the HTML pulls
+  // the new file fresh anyway.
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((res) => {
-        // Cache successful fetches of in-origin assets we didn't pre-cache
         if (res.ok && res.type === 'basic') {
           const clone = res.clone();
           caches.open(CACHE_VERSION).then((c) => c.put(req, clone)).catch(() => {});
         }
         return res;
-      }).catch(() =>
-        // Last-resort offline fallback for navigation: return the cached homepage
-        req.mode === 'navigate' ? caches.match('/index.html') : Response.error()
-      );
+      }).catch(() => Response.error());
     })
   );
 });
