@@ -3261,6 +3261,117 @@ app.get('/api/publishing/tags', (req, res) => {
   res.json(tags);
 });
 
+// POST /api/publishing/ai-suggest-posts — generate post-text variations
+// for a NEW post based on the account's existing style and an optional
+// short brief from the user. Doesn't read or modify any existing posts;
+// just returns generated text suggestions for the user to copy from.
+//
+// Body: { account_id: number, prompt?: string, count?: number }
+// Returns: { suggestions: string[] }
+app.post('/api/publishing/ai-suggest-posts', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const client = getAnthropicClient();
+    if (!client) {
+      return res.status(503).json({
+        error: 'ai_not_configured',
+        message: 'הסוכן AI עדיין לא מחובר. מנהל המערכת צריך להגדיר ANTHROPIC_API_KEY.'
+      });
+    }
+
+    const account_id = parseInt(req.body?.account_id, 10);
+    const account = findAccount(account_id);
+    if (!account) return res.status(400).json({ error: 'Invalid account_id' });
+
+    const userBrief = (req.body?.prompt || '').toString().slice(0, 1000).trim();
+    let count = parseInt(req.body?.count, 10);
+    if (!count || count < 1) count = 4;
+    if (count > 6) count = 6;
+
+    // Pull a few of the user's existing posts on this account (top 5
+    // most-recent published or scheduled ones) to give Claude a sense
+    // of the user's voice. Read-only; we don't touch them.
+    const sampleSize = 5;
+    const examples = (data.facebook_posts || [])
+      .filter(p => p.account_id === account_id && (Array.isArray(p.texts) ? p.texts.length > 0 : !!p.text))
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+      .slice(0, sampleSize)
+      .map(p => {
+        const t = Array.isArray(p.texts) && p.texts.length > 0 ? p.texts[0] : (p.text || '');
+        return t.trim();
+      })
+      .filter(Boolean);
+
+    const examplesBlock = examples.length
+      ? '\n\nדוגמאות לפוסטים קודמים שלי באותו חשבון (לסגנון בלבד — אל תעתיק אותם):\n\n' +
+        examples.map((ex, i) => `דוגמה ${i + 1}:\n"""${ex.slice(0, 1200)}"""`).join('\n\n')
+      : '\n\n(עדיין אין פוסטים קודמים בחשבון הזה — בנה/י סגנון חדש שמתאים לקונטקסט.)';
+
+    const briefBlock = userBrief
+      ? `\n\nתיאור הפוסט הספציפי שאני רוצה ליצור:\n${userBrief}`
+      : `\n\n(אין הוראה ספציפית — תייצרו ${count} וריאציות כלליות שמתאימות לחשבון.)`;
+
+    const system =
+      'את/ה יוצר/ת תוכן לפייסבוק עבור מגייסת ישראלית שמציבה ישראלים בעבודות בחו"ל. ' +
+      'תעבדי בעברית, בטון חברי וקליל אבל מקצועי. ' +
+      'הימנע/י מלשון מנופחת או שיווקית מוגזמת. תן/י אימוג\'ים בחכמה (1-3 פוסט) ולא בכל שורה. ' +
+      'אורך אופטימלי לכל פוסט: 60-150 מילים. שורות חדשות לקריאה נוחה. ' +
+      'כשרלוונטי — קריאה לפעולה ברורה בסוף ("שלחי קו"ח לוואטסאפ", "תייגי חברה", וכד\'). ' +
+      'החזר/י את התשובה בפורמט JSON תקין בלבד, ללא הסברים מסביב.';
+
+    const prompt =
+      `אני מנהלת חשבון פייסבוק בשם "${account.name}".${examplesBlock}${briefBlock}\n\n` +
+      `המשימה: צור/י ${count} וריאציות שונות של פוסט גיוס חדש. ` +
+      'כל וריאציה צריכה להיות בסגנון שונה (לדוגמה: אחת רגשית/סיפור, אחת ענייני/רשימה, אחת ישירה/קצרה). ' +
+      'החזר/י JSON במבנה: {"suggestions": ["טקסט 1...", "טקסט 2...", ...]} ללא הסברים מסביב.';
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2500,
+      system,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    // Pull the text out of the response
+    const raw = (response.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n')
+      .trim();
+
+    // Parse the JSON; if the model wrapped it in markdown fences strip them
+    let suggestions = [];
+    try {
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed?.suggestions)) {
+        suggestions = parsed.suggestions
+          .map(s => String(s || '').trim())
+          .filter(s => s.length > 0)
+          .slice(0, count);
+      }
+    } catch (e) {
+      console.warn('AI suggestions: JSON parse failed, returning raw text', e.message);
+      // Fallback: split by double-newline if the model didn't return JSON
+      suggestions = raw
+        .split(/\n\s*\n/)
+        .map(s => s.trim())
+        .filter(s => s.length > 30)
+        .slice(0, count);
+    }
+
+    if (suggestions.length === 0) {
+      return res.status(500).json({ error: 'ה-AI לא הצליח לייצר הצעות. נסי שוב.' });
+    }
+
+    auditLog('ai_suggest_posts', { account_id, count: suggestions.length, by: req.user.username });
+    res.json({ suggestions });
+  } catch (err) {
+    console.error('AI suggest-posts error:', err);
+    res.status(500).json({ error: err.message || 'שגיאה ביצירת הצעות' });
+  }
+});
+
 // POST /api/publishing/upload-image — upload an image, return it as a
 // data URL. The bytes are stored inline in the JSON DB (in `images[]`
 // on the post), so the image survives any Railway redeploy or volume

@@ -1028,6 +1028,112 @@
     }
   }
 
+  // ----- AI suggestions ----------------------------------------------
+  // Opens a small modal that takes a brief from the user and asks the
+  // server to generate 3-5 post-text variations based on the current
+  // account's existing style. Each suggestion can be clicked to be
+  // appended to the post being edited as a NEW variation. Existing
+  // variations and other post fields are not touched.
+  function openAiSuggestModal() {
+    // We need an account to anchor the suggestions to
+    const accountId = parseInt(document.getElementById('post-account').value, 10);
+    if (!accountId) {
+      showToast('בחרי חשבון פייסבוק קודם', 'error');
+      return;
+    }
+    document.getElementById('ai-suggest-brief').value = '';
+    document.getElementById('ai-suggest-results').innerHTML = '';
+    openModal('ai-suggest-modal');
+    setTimeout(() => document.getElementById('ai-suggest-brief').focus(), 100);
+  }
+
+  async function runAiSuggest() {
+    const accountId = parseInt(document.getElementById('post-account').value, 10);
+    if (!accountId) {
+      showToast('בחרי חשבון פייסבוק קודם', 'error');
+      return;
+    }
+    const brief = document.getElementById('ai-suggest-brief').value.trim();
+    const results = document.getElementById('ai-suggest-results');
+    const goBtn = document.getElementById('ai-suggest-go');
+    const briefEl = document.getElementById('ai-suggest-brief');
+
+    goBtn.disabled = true;
+    briefEl.disabled = true;
+    results.innerHTML = `
+      <div class="pub-ai-loading">
+        <div class="pub-ai-loading-spinner"></div>
+        <div>ה-AI כותב לך הצעות... 💭</div>
+      </div>
+    `;
+
+    try {
+      const data = await API.publishing.aiSuggest({
+        account_id: accountId,
+        prompt: brief,
+        count: 4
+      });
+      renderAiSuggestions(data.suggestions || []);
+    } catch (err) {
+      results.innerHTML = `<div class="pub-ai-error">⚠️ ${escapeHtml(err.message || 'שגיאה ביצירת הצעות')}</div>`;
+    } finally {
+      goBtn.disabled = false;
+      briefEl.disabled = false;
+    }
+  }
+
+  function renderAiSuggestions(suggestions) {
+    const results = document.getElementById('ai-suggest-results');
+    if (!suggestions || suggestions.length === 0) {
+      results.innerHTML = `<div class="pub-ai-empty">לא נוצרו הצעות. נסי תיאור אחר.</div>`;
+      return;
+    }
+    results.innerHTML = suggestions.map((text, i) => `
+      <div class="pub-ai-suggestion" data-idx="${i}">
+        <span class="pub-ai-suggestion-num">הצעה ${i + 1}</span>
+        <div class="pub-ai-suggestion-text">${escapeHtml(text)}</div>
+        <div class="pub-ai-suggestion-actions">
+          <button type="button" class="add-btn" data-action="add">📥 הוסיפי לפוסט</button>
+          <button type="button" class="copy-btn" data-action="copy">📋 העתק טקסט</button>
+        </div>
+      </div>
+    `).join('');
+
+    results.querySelectorAll('.pub-ai-suggestion').forEach(el => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const text = suggestions[idx];
+      el.querySelector('[data-action="add"]').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        // Add as a NEW variation in postTexts (don't touch existing ones).
+        // If postTexts is just one empty entry, replace that one.
+        if (postTexts.length === 1 && !postTexts[0].trim()) {
+          postTexts[0] = text;
+        } else {
+          if (postTexts.length >= 10) {
+            showToast('הגעת למקסימום 10 וריאציות. מחקי אחת קודם.', 'error');
+            return;
+          }
+          postTexts.push(text);
+        }
+        renderTextsArea();
+        btn.classList.add('added');
+        btn.textContent = '✓ נוסף';
+        showToast(`הצעה ${idx + 1} נוספה כוריאציה`);
+      });
+      el.querySelector('[data-action="copy"]').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        try {
+          await navigator.clipboard.writeText(text);
+          const orig = btn.textContent;
+          btn.textContent = '✓ הועתק';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        } catch {
+          showToast('העתקה נכשלה', 'error');
+        }
+      });
+    });
+  }
+
   // ----- Post modal ---------------------------------------------------
   // `prefill` lets the calendar view pre-fill the date + status when a
   // user clicks an empty day cell.
@@ -1347,6 +1453,8 @@
     document.getElementById('add-group-btn').addEventListener('click', handleAddGroup);
 
     document.getElementById('post-save-btn').addEventListener('click', savePost);
+    document.getElementById('btn-ai-suggest').addEventListener('click', openAiSuggestModal);
+    document.getElementById('ai-suggest-go').addEventListener('click', runAiSuggest);
     document.getElementById('post-delete-btn').addEventListener('click', async () => {
       if (!editingPostId) return;
       const post = posts.find(p => p.id === editingPostId);

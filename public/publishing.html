@@ -640,6 +640,112 @@
     .pub-image-add-thumb .icon  { font-size: 26px; }
     .pub-image-add-thumb .label { font-size: 11.5px; font-weight: 700; }
 
+    /* ----- AI suggestions modal -----
+       Small modal that appears over the post-edit modal. User types a
+       brief, gets 3-5 generated text suggestions. Each suggestion
+       has its own "add to post" button that pushes it as a new
+       variation into postTexts. */
+    .pub-ai-trigger-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 16px;
+      border: 2px solid var(--color-primary);
+      border-radius: 99px;
+      background: linear-gradient(135deg, rgba(94,92,230,0.08), rgba(139,92,246,0.08));
+      color: var(--color-primary);
+      font-family: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .pub-ai-trigger-btn:hover {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-purple, #8b5cf6));
+      color: white; transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(94,92,230,0.35);
+    }
+    .pub-ai-trigger-btn .icon { font-size: 16px; }
+
+    .pub-ai-brief {
+      width: 100%; padding: 12px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-family: inherit; font-size: 14px; line-height: 1.6;
+      min-height: 80px; resize: vertical;
+    }
+    .pub-ai-brief:focus {
+      outline: none; border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(94,92,230,0.12);
+    }
+    .pub-ai-results {
+      margin-top: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .pub-ai-suggestion {
+      background: var(--color-white);
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: all 0.15s;
+    }
+    .pub-ai-suggestion:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(94,92,230,0.12);
+    }
+    .pub-ai-suggestion-num {
+      font-size: 10px; font-weight: 800;
+      color: var(--color-primary);
+      background: var(--color-accent-soft);
+      padding: 2px 8px; border-radius: 99px;
+      align-self: flex-start;
+      letter-spacing: 0.3px;
+    }
+    .pub-ai-suggestion-text {
+      font-size: 13.5px; line-height: 1.65;
+      color: var(--color-text);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .pub-ai-suggestion-actions {
+      display: flex; gap: 8px; margin-top: 4px;
+    }
+    .pub-ai-suggestion-actions button {
+      padding: 7px 12px; border-radius: var(--radius);
+      border: 1px solid var(--color-border);
+      background: var(--color-white);
+      font-family: inherit; font-size: 12.5px; font-weight: 700;
+      cursor: pointer; transition: all 0.12s;
+    }
+    .pub-ai-suggestion-actions .add-btn {
+      background: var(--color-primary); color: white; border-color: var(--color-primary);
+    }
+    .pub-ai-suggestion-actions .add-btn:hover { background: var(--color-primary-dark, #0060c4); }
+    .pub-ai-suggestion-actions .add-btn.added {
+      background: var(--color-green); border-color: var(--color-green);
+    }
+    .pub-ai-suggestion-actions .copy-btn:hover {
+      border-color: var(--color-primary); color: var(--color-primary);
+    }
+    .pub-ai-loading {
+      text-align: center; padding: 30px 20px;
+      color: var(--color-text-secondary); font-size: 13px;
+    }
+    .pub-ai-loading-spinner {
+      display: inline-block;
+      width: 36px; height: 36px;
+      border: 3px solid var(--color-accent-soft);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: pub-ai-spin 0.9s linear infinite;
+      margin-bottom: 14px;
+    }
+    @keyframes pub-ai-spin { to { transform: rotate(360deg); } }
+    .pub-ai-empty {
+      text-align: center; padding: 30px 20px;
+      color: var(--color-text-light); font-size: 13px;
+    }
+    .pub-ai-error {
+      padding: 12px 14px; background: rgba(226,68,92,0.08);
+      color: var(--color-red); border-radius: var(--radius);
+      font-size: 13px; margin-top: 12px;
+    }
+
     /* Reference-link badge on cards */
     .pub-post-reflink {
       display: inline-flex; align-items: center; gap: 4px;
@@ -1109,7 +1215,13 @@
             <div class="field-hint">הכותרת היא מה שמוצג בכרטיס. הטקסט המלא יוצג רק כשתלחצי על הפוסט.</div>
           </div>
           <div class="pub-form-row">
-            <label>טקסט הפוסט</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+              <label style="margin-bottom:0">טקסט הפוסט</label>
+              <button type="button" class="pub-ai-trigger-btn" id="btn-ai-suggest" title="צרי הצעות AI לפוסט חדש">
+                <span class="icon">💡</span>
+                הצעות AI
+              </button>
+            </div>
             <div class="field-hint" style="margin-bottom:8px">אפשר להוסיף כמה גרסאות (וריאציות) — כל אחת תופיע ככרטיס נפרד בתצוגת הפוסט עם כפתור העתקה משלה.</div>
             <div id="post-texts-area">
               <!-- JS renders one textarea per variation -->
@@ -1187,6 +1299,32 @@
   <!-- ============================================================
        Modal: Post preview (full text + image, opened on card click)
        ============================================================ -->
+  <!-- ============================================================
+       Modal: AI suggestions for a NEW post
+       ============================================================ -->
+  <div class="modal-overlay" id="ai-suggest-modal" role="dialog" aria-modal="true" aria-labelledby="ai-suggest-title" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="ai-suggest-title">💡 הצעות AI לפוסט חדש</h2>
+        <button class="modal-close" onclick="closeModal('ai-suggest-modal')" aria-label="סגור">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:8px;line-height:1.6">
+          ספרי בקצרה על הפוסט שתרצי ליצור (אופציונלי). ה-AI ייצר 4 וריאציות בהשראת הסגנון של החשבון שלך.
+        </div>
+        <textarea class="pub-ai-brief" id="ai-suggest-brief" maxlength="1000"
+          placeholder="לדוגמה: מנהל מכירות בלאס וגאס לקונסטרקשן, שכר 90K + עמלות, מתחיל מחר..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <button type="button" class="btn btn-primary" id="ai-suggest-go">✨ צרי הצעות</button>
+          <span style="font-size:11px;color:var(--color-text-light)">לוקח 5-10 שניות</span>
+        </div>
+        <div class="pub-ai-results" id="ai-suggest-results"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" aria-hidden="true">
     <div class="modal modal-lg">
       <div class="modal-header">
@@ -1203,7 +1341,7 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=14"></script>
+  <script src="js/publishing.js?v=15"></script>
 
   <script src="js/ui-handlers.js?v=1"></script>
   <script src="js/consent-banner.js?v=2"></script>

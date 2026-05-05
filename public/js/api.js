@@ -185,6 +185,15 @@ const API = {
     listTags() {
       return API.request('/publishing/tags');
     },
+
+    // AI: generate post-text suggestions for a NEW post.
+    // Doesn't read or modify any existing posts.
+    aiSuggest({ account_id, prompt, count }) {
+      return API.request('/publishing/ai-suggest-posts', {
+        method: 'POST',
+        body: JSON.stringify({ account_id, prompt: prompt || '', count: count || 4 })
+      });
+    },
     async uploadImage(file) {
       const fd = new FormData();
       fd.append('image', file);
