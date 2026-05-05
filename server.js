@@ -3288,46 +3288,77 @@ app.post('/api/publishing/ai-suggest-posts', async (req, res) => {
     if (!count || count < 1) count = 4;
     if (count > 6) count = 6;
 
-    // Pull a few of the user's existing posts on this account (top 5
-    // most-recent published or scheduled ones) to give Claude a sense
-    // of the user's voice. Read-only; we don't touch them.
-    const sampleSize = 5;
+    // Pull up to 8 of the user's existing posts on this account so the
+    // model has plenty of voice samples. Read-only; we don't touch them.
+    const sampleSize = 8;
     const examples = (data.facebook_posts || [])
       .filter(p => p.account_id === account_id && (Array.isArray(p.texts) ? p.texts.length > 0 : !!p.text))
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, sampleSize)
       .map(p => {
-        const t = Array.isArray(p.texts) && p.texts.length > 0 ? p.texts[0] : (p.text || '');
-        return t.trim();
+        // Take ALL text variations, not just the first, so the model
+        // sees the full range of how the user phrases things.
+        if (Array.isArray(p.texts) && p.texts.length > 0) {
+          return p.texts.map(t => String(t || '').trim()).filter(Boolean).join('\n---\n');
+        }
+        return (p.text || '').trim();
       })
       .filter(Boolean);
 
     const examplesBlock = examples.length
-      ? '\n\nדוגמאות לפוסטים קודמים שלי באותו חשבון (לסגנון בלבד — אל תעתיק אותם):\n\n' +
-        examples.map((ex, i) => `דוגמה ${i + 1}:\n"""${ex.slice(0, 1200)}"""`).join('\n\n')
-      : '\n\n(עדיין אין פוסטים קודמים בחשבון הזה — בנה/י סגנון חדש שמתאים לקונטקסט.)';
+      ? '\n\nדוגמאות אמיתיות לפוסטים שלי באותו חשבון (קראי אותן וחקי את הקצב, האורך, אוצר המילים, השימוש באימוג\'ים — אל תעתיקי, רק תרגישי איך אני כותבת):\n\n' +
+        examples.map((ex, i) => `--- פוסט ${i + 1} ---\n${ex.slice(0, 1500)}`).join('\n\n')
+      : '\n\n(עדיין אין פוסטים קודמים בחשבון הזה. תכתבי בעברית טבעית של מגייסת ישראלית — לא רובוטית, לא שיווקית מוגזמת.)';
 
     const briefBlock = userBrief
-      ? `\n\nתיאור הפוסט הספציפי שאני רוצה ליצור:\n${userBrief}`
-      : `\n\n(אין הוראה ספציפית — תייצרו ${count} וריאציות כלליות שמתאימות לחשבון.)`;
+      ? `\n\nההוראה הספציפית שלי לפוסט הזה:\n${userBrief}`
+      : `\n\n(אין הוראה ספציפית — תכתבי ${count} פוסטים כלליים שמתאימים לחשבון לפי הסגנון של הדוגמאות.)`;
 
     const system =
-      'את/ה יוצר/ת תוכן לפייסבוק עבור מגייסת ישראלית שמציבה ישראלים בעבודות בחו"ל. ' +
-      'תעבדי בעברית, בטון חברי וקליל אבל מקצועי. ' +
-      'הימנע/י מלשון מנופחת או שיווקית מוגזמת. תן/י אימוג\'ים בחכמה (1-3 פוסט) ולא בכל שורה. ' +
-      'אורך אופטימלי לכל פוסט: 60-150 מילים. שורות חדשות לקריאה נוחה. ' +
-      'כשרלוונטי — קריאה לפעולה ברורה בסוף ("שלחי קו"ח לוואטסאפ", "תייגי חברה", וכד\'). ' +
-      'החזר/י את התשובה בפורמט JSON תקין בלבד, ללא הסברים מסביב.';
+`את כותבת תוכן בפייסבוק עבור מגייסת ישראלית. המטרה: שהפוסטים יישמעו כאילו היא כתבה אותם — בן אדם, לא מערכת.
+
+** איך הכי טוב לכתוב כמו בן אדם: **
+- עברית מדוברת. תכתבי כמו שאת מדברת לחברה — "תקשיבו", "אגב", "נראה לי", "אז".
+- שבירת שורות בטבעיות, איפה שהיית עוצרת לנשום. לא כל משפט חייב להסתיים בנקודה.
+- תני פרטים קונקרטיים כשיש (שם החברה, מקום, סכום שכר, סוג עבודה). ערך גדול יותר מהבטחות כלליות.
+- אם זה מתאים — סיפור קטן או דוגמה אישית עוזר.
+- אימוג'ים: רק אם זה הסגנון של המשתמשת בדוגמאות. אם היא משתמשת ב-2-3 פוסט, את גם. אם בכלל לא, את גם לא.
+- שאלות פתוחות עובדות טוב: "מי בקטע?", "תכירי?", "מי מהארץ עדיין מחפש משהו רציני בחו"ל?"
+
+** מה ל-לא לעשות (זה מה שגורם לזה להיראות AI): **
+- ❌ לא להתחיל בקלישאות: "הזדמנות פז!", "אל תפספסו!", "✨ הזדמנות מצוינת ✨"
+- ❌ לא משפטים מנופחים: "בעולם הדינמי של היום...", "אם אתם מחפשים את האתגר הבא..."
+- ❌ לא לעשות פתיחה+אמצע+סיכום מסודר עם 3 פסקאות. אנשים אמיתיים לא כותבים ככה בפייסבוק.
+- ❌ לא להעמיס באימוג'ים. עדיף 0 מאשר 7.
+- ❌ לא להשתמש בעברית "ספרותית" מדי — "מציאות מאתגרת", "סביבה מתגמלת", "פוטנציאל בלתי-מנוצל". אנשים לא מדברים ככה.
+- ❌ לא לסיים כל פוסט עם "פנו אליי בהקדם!" או "תיאום ראיון בפרטי" — תגוון, או פשוט תניחי שיודעים מה לעשות.
+- ❌ לא לחזור על אותו פתיח 3 פעמים. כל וריאציה צריכה לפתוח אחרת לגמרי.
+
+** אורך וגוון: **
+- וריאציה 1: קצרה (2-4 שורות, ישר לעניין).
+- וריאציה 2: בינונית עם פרטים (60-100 מילים).
+- וריאציה 3: סיפור/אישי (90-150 מילים, גוף ראשון).
+- וריאציה 4: רשימה/שאלה ("3 דברים שצריך לדעת על...", "מי שיודע X — בואו נדבר").
+- אם הוזמנו יותר וריאציות, תוסיפי סגנונות שונים (טון מצחיק, טון רציני, וכו').
+
+** פלט: **
+JSON תקין בלבד: {"suggestions": ["...", "...", ...]}. בלי שום טקסט סביב. בלי הסברים. בלי ${'```'}json. רק JSON נקי.`;
 
     const prompt =
-      `אני מנהלת חשבון פייסבוק בשם "${account.name}".${examplesBlock}${briefBlock}\n\n` +
-      `המשימה: צור/י ${count} וריאציות שונות של פוסט גיוס חדש. ` +
-      'כל וריאציה צריכה להיות בסגנון שונה (לדוגמה: אחת רגשית/סיפור, אחת ענייני/רשימה, אחת ישירה/קצרה). ' +
-      'החזר/י JSON במבנה: {"suggestions": ["טקסט 1...", "טקסט 2...", ...]} ללא הסברים מסביב.';
+`שם החשבון: "${account.name}"${examplesBlock}${briefBlock}
+
+המשימה: כתבי ${count} פוסטים שונים. כל אחד בסגנון/אורך אחר (ראי הנחיות הסגנונות). תכתבי כמו המגייסת — לא כמו מערכת. אסור שירגיש כתוב ע"י AI.
+
+החזירי JSON: {"suggestions": ["...", "...", ...]}`;
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 2500,
+      max_tokens: 3500,
+      // Higher temperature → more variety + less safe/predictable
+      // wording. Combined with the explicit "don't sound like AI"
+      // instructions in the system prompt, this is what gets us
+      // posts that read like a real person wrote them.
+      temperature: 1.0,
       system,
       messages: [{ role: 'user', content: prompt }]
     });
