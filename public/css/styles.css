@@ -1532,6 +1532,12 @@ button:focus-visible,
   background: var(--gradient-primary);
 }
 
+.kanban-header.no_response {
+  /* Muted purple-grey: signals "didn't progress" without looking like
+     a hard rejection (which is the dim grey of the rejected column). */
+  background: linear-gradient(135deg, #6b6e8a, #8b80c8);
+}
+
 .kanban-header.accepted {
   background: var(--gradient-green);
 }

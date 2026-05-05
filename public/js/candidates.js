@@ -57,6 +57,7 @@ function renderKanban() {
   const columns = {
     stage1: [],
     stage2: [],
+    no_response: [],
     accepted: [],
     rejected: []
   };
@@ -71,11 +72,13 @@ function renderKanban() {
   // Update counts
   document.getElementById('count-stage1').textContent = columns.stage1.length;
   document.getElementById('count-stage2').textContent = columns.stage2.length;
+  document.getElementById('count-no_response').textContent = columns.no_response.length;
   document.getElementById('count-rejected').textContent = columns.rejected.length;
 
   // Render each column (accepted shows as separate table below)
   renderColumn('stage1', columns.stage1);
   renderColumn('stage2', columns.stage2);
+  renderColumn('no_response', columns.no_response);
   renderColumn('rejected', columns.rejected);
   renderAcceptedTable(columns.accepted);
 
@@ -100,10 +103,11 @@ function renderColumn(stage, items) {
   const container = document.getElementById('column-' + stage);
 
   if (items.length === 0) {
-    const emptyIcons = { stage1: '👋', stage2: '📋', accepted: '🎉', rejected: '📭', delayed: '⏳' };
+    const emptyIcons = { stage1: '👋', stage2: '📋', no_response: '🔇', accepted: '🎉', rejected: '📭', delayed: '⏳' };
     const emptyTexts = {
       stage1: 'אין מועמדים בשלב זה',
       stage2: 'אין מועמדים בשלב זה',
+      no_response: 'אין מועמדים שלא ענו',
       accepted: 'אין מועמדים בשלב זה',
       rejected: 'אין מועמדים לא רלוונטיים',
       delayed: 'אין מועמדים עם זמינות מאוחרת'
@@ -181,7 +185,7 @@ function getFollowUpStatus(candidate) {
 }
 
 function renderCandidateCard(candidate, stage) {
-  const stageOrder = ['stage1', 'stage2', 'accepted', 'rejected', 'delayed'];
+  const stageOrder = ['stage1', 'stage2', 'no_response', 'accepted', 'rejected', 'delayed'];
   const currentIdx = stageOrder.indexOf(stage);
   const canPrev = currentIdx > 0;
   const canNext = currentIdx < stageOrder.length - 1;

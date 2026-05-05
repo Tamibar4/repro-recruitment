@@ -180,6 +180,18 @@
           <div class="kanban-body" id="column-stage2"></div>
         </div>
 
+        <!-- No Response -->
+        <div class="kanban-column">
+          <div class="kanban-header no_response">
+            <div class="kanban-title">
+              <span class="kanban-title-emoji">🔇</span>
+              <span data-i18n="no_response">אין מענה</span>
+            </div>
+            <span class="kanban-count" id="count-no_response">0</span>
+          </div>
+          <div class="kanban-body" id="column-no_response"></div>
+        </div>
+
         <!-- Not Relevant -->
         <div class="kanban-column">
           <div class="kanban-header" style="background: linear-gradient(135deg, #9e9e9e, #bdbdbd);">
@@ -284,6 +296,7 @@
               <select id="candidate-stage">
                 <option value="stage1">שלב ראשון - שיחה איתי</option>
                 <option value="stage2">שלב שני - שיחה עם המעסיק</option>
+                <option value="no_response">אין מענה</option>
                 <option value="accepted">התקבלו</option>
                 <option value="rejected">לא רלוונטים</option>
                 <option value="delayed">זמינות מאוחרת</option>

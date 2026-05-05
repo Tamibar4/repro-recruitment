@@ -48,10 +48,12 @@ const translations = {
     edit_candidate: "עריכת מועמד",
     stage1: "שלב ראשון - שיחה איתי",
     stage2: "שלב שני - אצל המעסיק",
+    no_response: "אין מענה",
     accepted: "התקבלו",
     rejected: "נדחו",
     no_candidates_stage1: "אין מועמדים בשלב זה",
     no_candidates_stage2: "אין מועמדים בשלב זה",
+    no_candidates_no_response: "אין מועמדים שלא ענו",
     no_candidates_accepted: "אין מועמדים בשלב זה",
 
     // Form fields
@@ -229,10 +231,12 @@ const translations = {
     edit_candidate: "Edit Candidate",
     stage1: "Stage 1 - With Me",
     stage2: "Stage 2 - With Employer",
+    no_response: "No Response",
     accepted: "Hired",
     rejected: "Rejected",
     no_candidates_stage1: "No candidates in this stage",
     no_candidates_stage2: "No candidates in this stage",
+    no_candidates_no_response: "No unresponsive candidates",
     no_candidates_accepted: "No candidates in this stage",
 
     // Form fields

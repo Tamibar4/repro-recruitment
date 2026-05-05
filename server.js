@@ -1430,7 +1430,7 @@ app.get('/api/jobs', (req, res) => {
 
     // Attach candidate counts
     const jobsWithCounts = jobs.map(job => {
-      const stageCounts = { stage1: 0, stage2: 0, accepted: 0, rejected: 0 };
+      const stageCounts = { stage1: 0, stage2: 0, no_response: 0, accepted: 0, rejected: 0 };
       data.candidates.forEach(c => {
         if (c.job_id === job.id && stageCounts[c.stage] !== undefined) {
           stageCounts[c.stage]++;
