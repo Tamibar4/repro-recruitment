@@ -12,7 +12,7 @@
  * — the activate handler then deletes any older caches so users always
  * get fresh code on first load after a deploy.
  */
-const CACHE_VERSION = 'repro-v2';
+const CACHE_VERSION = 'repro-v3';
 
 // Files to pre-cache so the app shell loads even on a cold offline start
 const APP_SHELL = [
