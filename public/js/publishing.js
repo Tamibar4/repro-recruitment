@@ -598,6 +598,22 @@
         <button class="btn btn-secondary" data-prev-action="move">🔀 העבירי</button>
         <button class="btn btn-secondary" data-prev-action="delete" style="color:var(--color-red)">🗑️ מחקי</button>
       </div>
+
+      <!-- AI suggestions section: lets the user generate variations
+           on THIS post (uses post text + style as seed). The button
+           starts collapsed; user clicks → loading → suggestion cards. -->
+      <div class="pub-ai-related-section" style="margin-top:24px;padding-top:20px;border-top:2px dashed var(--color-border)">
+        <h3 style="font-size:16px;font-weight:800;color:var(--color-text);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          ✨ פוסטים פוטנציאליים נוספים בסגנון הזה
+        </h3>
+        <p style="font-size:12.5px;color:var(--color-text-secondary);margin-bottom:14px;line-height:1.6">
+          ה-AI יקרא את הפוסט שלך, יקלוט את הסגנון, ויציע לך פוסטים נוספים על אותו נושא — זוויות שונות, אורכים שונים. את בוחרת מה להעתיק או להוסיף.
+        </p>
+        <button type="button" class="btn btn-primary" id="btn-related-suggest">
+          🪄 צרי וריאציות נוספות
+        </button>
+        <div class="pub-ai-results" id="related-results" style="margin-top:14px"></div>
+      </div>
     `;
 
     const content = document.getElementById('preview-modal-content');
@@ -687,7 +703,127 @@
       });
     });
 
+    // ---- AI "more variations of this post" wiring ----
+    const btnRelated = content.querySelector('#btn-related-suggest');
+    btnRelated?.addEventListener('click', () => runRelatedSuggest(post));
+
     openModal('preview-modal');
+  }
+
+  // Generate AI suggestions seeded by an EXISTING post. Uses the post's
+  // own text as primary inspiration (server reads it via seed_post_id).
+  // Renders results inside the preview modal's #related-results panel.
+  async function runRelatedSuggest(post) {
+    const results = document.getElementById('related-results');
+    const btn = document.getElementById('btn-related-suggest');
+    if (!results || !btn) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ ה-AI חושב...';
+    results.innerHTML = `
+      <div class="pub-ai-loading">
+        <div class="pub-ai-loading-spinner"></div>
+        <div>קורא את הפוסט שלך, חושב על וריאציות... 💭</div>
+      </div>
+    `;
+
+    try {
+      const data = await API.publishing.aiSuggest({
+        account_id: post.account_id,
+        seed_post_id: post.id,
+        count: 4
+      });
+      renderRelatedSuggestions(post, data.suggestions || []);
+      btn.textContent = '🔄 צרי הצעות נוספות';
+    } catch (err) {
+      results.innerHTML = `<div class="pub-ai-error">⚠️ ${escapeHtml(err.message || 'שגיאה ביצירת הצעות')}</div>`;
+      btn.textContent = '🔄 נסי שוב';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderRelatedSuggestions(post, suggestions) {
+    const results = document.getElementById('related-results');
+    if (!suggestions || suggestions.length === 0) {
+      results.innerHTML = `<div class="pub-ai-empty">לא נוצרו הצעות. נסי שוב.</div>`;
+      return;
+    }
+    results.innerHTML = suggestions.map((text, i) => `
+      <div class="pub-ai-suggestion" data-idx="${i}">
+        <span class="pub-ai-suggestion-num">וריאציה ${i + 1}</span>
+        <div class="pub-ai-suggestion-text">${escapeHtml(text)}</div>
+        <div class="pub-ai-suggestion-actions">
+          <button type="button" class="add-btn" data-action="add-as-variation">📥 הוסיפי כוריאציה לפוסט הזה</button>
+          <button type="button" class="copy-btn" data-action="copy">📋 העתק טקסט</button>
+          <button type="button" class="copy-btn" data-action="new-post" style="color:var(--color-primary)">✨ צרי פוסט חדש מזה</button>
+        </div>
+      </div>
+    `).join('');
+
+    results.querySelectorAll('.pub-ai-suggestion').forEach(el => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const text = suggestions[idx];
+
+      el.querySelector('[data-action="add-as-variation"]').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        try {
+          // Append this text to the existing post's `texts` array.
+          // Read fresh from the post in case the user already edited.
+          const newTexts = Array.isArray(post.texts) && post.texts.length > 0
+            ? post.texts.slice()
+            : (post.text ? [post.text] : []);
+          if (newTexts.length >= 10) {
+            showToast('הפוסט כבר מכיל 10 וריאציות. מחקי אחת קודם.', 'error');
+            return;
+          }
+          newTexts.push(text);
+          await API.publishing.updatePost(post.id, { texts: newTexts });
+          // Update the in-memory post so further actions see the new state
+          post.texts = newTexts;
+          post.text = newTexts[0] || '';
+          btn.classList.add('added');
+          btn.textContent = '✓ נוסף כוריאציה';
+          showToast('הוריאציה נוספה לפוסט');
+          // Schedule a list reload so the cards reflect the change
+          loadPosts().then(render);
+        } catch (err) {
+          showToast(err.message || 'שמירה נכשלה', 'error');
+        }
+      });
+
+      el.querySelector('[data-action="copy"]').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        try {
+          await navigator.clipboard.writeText(text);
+          const orig = btn.textContent;
+          btn.textContent = '✓ הועתק';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        } catch {
+          showToast('העתקה נכשלה', 'error');
+        }
+      });
+
+      el.querySelector('[data-action="new-post"]').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        try {
+          // Create a brand-new draft post in the same account with this text.
+          await API.publishing.createPost({
+            account_id: post.account_id,
+            title: '',
+            texts: [text],
+            text: text,
+            status: 'draft',
+            tags: []
+          });
+          btn.classList.add('added');
+          btn.textContent = '✓ נוצר פוסט חדש';
+          showToast('פוסט חדש נוצר כטיוטה');
+          loadPosts().then(render);
+        } catch (err) {
+          showToast(err.message || 'יצירה נכשלה', 'error');
+        }
+      });
+    });
   }
 
   // Quick-add image: lets the user upload an image directly from a card

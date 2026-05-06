@@ -3284,15 +3284,29 @@ app.post('/api/publishing/ai-suggest-posts', async (req, res) => {
     if (!account) return res.status(400).json({ error: 'Invalid account_id' });
 
     const userBrief = (req.body?.prompt || '').toString().slice(0, 1000).trim();
+    const seedPostId = req.body?.seed_post_id ? parseInt(req.body.seed_post_id, 10) : null;
     let count = parseInt(req.body?.count, 10);
     if (!count || count < 1) count = 4;
     if (count > 6) count = 6;
 
+    // If a seed post was provided, pull its text out — we'll feed it
+    // to the model as the primary inspiration for the new variations.
+    let seedPost = null;
+    if (seedPostId) {
+      seedPost = findPost(seedPostId);
+      if (!seedPost || seedPost.account_id !== account_id) {
+        seedPost = null; // ignore mismatched seed
+      }
+    }
+
     // Pull up to 8 of the user's existing posts on this account so the
     // model has plenty of voice samples. Read-only; we don't touch them.
+    // Skip the seed post itself in this list — it goes in its own block.
     const sampleSize = 8;
     const examples = (data.facebook_posts || [])
-      .filter(p => p.account_id === account_id && (Array.isArray(p.texts) ? p.texts.length > 0 : !!p.text))
+      .filter(p => p.account_id === account_id &&
+                   (!seedPost || p.id !== seedPost.id) &&
+                   (Array.isArray(p.texts) ? p.texts.length > 0 : !!p.text))
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, sampleSize)
       .map(p => {
@@ -3310,9 +3324,27 @@ app.post('/api/publishing/ai-suggest-posts', async (req, res) => {
         examples.map((ex, i) => `--- פוסט ${i + 1} ---\n${ex.slice(0, 1500)}`).join('\n\n')
       : '\n\n(עדיין אין פוסטים קודמים בחשבון הזה. תכתבי בעברית טבעית של מגייסת ישראלית — לא רובוטית, לא שיווקית מוגזמת.)';
 
+    // If we have a seed post, include its text as the primary inspiration —
+    // the model should generate variations on this specific theme/topic
+    // (different angle, tone, length) rather than whatever it feels like.
+    let seedBlock = '';
+    if (seedPost) {
+      const seedText = Array.isArray(seedPost.texts) && seedPost.texts.length > 0
+        ? seedPost.texts.map(t => String(t || '').trim()).filter(Boolean).join('\n---\n')
+        : (seedPost.text || '').trim();
+      if (seedText) {
+        seedBlock =
+          '\n\n=== הפוסט המקורי ===\n' +
+          'זה פוסט שכבר כתבתי. אני רוצה שתציעי לי וריאציות נוספות על אותו נושא — אותו תוכן בערך, אבל בסגנון/אורך/זווית אחרת. לא להעתיק, להציע אלטרנטיבות.\n\n' +
+          `הפוסט המקורי:\n"""\n${seedText.slice(0, 3000)}\n"""`;
+      }
+    }
+
     const briefBlock = userBrief
-      ? `\n\nההוראה הספציפית שלי לפוסט הזה:\n${userBrief}`
-      : `\n\n(אין הוראה ספציפית — תכתבי ${count} פוסטים כלליים שמתאימים לחשבון לפי הסגנון של הדוגמאות.)`;
+      ? `\n\nההוראה הספציפית שלי:\n${userBrief}`
+      : (seedPost
+          ? '' // seedBlock already gives the model what it needs
+          : `\n\n(אין הוראה ספציפית — תכתבי ${count} פוסטים כלליים שמתאימים לחשבון לפי הסגנון של הדוגמאות.)`);
 
     const system =
 `את כותבת תוכן בפייסבוק עבור מגייסת ישראלית. המטרה: שהפוסטים יישמעו כאילו היא כתבה אותם — בן אדם, לא מערכת.
@@ -3344,10 +3376,14 @@ app.post('/api/publishing/ai-suggest-posts', async (req, res) => {
 ** פלט: **
 JSON תקין בלבד: {"suggestions": ["...", "...", ...]}. בלי שום טקסט סביב. בלי הסברים. בלי ${'```'}json. רק JSON נקי.`;
 
-    const prompt =
-`שם החשבון: "${account.name}"${examplesBlock}${briefBlock}
+    const taskInstruction = seedPost
+      ? `המשימה: על בסיס הפוסט המקורי שלמעלה, כתבי ${count} וריאציות אלטרנטיביות. אותו תוכן/נושא בערך, אבל כל וריאציה בסגנון/אורך/זווית אחר. אם הפוסט המקורי קצר וענייני — תני אחת ארוכה וסיפורית. אם הוא רגשי — תני גם גרסה ישירה. גוון!`
+      : `המשימה: כתבי ${count} פוסטים שונים. כל אחד בסגנון/אורך אחר (ראי הנחיות הסגנונות).`;
 
-המשימה: כתבי ${count} פוסטים שונים. כל אחד בסגנון/אורך אחר (ראי הנחיות הסגנונות). תכתבי כמו המגייסת — לא כמו מערכת. אסור שירגיש כתוב ע"י AI.
+    const prompt =
+`שם החשבון: "${account.name}"${examplesBlock}${seedBlock}${briefBlock}
+
+${taskInstruction} תכתבי כמו המגייסת — לא כמו מערכת. אסור שירגיש כתוב ע"י AI.
 
 החזירי JSON: {"suggestions": ["...", "...", ...]}`;
 

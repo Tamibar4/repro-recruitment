@@ -186,12 +186,19 @@ const API = {
       return API.request('/publishing/tags');
     },
 
-    // AI: generate post-text suggestions for a NEW post.
-    // Doesn't read or modify any existing posts.
-    aiSuggest({ account_id, prompt, count }) {
+    // AI: generate post-text suggestions.
+    //   - For a brand-new post: pass { account_id, prompt? }
+    //   - For variations on an existing post: pass { account_id, seed_post_id }
+    // Either way, doesn't modify any existing posts.
+    aiSuggest({ account_id, prompt, count, seed_post_id }) {
       return API.request('/publishing/ai-suggest-posts', {
         method: 'POST',
-        body: JSON.stringify({ account_id, prompt: prompt || '', count: count || 4 })
+        body: JSON.stringify({
+          account_id,
+          prompt: prompt || '',
+          count: count || 4,
+          seed_post_id: seed_post_id || null
+        })
       });
     },
     async uploadImage(file) {
