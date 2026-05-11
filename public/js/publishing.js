@@ -28,6 +28,7 @@
   let allTags = [];
   let filters = { status: 'all', q: '' };
   let draggingAccountId = null;   // tab being dragged (account id)
+  let draggingPostId = null;      // post card being dragged to another tab
 
   // Display title for a post: ONLY the explicit title field. No fallback
   // to the body text — if the user didn't enter a title, the card shows
@@ -223,13 +224,25 @@
         draggingAccountId = null;
       });
       tab.addEventListener('dragover', (e) => {
-        if (draggingAccountId == null) return;
         const overId = parseInt(tab.dataset.accountId, 10);
-        if (overId === draggingAccountId) return;
-        e.preventDefault();
-        try { e.dataTransfer.dropEffect = 'move'; } catch {}
-        tabsEl.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
-        tab.classList.add('is-drop-target');
+        // Case A: dragging an account-tab onto another tab → reorder
+        if (draggingAccountId != null) {
+          if (overId === draggingAccountId) return;
+          e.preventDefault();
+          try { e.dataTransfer.dropEffect = 'move'; } catch {}
+          tabsEl.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
+          tab.classList.add('is-drop-target');
+          return;
+        }
+        // Case B: dragging a POST card onto a tab → move post.
+        // Don't allow dropping on the post's current account tab.
+        if (draggingPostId != null) {
+          if (overId === currentAccountId) return;
+          e.preventDefault();
+          try { e.dataTransfer.dropEffect = 'move'; } catch {}
+          tabsEl.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
+          tab.classList.add('is-drop-target');
+        }
       });
       tab.addEventListener('dragleave', () => {
         tab.classList.remove('is-drop-target');
@@ -237,8 +250,28 @@
       tab.addEventListener('drop', async (e) => {
         e.preventDefault();
         tab.classList.remove('is-drop-target');
-        if (draggingAccountId == null) return;
         const targetId = parseInt(tab.dataset.accountId, 10);
+        // Case A: post drop
+        if (draggingPostId != null) {
+          if (targetId === currentAccountId) return; // dropping on the same account is a no-op
+          const movingId = draggingPostId;
+          draggingPostId = null;
+          try {
+            const targetAccount = accounts.find(a => a.id === targetId);
+            await API.publishing.movePost(movingId, targetId);
+            // Remove the moved post from the in-memory list since it
+            // no longer belongs to currentAccountId — the user stays on
+            // the source account, the destination updates on next visit.
+            posts = posts.filter(p => p.id !== movingId);
+            render();
+            showToast(`הפוסט הועבר ל-"${targetAccount ? targetAccount.name : 'חשבון אחר'}"`);
+          } catch (err) {
+            showToast(err.message || 'ההעברה נכשלה', 'error');
+          }
+          return;
+        }
+        // Case B: account reorder (existing behavior)
+        if (draggingAccountId == null) return;
         if (targetId === draggingAccountId) return;
         await reorderAccounts(draggingAccountId, targetId);
       });
@@ -385,7 +418,8 @@
     const title = postTitle(post);
     const imgSrc = imageUrl(post.image_url);
     return `
-      <article class="pub-post" data-post-id="${post.id}">
+      <article class="pub-post" data-post-id="${post.id}" draggable="true"
+               title="גררי כדי להעביר לחשבון אחר">
         <div class="pub-post-image" data-post-id-img="${post.id}">
           ${imgSrc
             ? `<img src="${escapeHtml(imgSrc)}" alt="" loading="lazy" data-broken-watcher="1">`
@@ -444,6 +478,26 @@
           else if (action === 'add-image')  triggerImageUploadForPost(post);
           else if (action === 'replace-broken') replaceBrokenImage(post);
         });
+      });
+
+      // Drag-and-drop: let the user drag this card and drop it onto
+      // another account's tab to move the post.
+      card.addEventListener('dragstart', (e) => {
+        // If the drag started on a button inside the card (e.g. user
+        // is trying to interact with copy/edit), let those handle it.
+        if (e.target.closest('button, a, input, textarea')) {
+          e.preventDefault();
+          return;
+        }
+        draggingPostId = id;
+        card.classList.add('is-dragging');
+        try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+        try { e.dataTransfer.setData('text/plain', 'post:' + id); } catch {}
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('is-dragging');
+        document.querySelectorAll('.pub-tab').forEach(t => t.classList.remove('is-drop-target'));
+        draggingPostId = null;
       });
       // Watch the card's <img> for load failures. When the file backing
       // the URL is gone (legacy disk-stored images that didn't survive

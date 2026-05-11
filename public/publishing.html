@@ -438,6 +438,21 @@
     .pub-tab.is-dragging       { opacity: 0.4; cursor: grabbing; }
     .pub-tab.is-drop-target {
       box-shadow: 0 0 0 3px var(--color-primary);
+      transform: scale(1.06);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    /* ----- Drag-and-drop for moving posts between accounts -----
+       Each post card is draggable; the user can drop it on a
+       different account's tab to move it. */
+    .pub-post[draggable="true"] {
+      cursor: grab;
+    }
+    .pub-post[draggable="true"]:active { cursor: grabbing; }
+    .pub-post.is-dragging {
+      opacity: 0.45;
+      transform: scale(0.97);
+      cursor: grabbing;
     }
 
     /* Quick-add image button visible on cards without an image. Made
@@ -1341,7 +1356,7 @@
 
   <script src="js/i18n.js?v=2"></script>
   <script src="js/api.js?v=5"></script>
-  <script src="js/publishing.js?v=16"></script>
+  <script src="js/publishing.js?v=17"></script>
 
   <script src="js/ui-handlers.js?v=1"></script>
   <script src="js/consent-banner.js?v=2"></script>
