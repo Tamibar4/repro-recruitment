@@ -1471,17 +1471,14 @@ button:focus-visible,
 
 /* ---------- Kanban Board ---------- */
 .kanban-board {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
-  gap: 16px;
-  min-height: 70vh;
-  overflow-x: auto;
-  padding-bottom: 12px;
+  /* Vertical stack: each stage row gets full width, cards inside the
+     row flow horizontally and wrap. Better for seeing many candidates
+     at once than the old 3-up grid. */
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 24px;
 }
-
-.kanban-board::-webkit-scrollbar { height: 8px; }
-.kanban-board::-webkit-scrollbar-track { background: var(--color-bg); border-radius: 4px; }
-.kanban-board::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 4px; }
 
 .kanban-column {
   background: var(--color-white);
@@ -1489,7 +1486,7 @@ button:focus-visible,
   border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  min-height: 500px;
+  /* No more min-height: 500px — the row sizes to its content. */
   box-shadow: var(--shadow-xs);
   overflow: hidden;
   transition: all var(--transition);
@@ -1584,21 +1581,26 @@ button:focus-visible,
 }
 
 .kanban-body {
+  /* Cards flow horizontally within a row, wrap to next line when they
+     run out of space. Each card is min 280px wide. Row sizes to its
+     content; no fixed height limit so the user just scrolls the page
+     to see everyone. */
   flex: 1;
-  padding: 10px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: calc(100vh - 280px);
-  min-height: 300px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: start;
+  min-height: 120px;
 }
 .kanban-body::-webkit-scrollbar { width: 6px; }
 .kanban-body::-webkit-scrollbar-track { background: transparent; }
 .kanban-body::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
 
 .kanban-empty {
-  padding: 40px 20px;
+  /* Span the whole grid row when a column has no candidates */
+  grid-column: 1 / -1;
+  padding: 28px 20px;
   text-align: center;
   color: var(--color-text-light);
   font-size: 13px;
