@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
   <link rel="icon" type="image/png" href="assets/logo.png?v=2">
   <link rel="apple-touch-icon" href="assets/logo.png?v=2">
   <!-- pwa-meta-injected -->
@@ -157,7 +157,7 @@
       <!-- Kanban Board -->
       <div class="kanban-board">
         <!-- Stage 1 -->
-        <div class="kanban-column">
+        <div class="kanban-column" data-stage="stage1">
           <div class="kanban-header stage1">
             <div class="kanban-title">
               <span class="kanban-title-emoji">📞</span>
@@ -169,7 +169,7 @@
         </div>
 
         <!-- Stage 2 -->
-        <div class="kanban-column">
+        <div class="kanban-column" data-stage="stage2">
           <div class="kanban-header stage2">
             <div class="kanban-title">
               <span class="kanban-title-emoji">🤝</span>
@@ -181,7 +181,7 @@
         </div>
 
         <!-- No Response -->
-        <div class="kanban-column">
+        <div class="kanban-column" data-stage="no_response">
           <div class="kanban-header no_response">
             <div class="kanban-title">
               <span class="kanban-title-emoji">🔇</span>
@@ -193,7 +193,7 @@
         </div>
 
         <!-- Not Relevant -->
-        <div class="kanban-column">
+        <div class="kanban-column" data-stage="rejected">
           <div class="kanban-header" style="background: linear-gradient(135deg, #9e9e9e, #bdbdbd);">
             <div class="kanban-title">
               <span class="kanban-title-emoji">❌</span>
@@ -285,6 +285,33 @@
               <label data-i18n="source">מקור</label>
               <input type="text" id="candidate-source" placeholder="LinkedIn, Indeed, ...">
             </div>
+
+            <!-- New personal details (Tami's spec) -->
+            <div class="form-field">
+              <label>גיל</label>
+              <input type="number" id="candidate-age" min="14" max="99" step="1" dir="ltr" placeholder="לדוגמה: 28">
+            </div>
+            <div class="form-field">
+              <label>מגורים נוכחיים</label>
+              <input type="text" id="candidate-residence" placeholder="תל אביב, חיפה, ...">
+            </div>
+            <div class="form-field">
+              <label>סוג דרכון</label>
+              <select id="candidate-passport-type">
+                <option value="">– לא ידוע</option>
+                <option value="american">אמריקאי</option>
+                <option value="green_card">גרין קארד</option>
+                <option value="tourist_visa">ויזת תייר</option>
+                <option value="esta_visa">ויזת ESTA</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>כרטיס טיסה</label>
+              <label style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer">
+                <input type="checkbox" id="candidate-has-card" style="width:18px;height:18px;cursor:pointer">
+                <span style="font-size:13px;color:var(--color-text)">יש למועמד כרטיס</span>
+              </label>
+            </div>
             <div class="form-field full">
               <label data-i18n="job">משרה</label>
               <select id="candidate-job">
@@ -326,8 +353,13 @@
               <input type="month" id="candidate-available-from" placeholder="בחר חודש">
             </div>
             <div class="form-field full">
-              <label data-i18n="call_summary">סיכום שיחה</label>
-              <textarea id="candidate-summary" rows="4"></textarea>
+              <label data-i18n="call_summary">סיכום שיחה (מהצד שלי)</label>
+              <textarea id="candidate-summary" rows="4" placeholder="מה דיברנו, מה הרושם, פרטים חשובים..."></textarea>
+            </div>
+            <div class="form-field full">
+              <label>סיכום שיחה מהצד של המעסיק</label>
+              <textarea id="candidate-summary-employer" rows="4" placeholder="מה המעסיק חשב? מה הוא ראה, מה אהב או לא, בקשה חוזרת..."></textarea>
+              <div class="field-hint" style="font-size:11px;color:var(--color-text-light);margin-top:4px">רלוונטי במיוחד לשלב 2 — אצל המעסיק</div>
             </div>
 
             <!-- Payment fields (visible for accepted candidates) -->

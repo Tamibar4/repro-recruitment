@@ -1740,6 +1740,14 @@ app.post('/api/candidates', (req, res) => {
       payment_amount: payment_amount != null ? Number(payment_amount) : null,
       payment_plan: payment_plan || null,
       available_from: req.body.available_from || null,
+      // New fields for the detailed candidate table (Tami's spec)
+      age: req.body.age != null && req.body.age !== '' ? parseInt(req.body.age, 10) : null,
+      current_residence: req.body.current_residence || null,
+      passport_type: req.body.passport_type || null, // american | green_card | tourist_visa | esta_visa | null
+      has_card: req.body.has_card === true || req.body.has_card === 'true',
+      // Stage 2 second-summary field: the employer's notes from his
+      // own conversation with the candidate
+      call_summary_employer: req.body.call_summary_employer || null,
       created_by: req.user ? req.user.username : null,
       created_at: now(),
       updated_at: now()
@@ -1825,6 +1833,23 @@ app.put('/api/candidates/:id', (req, res) => {
       payment_amount: payment_amount !== undefined ? (payment_amount != null ? Number(payment_amount) : null) : (existing.payment_amount || null),
       payment_plan: payment_plan !== undefined ? (payment_plan || null) : (existing.payment_plan || null),
       available_from: req.body.available_from !== undefined ? (req.body.available_from || null) : (existing.available_from || null),
+      // New detailed candidate fields — preserve existing values when
+      // the client doesn't send them (partial updates from old forms).
+      age: req.body.age !== undefined
+        ? (req.body.age != null && req.body.age !== '' ? parseInt(req.body.age, 10) : null)
+        : (existing.age != null ? existing.age : null),
+      current_residence: req.body.current_residence !== undefined
+        ? (req.body.current_residence || null)
+        : (existing.current_residence || null),
+      passport_type: req.body.passport_type !== undefined
+        ? (req.body.passport_type || null)
+        : (existing.passport_type || null),
+      has_card: req.body.has_card !== undefined
+        ? (req.body.has_card === true || req.body.has_card === 'true')
+        : !!existing.has_card,
+      call_summary_employer: req.body.call_summary_employer !== undefined
+        ? (req.body.call_summary_employer || null)
+        : (existing.call_summary_employer || null),
       updated_at: now()
     };
 

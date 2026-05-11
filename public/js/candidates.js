@@ -81,6 +81,9 @@ function renderKanban() {
   renderColumn('no_response', columns.no_response);
   renderColumn('rejected', columns.rejected);
   renderAcceptedTable(columns.accepted);
+  // Wire up drag-drop targets on each kanban-column so the user can
+  // drag a row into another stage's container.
+  wireStageDropTargets();
 
   // Highlight the column that matches URL stage filter
   if (filters.stage && filters.stage !== 'all') {
@@ -99,8 +102,30 @@ function renderKanban() {
   }
 }
 
+// Map of passport_type values → Hebrew labels for display
+const PASSPORT_LABELS = {
+  american: '🇺🇸 אמריקאי',
+  green_card: '💳 גרין קארד',
+  tourist_visa: '🛂 ויזת תייר',
+  esta_visa: '✈️ ESTA',
+  '': '–',
+  null: '–'
+};
+function passportLabel(p) { return PASSPORT_LABELS[p || ''] || '–'; }
+
+// Render a stage's container as a TABLE (instead of the old card view).
+// Each stage gets its own column set:
+//   - stage1: full detail (date, phone+WA, name, age, residence, job,
+//             passport, availability, has-card, summary)
+//   - stage2: focused on the two summaries (recruiter + employer)
+//   - no_response / rejected / delayed: compact view (date, name,
+//             phone+WA, job, summary)
+//
+// Every row is draggable so the user can drop it on a different
+// stage's container to move it.
 function renderColumn(stage, items) {
   const container = document.getElementById('column-' + stage);
+  if (!container) return;
 
   if (items.length === 0) {
     const emptyIcons = { stage1: '👋', stage2: '📋', no_response: '🔇', accepted: '🎉', rejected: '📭', delayed: '⏳' };
@@ -121,20 +146,45 @@ function renderColumn(stage, items) {
     return;
   }
 
-  container.innerHTML = items.map(c => renderCandidateCard(c, stage)).join('');
+  container.innerHTML = `
+    <div class="cand-table-wrap">
+      <table class="cand-table">
+        ${renderTableHeader(stage)}
+        <tbody>
+          ${items.map(c => renderCandidateRow(c, stage)).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 
-  // Card click -> open modal
-  container.querySelectorAll('.candidate-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.move-btn') || e.target.closest('.followup-done-btn') || e.target.closest('.whatsapp-btn')) return;
-      const id = card.dataset.id;
+  // Row click → open modal (but not if drag, button, or link was clicked)
+  container.querySelectorAll('tr.cand-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, input, textarea, .cand-row-actions')) return;
+      const id = row.dataset.id;
       const candidate = allCandidates.find(c => c.id == id);
       if (candidate) openCandidateModal(candidate);
     });
+    // Drag-and-drop: row → another stage's container
+    row.addEventListener('dragstart', (e) => {
+      if (e.target.closest('button, a, input, textarea')) {
+        e.preventDefault();
+        return;
+      }
+      draggingCandidateId = parseInt(row.dataset.id, 10);
+      row.classList.add('is-dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+      try { e.dataTransfer.setData('text/plain', 'candidate:' + row.dataset.id); } catch {}
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('is-dragging');
+      document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('is-drop-target'));
+      draggingCandidateId = null;
+    });
   });
 
-  // Move buttons
-  container.querySelectorAll('.move-btn').forEach(btn => {
+  // Move buttons (kept as a fallback for non-drag use)
+  container.querySelectorAll('.cand-move-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
@@ -148,16 +198,182 @@ function renderColumn(stage, items) {
       }
     });
   });
+}
 
-  // Follow-up "Mark as done" buttons
-  container.querySelectorAll('.followup-done-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = parseInt(btn.dataset.followupId);
-      const candidate = allCandidates.find(c => c.id === id);
-      if (candidate) openFollowUpCompleteModal(candidate);
+// Mutable state for drag-and-drop between stages
+let draggingCandidateId = null;
+
+// Wire the kanban-column elements as drop targets — called once per
+// renderKanban() so handlers live as long as the DOM nodes do.
+function wireStageDropTargets() {
+  document.querySelectorAll('.kanban-column').forEach(col => {
+    // Each column corresponds to a stage via its data-stage attribute,
+    // which we'll set on the column root in renderKanban.
+    col.addEventListener('dragover', (e) => {
+      if (draggingCandidateId == null) return;
+      const targetStage = col.dataset.stage;
+      if (!targetStage) return;
+      const cand = allCandidates.find(c => c.id === draggingCandidateId);
+      if (cand && cand.stage === targetStage) return; // same stage = no-op
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'move'; } catch {}
+      document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('is-drop-target'));
+      col.classList.add('is-drop-target');
+    });
+    col.addEventListener('dragleave', (e) => {
+      // Only clear if we actually left the column (not just moved over a child)
+      if (!col.contains(e.relatedTarget)) col.classList.remove('is-drop-target');
+    });
+    col.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      col.classList.remove('is-drop-target');
+      if (draggingCandidateId == null) return;
+      const targetStage = col.dataset.stage;
+      const id = draggingCandidateId;
+      draggingCandidateId = null;
+      const cand = allCandidates.find(c => c.id === id);
+      if (!cand || !targetStage || cand.stage === targetStage) return;
+      try {
+        await API.candidates.updateStage(id, targetStage);
+        showToast(`הליד הועבר ל-"${stageLabel(targetStage)}"`);
+        loadCandidates();
+      } catch (err) {
+        showToast(err.message || 'ההעברה נכשלה', 'error');
+      }
     });
   });
+}
+
+function stageLabel(stage) {
+  return ({
+    stage1: 'שלב ראשון',
+    stage2: 'שלב שני',
+    no_response: 'אין מענה',
+    accepted: 'התקבלו',
+    rejected: 'לא רלוונטים'
+  })[stage] || stage;
+}
+
+// Returns the <thead> for a given stage's table
+function renderTableHeader(stage) {
+  if (stage === 'stage1') {
+    return `
+      <thead>
+        <tr>
+          <th>תאריך הוספה</th>
+          <th>טלפון</th>
+          <th>שם</th>
+          <th>גיל</th>
+          <th>מגורים</th>
+          <th>משרה</th>
+          <th>סוג דרכון</th>
+          <th>זמינות</th>
+          <th>כרטיס</th>
+          <th>סיכום שיחה</th>
+          <th class="cand-table-actions-col"></th>
+        </tr>
+      </thead>`;
+  }
+  if (stage === 'stage2') {
+    return `
+      <thead>
+        <tr>
+          <th>תאריך</th>
+          <th>טלפון</th>
+          <th>שם</th>
+          <th>משרה</th>
+          <th>סיכום שיחה (מהצד שלי)</th>
+          <th>סיכום שיחה (מהצד של המעסיק)</th>
+          <th class="cand-table-actions-col"></th>
+        </tr>
+      </thead>`;
+  }
+  // no_response / rejected / delayed
+  return `
+    <thead>
+      <tr>
+        <th>תאריך</th>
+        <th>טלפון</th>
+        <th>שם</th>
+        <th>משרה</th>
+        <th>סיכום שיחה</th>
+        <th class="cand-table-actions-col"></th>
+      </tr>
+    </thead>`;
+}
+
+// Build the WhatsApp icon link for a phone (returns '' if no valid number)
+function waCell(phone) {
+  if (!phone) return '–';
+  const link = buildWhatsAppLink(phone);
+  const phoneDisplay = `<span class="cand-phone-num" dir="ltr">${escapeHtml(phone)}</span>`;
+  if (!link) return phoneDisplay;
+  return `
+    <a href="${link}" target="_blank" rel="noopener" class="cand-wa-icon" title="WhatsApp" aria-label="WhatsApp" onclick="event.stopPropagation()">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    </a>
+    ${phoneDisplay}`;
+}
+
+function summaryCell(text, max = 80) {
+  if (!text) return '<span class="cand-empty-cell">–</span>';
+  const t = String(text).trim();
+  if (t.length <= max) return escapeHtml(t);
+  return `<span title="${escapeHtml(t)}">${escapeHtml(t.slice(0, max))}…</span>`;
+}
+
+function renderCandidateRow(c, stage) {
+  const created = c.created_at ? formatDateShort(c.created_at) : '–';
+  const jobLabel = c.job_title
+    ? escapeHtml(c.job_title) + (c.job_company ? ' · ' + escapeHtml(c.job_company) : '')
+    : '<span class="cand-empty-cell">–</span>';
+
+  if (stage === 'stage1') {
+    return `
+      <tr class="cand-row" data-id="${c.id}" draggable="true" title="גררי לשלב אחר">
+        <td>${escapeHtml(created)}</td>
+        <td class="cand-phone-cell">${waCell(c.phone)}</td>
+        <td><strong>${escapeHtml(c.name || '')}</strong></td>
+        <td>${c.age != null ? c.age : '<span class="cand-empty-cell">–</span>'}</td>
+        <td>${c.current_residence ? escapeHtml(c.current_residence) : '<span class="cand-empty-cell">–</span>'}</td>
+        <td>${jobLabel}</td>
+        <td>${escapeHtml(passportLabel(c.passport_type))}</td>
+        <td>${c.available_from ? escapeHtml(c.available_from) : '<span class="cand-empty-cell">–</span>'}</td>
+        <td>${c.has_card ? '✅' : '<span class="cand-empty-cell">–</span>'}</td>
+        <td>${summaryCell(c.call_summary)}</td>
+        <td class="cand-row-actions">
+          <button class="cand-move-btn" data-id="${c.id}" data-stage="stage2" title="העברה לשלב 2">←</button>
+        </td>
+      </tr>`;
+  }
+  if (stage === 'stage2') {
+    return `
+      <tr class="cand-row" data-id="${c.id}" draggable="true" title="גררי לשלב אחר">
+        <td>${escapeHtml(created)}</td>
+        <td class="cand-phone-cell">${waCell(c.phone)}</td>
+        <td><strong>${escapeHtml(c.name || '')}</strong></td>
+        <td>${jobLabel}</td>
+        <td>${summaryCell(c.call_summary, 120)}</td>
+        <td>${summaryCell(c.call_summary_employer, 120)}</td>
+        <td class="cand-row-actions">
+          <button class="cand-move-btn" data-id="${c.id}" data-stage="stage1" title="חזרה לשלב 1">→</button>
+        </td>
+      </tr>`;
+  }
+  // no_response / rejected / delayed (simpler layout)
+  return `
+    <tr class="cand-row" data-id="${c.id}" draggable="true" title="גררי לשלב אחר">
+      <td>${escapeHtml(created)}</td>
+      <td class="cand-phone-cell">${waCell(c.phone)}</td>
+      <td><strong>${escapeHtml(c.name || '')}</strong></td>
+      <td>${jobLabel}</td>
+      <td>${summaryCell(c.call_summary)}</td>
+      <td class="cand-row-actions">
+        <button class="cand-move-btn" data-id="${c.id}" data-stage="stage1" title="החזרה לשלב 1">↺</button>
+      </td>
+    </tr>`;
 }
 
 function getInitials(name) {
@@ -362,6 +578,11 @@ function openCandidateModal(candidate = null) {
       document.getElementById('followup-date-row').style.display = 'none';
     }
     document.getElementById('candidate-summary').value = candidate.call_summary || '';
+    document.getElementById('candidate-summary-employer').value = candidate.call_summary_employer || '';
+    document.getElementById('candidate-age').value = candidate.age != null ? candidate.age : '';
+    document.getElementById('candidate-residence').value = candidate.current_residence || '';
+    document.getElementById('candidate-passport-type').value = candidate.passport_type || '';
+    document.getElementById('candidate-has-card').checked = !!candidate.has_card;
     document.getElementById('candidate-notes').value = candidate.notes || '';
     document.getElementById('candidate-start-date').value = candidate.start_date || '';
     document.getElementById('candidate-payment-date').value = candidate.payment_date || '';
@@ -431,6 +652,11 @@ async function saveCandidate() {
     call_date: document.getElementById('candidate-call-date').value || null,
     follow_up_at: document.getElementById('candidate-follow-up').value || null,
     call_summary: document.getElementById('candidate-summary').value.trim(),
+    call_summary_employer: document.getElementById('candidate-summary-employer').value.trim() || null,
+    age: document.getElementById('candidate-age').value || null,
+    current_residence: document.getElementById('candidate-residence').value.trim() || null,
+    passport_type: document.getElementById('candidate-passport-type').value || null,
+    has_card: document.getElementById('candidate-has-card').checked,
     notes: document.getElementById('candidate-notes').value.trim(),
     start_date: document.getElementById('candidate-start-date').value || null,
     payment_date: document.getElementById('candidate-payment-date').value || null,

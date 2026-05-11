@@ -1610,6 +1610,99 @@ button:focus-visible,
   gap: 12px;
 }
 
+/* ===== Candidates table view (replaces card layout per Tami's spec) ===== */
+.cand-table-wrap {
+  grid-column: 1 / -1;
+  overflow-x: auto;
+}
+.cand-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cand-table thead th {
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  text-align: start;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.cand-table tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  color: var(--color-text);
+}
+.cand-table tbody tr:last-child td { border-bottom: none; }
+
+.cand-row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.cand-row:hover { background: var(--color-accent-soft, rgba(94,92,230,0.05)); }
+.cand-row[draggable="true"] { cursor: grab; }
+.cand-row.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.cand-phone-cell {
+  white-space: nowrap;
+}
+.cand-phone-num {
+  display: inline-block;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  font-feature-settings: 'tnum';
+}
+.cand-wa-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #25D366; color: white;
+  margin-left: 6px;
+  transition: transform 0.12s;
+  text-decoration: none;
+}
+.cand-wa-icon:hover { transform: scale(1.1); }
+
+.cand-empty-cell {
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+.cand-table-actions-col { width: 36px; }
+.cand-row-actions { text-align: center; }
+.cand-move-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-white); color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+.cand-move-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Drop-target highlight when a row is being dragged over a stage */
+.kanban-column.is-drop-target {
+  box-shadow: 0 0 0 3px var(--color-primary);
+  transform: scale(1.005);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.kanban-column.is-drop-target .kanban-body {
+  background: var(--color-accent-soft, rgba(94,92,230,0.04));
+}
+
 .kanban-empty-icon {
   width: 56px;
   height: 56px;
