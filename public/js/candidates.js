@@ -203,6 +203,229 @@ function renderColumn(stage, items) {
 // Mutable state for drag-and-drop between stages
 let draggingCandidateId = null;
 
+// Holds the parsed rows after the user picks a file, ready for the
+// user to confirm and POST to /api/candidates/bulk.
+let pendingImportRows = null;
+
+// ===== Excel/CSV import =====
+// SheetJS is loaded lazily from cdnjs on first use. Returns the
+// global XLSX object once ready.
+async function loadSheetJs() {
+  if (window.XLSX) return window.XLSX;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX not loaded'));
+    s.onerror = () => reject(new Error('כשל בטעינת ספריית האקסל. בדקי חיבור לאינטרנט.'));
+    document.head.appendChild(s);
+  });
+}
+
+// Map header text → candidate field. Loose matching, case-insensitive,
+// matches Hebrew and English variations.
+function detectColumn(header) {
+  const h = String(header || '').toLowerCase().trim();
+  if (!h) return null;
+  const isAny = (...needles) => needles.some(n => h.includes(n));
+  if (isAny('שם') && !isAny('משפחה')) return 'name';
+  if (h === 'name' || h === 'full name') return 'name';
+  if (isAny('טלפון', 'נייד', 'phone', 'mobile')) return 'phone';
+  if (isAny('אימייל', 'מייל', 'email')) return 'email';
+  if (isAny('גיל', 'age')) return 'age';
+  if (isAny('מגורים', 'עיר', 'כתובת', 'residence', 'city', 'address')) return 'current_residence';
+  if (isAny('משרה', 'תפקיד', 'job', 'position')) return 'job_title';
+  if (isAny('סיכום', 'הערות', 'תיאור', 'summary', 'notes', 'description')) return 'call_summary';
+  if (isAny('מקור', 'source', 'origin')) return 'source';
+  if (isAny('דרכון', 'passport', 'ויזה', 'visa')) return 'passport_type';
+  if (isAny('זמינות', 'available')) return 'available_from';
+  return null;
+}
+
+// Convert a passport raw value (free text from Excel) to one of our
+// enum slugs, or null if unrecognized.
+function normalizePassport(raw) {
+  const s = String(raw || '').toLowerCase().trim();
+  if (!s || s === '-' || s === '–') return null;
+  if (s.includes('אמריק') || s.includes('us') || s.includes('america')) return 'american';
+  if (s.includes('גרין') || s.includes('green')) return 'green_card';
+  if (s.includes('esta') || s.includes('איסת')) return 'esta_visa';
+  if (s.includes('תייר') || s.includes('tourist')) return 'tourist_visa';
+  return null;
+}
+
+async function openImportModal() {
+  // Reset modal state
+  document.getElementById('import-file-input').value = '';
+  document.getElementById('import-step-pick').style.display = '';
+  document.getElementById('import-step-preview').style.display = 'none';
+  document.getElementById('import-step-result').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-back-btn').style.display = 'none';
+  pendingImportRows = null;
+  openModal('import-modal');
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  try {
+    const XLSX = await loadSheetJs();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheetName = wb.SheetNames[0];
+    if (!sheetName) throw new Error('הקובץ ריק');
+    const sheet = wb.Sheets[sheetName];
+    // Parse with header:1 so we get a 2D array
+    const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (aoa.length < 2) throw new Error('הקובץ חייב להכיל שורת כותרות + לפחות שורת נתונים אחת');
+
+    const headers = aoa[0].map(h => String(h || '').trim());
+    const dataRows = aoa.slice(1).filter(r => r.some(c => String(c || '').trim() !== ''));
+
+    // Map columns: header index → candidate field
+    const colMap = headers.map(detectColumn);
+
+    // Build candidate-shape rows
+    const rows = dataRows.map(r => {
+      const obj = {};
+      colMap.forEach((field, i) => {
+        if (!field) return;
+        const val = String(r[i] || '').trim();
+        if (!val) return;
+        if (field === 'passport_type') {
+          obj.passport_type = normalizePassport(val);
+        } else if (field === 'age') {
+          const n = parseInt(val, 10);
+          obj.age = isNaN(n) ? null : n;
+        } else {
+          obj[field] = val;
+        }
+      });
+      return obj;
+    });
+
+    pendingImportRows = rows;
+    renderImportPreview(headers, colMap, dataRows, rows);
+  } catch (err) {
+    showToast(err.message || 'שגיאה בקריאת הקובץ', 'error');
+  }
+}
+
+function renderImportPreview(headers, colMap, rawRows, parsed) {
+  document.getElementById('import-step-pick').style.display = 'none';
+  document.getElementById('import-step-preview').style.display = '';
+  document.getElementById('import-back-btn').style.display = '';
+  document.getElementById('import-confirm-btn').style.display = '';
+
+  const total = parsed.length;
+  const withName = parsed.filter(r => r.name).length;
+  const mapped = colMap.filter(Boolean).length;
+  document.getElementById('import-preview-summary').innerHTML = `
+    <div style="background:var(--color-bg);padding:12px;border-radius:8px">
+      📊 <strong>${total}</strong> שורות מהקובץ ·
+      <strong>${withName}</strong> עם שם · זוהו אוטומטית <strong>${mapped}</strong> מתוך ${headers.length} עמודות.
+      ${withName < total ? `<div style="color:var(--color-red);margin-top:6px;font-size:12px">⚠️ ${total - withName} שורות בלי שם — ידולגו בייבוא.</div>` : ''}
+    </div>
+  `;
+
+  // Render the table — show first 10 rows so the user can sanity-check
+  const fieldLabels = {
+    name: 'שם', phone: 'טלפון', email: 'אימייל', age: 'גיל',
+    current_residence: 'מגורים', job_title: 'משרה',
+    call_summary: 'סיכום', source: 'מקור',
+    passport_type: 'דרכון', available_from: 'זמינות'
+  };
+  const showRows = parsed.slice(0, 10);
+  const tableHtml = `
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+      <thead style="background:var(--color-accent-soft);position:sticky;top:0">
+        <tr>
+          ${headers.map((h, i) => {
+            const mapped = colMap[i];
+            return `<th style="padding:8px;text-align:start;border-bottom:1px solid var(--color-border)">
+              ${escapeHtml(h || '(ללא כותרת)')}
+              ${mapped
+                ? `<div style="font-size:10px;color:var(--color-primary);margin-top:2px">→ ${fieldLabels[mapped] || mapped}</div>`
+                : `<div style="font-size:10px;color:var(--color-text-light);margin-top:2px">לא ממופה</div>`}
+            </th>`;
+          }).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rawRows.slice(0, 10).map(r => `
+          <tr>
+            ${headers.map((_, i) => `<td style="padding:8px;border-bottom:1px solid var(--color-border)">${escapeHtml(String(r[i] || ''))}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ${parsed.length > 10 ? `<div style="padding:10px;text-align:center;font-size:12px;color:var(--color-text-light)">... ועוד ${parsed.length - 10} שורות</div>` : ''}
+  `;
+  document.getElementById('import-preview-table').innerHTML = tableHtml;
+}
+
+async function confirmImport() {
+  if (!pendingImportRows || pendingImportRows.length === 0) {
+    showToast('אין שורות לייבא', 'error');
+    return;
+  }
+  const stage = document.getElementById('import-default-stage').value;
+  const btn = document.getElementById('import-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ מייבא...';
+  try {
+    const result = await API.request('/candidates/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ rows: pendingImportRows, default_stage: stage })
+    });
+    renderImportResult(result);
+    loadCandidates(); // Refresh the page so new candidates appear
+  } catch (err) {
+    showToast(err.message || 'הייבוא נכשל', 'error');
+    btn.disabled = false;
+    btn.textContent = '✓ ייבא את הלידים';
+  }
+}
+
+function renderImportResult(result) {
+  document.getElementById('import-step-preview').style.display = 'none';
+  document.getElementById('import-step-result').style.display = '';
+  document.getElementById('import-back-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+
+  const dupHtml = result.duplicates && result.duplicates.length
+    ? `<div style="margin-top:14px;padding:12px;background:rgba(253,171,61,0.1);border-radius:8px;font-size:13px">
+        <strong>⚠️ ${result.duplicates.length} כפולים דולגו</strong> (טלפון כבר קיים):
+        <ul style="margin:6px 0 0;padding-right:18px;font-size:12px">
+          ${result.duplicates.slice(0, 10).map(d => `<li>שורה ${d.row}: ${escapeHtml(d.name)} (${escapeHtml(d.phone)}) — כבר קיים כ-"${escapeHtml(d.existing_name)}"</li>`).join('')}
+          ${result.duplicates.length > 10 ? `<li>...ועוד ${result.duplicates.length - 10}</li>` : ''}
+        </ul>
+      </div>`
+    : '';
+
+  const errHtml = result.errors && result.errors.length
+    ? `<div style="margin-top:14px;padding:12px;background:rgba(226,68,92,0.08);border-radius:8px;font-size:13px;color:var(--color-red)">
+        <strong>❌ ${result.errors.length} שגיאות</strong>:
+        <ul style="margin:6px 0 0;padding-right:18px;font-size:12px">
+          ${result.errors.slice(0, 10).map(e => `<li>שורה ${e.row}: ${escapeHtml(e.error)}</li>`).join('')}
+        </ul>
+      </div>`
+    : '';
+
+  document.getElementById('import-result-content').innerHTML = `
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:48px;margin-bottom:10px">✅</div>
+      <div style="font-size:18px;font-weight:800;color:var(--color-text);margin-bottom:6px">
+        ${result.created} לידים נוספו בהצלחה!
+      </div>
+      <div style="font-size:13px;color:var(--color-text-secondary)">
+        מתוך ${result.total} שורות בקובץ
+      </div>
+    </div>
+    ${dupHtml}
+    ${errHtml}
+  `;
+}
+
 // Wire the kanban-column elements as drop targets — called once per
 // renderKanban() so handlers live as long as the DOM nodes do.
 function wireStageDropTargets() {
@@ -317,6 +540,18 @@ function waCell(phone) {
     ${phoneDisplay}`;
 }
 
+// Card cell for stage1 table: shows ✅ + date + destination if has_card,
+// otherwise a dash. Uses a tooltip for the full date/destination when
+// they're truncated in the cell.
+function cardCell(c) {
+  if (!c.has_card) return '<span class="cand-empty-cell">–</span>';
+  const parts = [];
+  if (c.card_date) parts.push(formatDateShort(c.card_date));
+  if (c.card_destination) parts.push(escapeHtml(c.card_destination));
+  if (parts.length === 0) return '✅';
+  return `<span title="${escapeHtml(parts.join(' · '))}">✅ ${parts.join(' · ')}</span>`;
+}
+
 function summaryCell(text, max = 80) {
   if (!text) return '<span class="cand-empty-cell">–</span>';
   const t = String(text).trim();
@@ -341,7 +576,7 @@ function renderCandidateRow(c, stage) {
         <td>${jobLabel}</td>
         <td>${escapeHtml(passportLabel(c.passport_type))}</td>
         <td>${c.available_from ? escapeHtml(c.available_from) : '<span class="cand-empty-cell">–</span>'}</td>
-        <td>${c.has_card ? '✅' : '<span class="cand-empty-cell">–</span>'}</td>
+        <td>${cardCell(c)}</td>
         <td>${summaryCell(c.call_summary)}</td>
         <td class="cand-row-actions">
           <button class="cand-move-btn" data-id="${c.id}" data-stage="stage2" title="העברה לשלב 2">←</button>
@@ -583,6 +818,9 @@ function openCandidateModal(candidate = null) {
     document.getElementById('candidate-residence').value = candidate.current_residence || '';
     document.getElementById('candidate-passport-type').value = candidate.passport_type || '';
     document.getElementById('candidate-has-card').checked = !!candidate.has_card;
+    document.getElementById('candidate-card-date').value = candidate.card_date || '';
+    document.getElementById('candidate-card-destination').value = candidate.card_destination || '';
+    toggleCardDetails();
     document.getElementById('candidate-notes').value = candidate.notes || '';
     document.getElementById('candidate-start-date').value = candidate.start_date || '';
     document.getElementById('candidate-payment-date').value = candidate.payment_date || '';
@@ -620,6 +858,10 @@ function openCandidateModal(candidate = null) {
     document.getElementById('candidate-available-from').value = '';
     document.querySelectorAll('#payment-plan-options .plan-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('payment-schedule-section').style.display = 'none';
+    // Reset the card-details row to closed state for a fresh candidate
+    document.getElementById('candidate-card-date').value = '';
+    document.getElementById('candidate-card-destination').value = '';
+    toggleCardDetails();
     deleteBtn.style.display = 'none';
   }
 
@@ -630,6 +872,14 @@ function openCandidateModal(candidate = null) {
   togglePaymentFields();
 
   openModal('candidate-modal');
+}
+
+// Show or hide the card-detail row (date + destination) based on
+// whether the "יש למועמד כרטיס" checkbox is ticked.
+function toggleCardDetails() {
+  const checked = document.getElementById('candidate-has-card').checked;
+  const row = document.getElementById('card-details-row');
+  if (row) row.style.display = checked ? 'block' : 'none';
 }
 
 function togglePaymentFields() {
@@ -657,6 +907,12 @@ async function saveCandidate() {
     current_residence: document.getElementById('candidate-residence').value.trim() || null,
     passport_type: document.getElementById('candidate-passport-type').value || null,
     has_card: document.getElementById('candidate-has-card').checked,
+    card_date: document.getElementById('candidate-has-card').checked
+      ? (document.getElementById('candidate-card-date').value || null)
+      : null,
+    card_destination: document.getElementById('candidate-has-card').checked
+      ? (document.getElementById('candidate-card-destination').value.trim() || null)
+      : null,
     notes: document.getElementById('candidate-notes').value.trim(),
     start_date: document.getElementById('candidate-start-date').value || null,
     payment_date: document.getElementById('candidate-payment-date').value || null,
@@ -799,6 +1055,23 @@ document.getElementById('candidate-follow-up').addEventListener('change', () => 
 // WhatsApp button in modal - update href as user types phone number
 // Show/hide payment fields when stage changes
 document.getElementById('candidate-stage').addEventListener('change', togglePaymentFields);
+document.getElementById('candidate-has-card').addEventListener('change', toggleCardDetails);
+
+// ===== Import-from-Excel wiring =====
+document.getElementById('btn-import-excel').addEventListener('click', openImportModal);
+document.getElementById('import-file-input').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (file) handleImportFile(file);
+});
+document.getElementById('import-back-btn').addEventListener('click', () => {
+  document.getElementById('import-step-preview').style.display = 'none';
+  document.getElementById('import-step-pick').style.display = '';
+  document.getElementById('import-back-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-file-input').value = '';
+  pendingImportRows = null;
+});
+document.getElementById('import-confirm-btn').addEventListener('click', confirmImport);
 
 // Payment plan buttons
 document.querySelectorAll('#payment-plan-options .plan-btn').forEach(btn => {

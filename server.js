@@ -1745,6 +1745,11 @@ app.post('/api/candidates', (req, res) => {
       current_residence: req.body.current_residence || null,
       passport_type: req.body.passport_type || null, // american | green_card | tourist_visa | esta_visa | null
       has_card: req.body.has_card === true || req.body.has_card === 'true',
+      // Card detail fields — only meaningful when has_card === true.
+      // card_date = when the flight/card is scheduled for.
+      // card_destination = where the card is for (city/country/etc).
+      card_date: req.body.card_date || null,
+      card_destination: req.body.card_destination || null,
       // Stage 2 second-summary field: the employer's notes from his
       // own conversation with the candidate
       call_summary_employer: req.body.call_summary_employer || null,
@@ -1847,6 +1852,12 @@ app.put('/api/candidates/:id', (req, res) => {
       has_card: req.body.has_card !== undefined
         ? (req.body.has_card === true || req.body.has_card === 'true')
         : !!existing.has_card,
+      card_date: req.body.card_date !== undefined
+        ? (req.body.card_date || null)
+        : (existing.card_date || null),
+      card_destination: req.body.card_destination !== undefined
+        ? (req.body.card_destination || null)
+        : (existing.card_destination || null),
       call_summary_employer: req.body.call_summary_employer !== undefined
         ? (req.body.call_summary_employer || null)
         : (existing.call_summary_employer || null),
@@ -1856,6 +1867,134 @@ app.put('/api/candidates/:id', (req, res) => {
     saveData();
     res.json(enrichCandidate(data.candidates[idx]));
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/candidates/bulk — bulk-import candidates from a parsed
+// spreadsheet (Excel/CSV). The client parses the file with SheetJS,
+// maps columns to candidate fields, and sends the array as JSON.
+//
+// Body: { rows: [{ name, phone, age, ... }, ...], default_stage?: 'stage1' }
+// Returns: { created: number, duplicates: array, errors: array }
+//
+// Duplicate detection is the same phone-prefix logic the single-create
+// endpoint uses. Duplicates are skipped (NOT errored) so a mostly-good
+// file can still import without a total failure.
+app.post('/api/candidates/bulk', (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+    if (!rows || rows.length === 0) {
+      return res.status(400).json({ error: 'No rows to import' });
+    }
+    if (rows.length > 500) {
+      return res.status(400).json({ error: 'מקסימום 500 לידים לייבוא בפעם אחת' });
+    }
+    const defaultStage = req.body?.default_stage || 'stage1';
+
+    const created = [];
+    const duplicates = [];
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] || {};
+      const rowNum = i + 1;
+      const name = String(row.name || '').trim();
+      if (!name) {
+        errors.push({ row: rowNum, error: 'חסר שם' });
+        continue;
+      }
+
+      // Phone duplicate check (same logic as single POST)
+      const phone = (row.phone || '').toString().trim();
+      if (phone) {
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone) {
+          const dup = data.candidates.find(c => {
+            const cp = (c.phone || '').replace(/\D/g, '');
+            return cp && (cp.includes(cleanPhone) || cleanPhone.includes(cp));
+          });
+          if (dup) {
+            duplicates.push({
+              row: rowNum,
+              name,
+              phone,
+              existing_id: dup.id,
+              existing_name: dup.name
+            });
+            continue;
+          }
+        }
+      }
+
+      // Find job_id by job_title if provided (loose match)
+      let job_id = null;
+      if (row.job_title) {
+        const wanted = String(row.job_title).trim().toLowerCase();
+        const job = (data.jobs || []).find(j =>
+          (j.title || '').toLowerCase() === wanted ||
+          (j.title || '').toLowerCase().includes(wanted) ||
+          wanted.includes((j.title || '').toLowerCase())
+        );
+        if (job) job_id = job.id;
+      }
+
+      const candidate = {
+        id: nextId('candidates'),
+        name,
+        phone: phone || null,
+        email: row.email ? String(row.email).trim() : null,
+        job_id,
+        stage: row.stage || defaultStage,
+        call_date: row.call_date || null,
+        call_summary: row.call_summary ? String(row.call_summary).trim() : null,
+        notes: row.notes ? String(row.notes).trim() : null,
+        source: row.source ? String(row.source).trim() : 'אקסל',
+        follow_up_at: null,
+        follow_up_done: false,
+        start_date: null,
+        payment_date: null,
+        payment_amount: null,
+        payment_plan: null,
+        available_from: row.available_from || null,
+        age: row.age != null && row.age !== '' ? parseInt(row.age, 10) || null : null,
+        current_residence: row.current_residence || null,
+        passport_type: row.passport_type || null,
+        has_card: row.has_card === true || row.has_card === 'true',
+        card_date: row.card_date || null,
+        card_destination: row.card_destination || null,
+        call_summary_employer: row.call_summary_employer || null,
+        created_by: req.user ? req.user.username : null,
+        created_at: now(),
+        updated_at: now()
+      };
+      data.candidates.push(candidate);
+      data.stage_history.push({
+        id: nextId('stage_history'),
+        candidate_id: candidate.id,
+        from_stage: null,
+        to_stage: candidate.stage,
+        changed_at: now()
+      });
+      created.push(candidate.id);
+    }
+
+    saveData();
+    auditLog('candidates_bulk_import', {
+      total: rows.length,
+      created: created.length,
+      duplicates: duplicates.length,
+      errors: errors.length,
+      by: req.user ? req.user.username : null
+    });
+    res.json({
+      created: created.length,
+      duplicates,
+      errors,
+      total: rows.length
+    });
+  } catch (err) {
+    console.error('Bulk import error:', err);
     res.status(500).json({ error: err.message });
   }
 });

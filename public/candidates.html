@@ -110,10 +110,20 @@
           <h1 class="page-title" data-i18n="candidates_title">מועמדים</h1>
           <div class="page-subtitle" data-i18n="candidates_subtitle">ניהול פייפליין המועמדים</div>
         </div>
-        <button class="btn btn-primary" id="btn-new-candidate">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          <span data-i18n="new_candidate">מועמד חדש</span>
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="btn-import-excel" title="ייבוא לידים מקובץ אקסל / CSV">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span>ייבוא מאקסל</span>
+          </button>
+          <button class="btn btn-primary" id="btn-new-candidate">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="new_candidate">מועמד חדש</span>
+          </button>
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -250,6 +260,68 @@
   </div>
 
   <!-- Candidate Modal -->
+  <!-- Excel/CSV import modal -->
+  <div class="modal-overlay" id="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="import-modal-title">📥 ייבוא לידים מאקסל / CSV</h2>
+        <button class="modal-close" onclick="closeModal('import-modal')" aria-label="סגור">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: file picker + instructions -->
+        <div id="import-step-pick">
+          <div style="background:var(--color-bg);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.7">
+            <div style="font-weight:700;margin-bottom:6px">📌 הוראות:</div>
+            <ul style="margin:0;padding-right:18px;color:var(--color-text-secondary)">
+              <li>שמרי את האקסל עם <strong>שורת כותרות בעברית</strong> (למשל: שם, טלפון, גיל, מגורים, משרה, סיכום).</li>
+              <li>המערכת תזהה עמודות אוטומטית לפי שמות שמכילים: <em>שם, טלפון, אימייל, גיל, מגורים, משרה, סיכום, הערות, מקור</em>.</li>
+              <li>שדה השם חובה. שדות אחרים אופציונליים.</li>
+              <li>לידים עם טלפון שכבר קיים יסומנו ככפולים ולא ייובאו (תקבלי דוח בסוף).</li>
+              <li>עד 500 שורות לייבוא אחד.</li>
+            </ul>
+          </div>
+
+          <div class="form-field full">
+            <label>שלב ברירת מחדל לכל הלידים שיובאו</label>
+            <select id="import-default-stage" style="width:100%">
+              <option value="stage1" selected>📞 שלב ראשון - שיחה איתי</option>
+              <option value="stage2">🤝 שלב שני - אצל המעסיק</option>
+              <option value="no_response">🔇 אין מענה</option>
+              <option value="accepted">🎉 התקבלו</option>
+              <option value="rejected">❌ לא רלוונטים</option>
+            </select>
+          </div>
+
+          <div style="margin-top:18px">
+            <label class="btn btn-primary" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              בחרי קובץ אקסל / CSV
+              <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" style="display:none">
+            </label>
+          </div>
+        </div>
+
+        <!-- Step 2: preview + import button -->
+        <div id="import-step-preview" style="display:none">
+          <div id="import-preview-summary" style="font-size:14px;margin-bottom:14px"></div>
+          <div id="import-preview-table" style="max-height:340px;overflow:auto;border:1px solid var(--color-border);border-radius:8px"></div>
+        </div>
+
+        <!-- Step 3: results -->
+        <div id="import-step-result" style="display:none">
+          <div id="import-result-content"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('import-modal')">סגרי</button>
+        <button type="button" class="btn btn-secondary" id="import-back-btn" style="display:none">↶ חזרה</button>
+        <button type="button" class="btn btn-primary" id="import-confirm-btn" style="display:none">✓ ייבא את הלידים</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="candidate-modal" role="dialog" aria-modal="true" aria-labelledby="candidate-modal-title" aria-hidden="true">
     <div class="modal">
       <div class="modal-header">
@@ -305,12 +377,25 @@
                 <option value="esta_visa">ויזת ESTA</option>
               </select>
             </div>
-            <div class="form-field">
+            <div class="form-field full">
               <label>כרטיס טיסה</label>
               <label style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer">
                 <input type="checkbox" id="candidate-has-card" style="width:18px;height:18px;cursor:pointer">
                 <span style="font-size:13px;color:var(--color-text)">יש למועמד כרטיס</span>
               </label>
+              <!-- Card details: only visible when "יש למועמד כרטיס" is checked -->
+              <div id="card-details-row" style="display:none;margin-top:10px;padding:12px;background:var(--color-bg);border-radius:8px">
+                <div class="form-grid" style="gap:10px">
+                  <div class="form-field">
+                    <label style="font-size:12px;color:var(--color-text-secondary)">מתי? (תאריך טיסה)</label>
+                    <input type="date" id="candidate-card-date">
+                  </div>
+                  <div class="form-field">
+                    <label style="font-size:12px;color:var(--color-text-secondary)">לאן? (יעד)</label>
+                    <input type="text" id="candidate-card-destination" placeholder="למשל: לאס וגאס, ניו יורק, ...">
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="form-field full">
               <label data-i18n="job">משרה</label>
@@ -489,9 +574,12 @@
     </div>
   </div>
 
+  <!-- SheetJS loaded lazily only when the user opens the import modal
+       (see candidates.js → openImportModal). Kept out of the static
+       script tags so the page weight stays small for normal use. -->
   <script src="js/i18n.js?v=3"></script>
   <script src="js/api.js?v=3"></script>
-  <script src="js/candidates.js?v=5"></script>
+  <script src="js/candidates.js?v=6"></script>
   <script src="js/ai-widget.js?v=3"></script>
 
   <script src="js/ui-handlers.js?v=1"></script>
